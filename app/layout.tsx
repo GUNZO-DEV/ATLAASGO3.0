@@ -18,8 +18,6 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 const bricolageGrotesque = Bricolage_Grotesque({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
-  axes: ["opsz"],
 });
 
 export const metadata: Metadata = {

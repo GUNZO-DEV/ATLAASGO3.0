@@ -4,7 +4,7 @@
 import { Check, Clock, Truck, Home, X } from "lucide-react";
 import type { OrderStatus, StatusHistoryEntry } from "@/types/order";
 
-const STEPS: { status: OrderStatus; label: string; Icon: React.ElementType }[] = [
+const STEPS: { status: OrderStatus; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { status: "pending",   label: "Order placed",      Icon: Clock },
   { status: "accepted",  label: "Driver on the way",  Icon: Check },
   { status: "picked_up", label: "Order picked up",    Icon: Truck },
