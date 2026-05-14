@@ -1,22 +1,23 @@
 "use client";
 
-/**
- * Hero background — animated mesh gradient.
- * Spline removed; will be replaced with R3F MountainScene in Phase 2.
- */
+import dynamic from "next/dynamic";
+
+const SceneCanvas   = dynamic(() => import("@/lib/r3f/canvas"),                  { ssr: false });
+const MountainScene = dynamic(() => import("@/components/3d/MountainScene"),     { ssr: false });
+const ParticleField = dynamic(() => import("@/components/3d/ParticleField"),     { ssr: false });
+const HeroLighting  = dynamic(
+  () => import("@/lib/r3f/lighting").then((m) => ({ default: m.HeroLighting })),
+  { ssr: false }
+);
+
 export default function Hero3D() {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `
-            radial-gradient(ellipse 80% 60% at 70% 20%, rgba(0,103,71,0.35) 0%, transparent 65%),
-            radial-gradient(ellipse 60% 50% at 20% 80%, rgba(184,151,62,0.18) 0%, transparent 55%),
-            radial-gradient(ellipse 40% 40% at 90% 90%, rgba(0,77,53,0.2) 0%, transparent 50%)
-          `,
-        }}
-      />
+      <SceneCanvas camera={{ fov: 50, position: [0, 3, 10] }}>
+        <HeroLighting />
+        <MountainScene />
+        <ParticleField count={80} spread={14} color="#e05a23" />
+      </SceneCanvas>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useRef } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
   UtensilsCrossed, Navigation, CheckCircle2,
   Mountain, Building2, Store,
@@ -28,6 +29,7 @@ import Link from "next/link";
 import CityModal from "@/components/CityModal";
 import FloatingNavbar from "@/components/FloatingNavbar";
 import Hero3D from "@/components/Hero3D";
+import ZoneCard3D from "@/components/3d/ZoneCard3D";
 
 // ─── Animation helpers ────────────────────────────────────────────
 const ease = [0.25, 0.46, 0.45, 0.94] as [number, number, number, number];
@@ -99,6 +101,14 @@ const ZONES = [
 
 // ─── Page ─────────────────────────────────────────────────────────
 export default function Home() {
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const heroTextY   = useTransform(scrollYProgress, [0, 1], ["0%", "-25%"]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
+
   return (
     <main className="flex flex-col bg-white overflow-x-hidden">
       <FloatingNavbar />
@@ -111,13 +121,20 @@ export default function Home() {
         className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 overflow-hidden"
         style={{ background: "linear-gradient(135deg, #1E2D4A 0%, #13203A 55%, #0D1628 100%)" }}
       >
-        <Hero3D />
+        <div className="sticky top-0 h-screen absolute inset-0">
+          <Hero3D />
+        </div>
 
+        <motion.div
+          ref={heroRef}
+          style={{ y: heroTextY, opacity: heroOpacity }}
+          className="relative z-10 flex flex-col items-center text-center px-4 pt-32 pb-16"
+        >
         <motion.div
           variants={stagger}
           initial="hidden"
           animate="show"
-          className="relative z-10 flex flex-col items-center gap-8 max-w-2xl"
+          className="flex flex-col items-center gap-8 max-w-2xl"
         >
           {/* Eyebrow badge */}
           <motion.div variants={staggerItem}>
@@ -184,6 +201,7 @@ export default function Home() {
             <span className="w-px h-3 bg-white/20" />
             <span>✓ Real-time tracking</span>
           </motion.div>
+        </motion.div>
         </motion.div>
 
         {/* Scroll nudge */}
@@ -270,45 +288,46 @@ export default function Home() {
             className="grid grid-cols-1 sm:grid-cols-2 gap-6"
           >
             {ZONES.map((z) => (
-              <motion.div
-                key={z.id}
-                variants={staggerItem}
-                whileHover={{ scale: 1.02, y: -4 }}
-                className="relative rounded-3xl overflow-hidden cursor-default"
-              >
-                {/* Gradient header */}
-                <div className={`bg-gradient-to-br ${z.accent} p-7 flex flex-col gap-3`}>
-                  <div className="flex items-start justify-between">
-                    <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center text-white">
-                      {z.icon}
+              <ZoneCard3D key={z.id} className="rounded-3xl cursor-pointer">
+                <motion.div
+                  variants={staggerItem}
+                  whileHover={{ y: -4 }}
+                  className="relative rounded-3xl overflow-hidden"
+                >
+                  {/* Gradient header */}
+                  <div className={`bg-gradient-to-br ${z.accent} p-7 flex flex-col gap-3`}>
+                    <div className="flex items-start justify-between">
+                      <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center text-white">
+                        {z.icon}
+                      </div>
+                      <span className="text-[10px] font-bold bg-white/20 text-white px-2.5 py-1 rounded-full tracking-widest uppercase">
+                        {z.badge}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold bg-white/20 text-white px-2.5 py-1 rounded-full tracking-widest uppercase">
-                      {z.badge}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-extrabold text-white tracking-tight">{z.name}</h3>
-                    <p className="text-white/70 text-sm font-medium mt-0.5">{z.tagline}</p>
-                  </div>
-                </div>
-
-                {/* Card body */}
-                <div className="bg-white border border-t-0 border-gray-100 rounded-b-3xl px-7 py-5 flex flex-col gap-4">
-                  <p className="text-gray-500 text-sm leading-relaxed">{z.description}</p>
-                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Delivery fee</p>
-                      <p className="text-2xl font-extrabold text-gray-900 tabular-nums">{z.fee}</p>
+                      <h3 className="text-2xl font-extrabold text-white tracking-tight">{z.name}</h3>
+                      <p className="text-white/70 text-sm font-medium mt-0.5">{z.tagline}</p>
                     </div>
-                    <Link
-                      href="/register"
-                      className="text-sm font-bold text-brand hover:text-brand-dark border border-brand/30 hover:border-brand px-4 py-2 rounded-xl transition"
-                    >
-                      Order here →
-                    </Link>
                   </div>
-                </div>
-              </motion.div>
+
+                  {/* Card body */}
+                  <div className="bg-white border border-t-0 border-gray-100 rounded-b-3xl px-7 py-5 flex flex-col gap-4">
+                    <p className="text-gray-500 text-sm leading-relaxed">{z.description}</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Delivery fee</p>
+                        <p className="text-2xl font-extrabold text-gray-900 tabular-nums">{z.fee}</p>
+                      </div>
+                      <Link
+                        href="/register"
+                        className="text-sm font-bold text-brand hover:text-brand-dark border border-brand/30 hover:border-brand px-4 py-2 rounded-xl transition"
+                      >
+                        Order here →
+                      </Link>
+                    </div>
+                  </div>
+                </motion.div>
+              </ZoneCard3D>
             ))}
           </motion.div>
 
