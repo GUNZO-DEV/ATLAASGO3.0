@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Clock, Calendar } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where, doc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useCart } from "@/contexts/CartContext";
 import AddressInput from "@/components/AddressInput";
 import { calculateSurgeFee } from "@/lib/pricing";
 import toast from "react-hot-toast";
+import { useSavedAddresses } from "@/hooks/useSavedAddresses";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -25,6 +26,10 @@ export default function CheckoutPage() {
   const [scheduledFor, setScheduledFor] = useState("");
   const [deliveryFee, setDeliveryFee]   = useState(15);
   const [loading, setLoading]           = useState(false);
+
+  const { addresses } = useSavedAddresses(userId);
+  const [referralCredits, setReferralCredits] = useState(0);
+  const [useCredit, setUseCredit]             = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -47,7 +52,16 @@ export default function CheckoutPage() {
     fetchFee();
   }, [cart, router]);
 
+  useEffect(() => {
+    if (!userId) return;
+    getDoc(doc(db, "users", userId)).then((snap) => {
+      if (snap.exists()) setReferralCredits(snap.data().referralCredits ?? 0);
+    });
+  }, [userId]);
+
   const total = subtotal + deliveryFee;
+  const creditApplied = useCredit ? Math.min(referralCredits, total) : 0;
+  const finalTotal    = total - creditApplied;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,10 +90,16 @@ export default function CheckoutPage() {
         subtotal,
         fee:           deliveryFee,
         total,
+        creditUsed:    creditApplied,
         statusHistory: [{ status: "pending", timestamp: now, actorId: userId }],
         timestamp:     now,
       });
 
+      if (useCredit && creditApplied > 0 && userId) {
+        await updateDoc(doc(db, "users", userId), {
+          referralCredits: increment(-creditApplied),
+        });
+      }
       await checkOut();
       toast.success("Order placed!");
       router.push(`/orders/${orderRef.id}`);
@@ -128,6 +148,25 @@ export default function CheckoutPage() {
           {/* Delivery address */}
           <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
             <h2 className="font-semibold text-gray-900 text-sm">Delivery address</h2>
+            {addresses.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Saved addresses
+                </label>
+                <select
+                  onChange={(e) => { if (e.target.value) setAddress(e.target.value); }}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E05A23] bg-white"
+                >
+                  <option value="">— Select a saved address —</option>
+                  {addresses.map((a) => (
+                    <option key={a.id} value={a.address}>
+                      {a.label}: {a.address}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Or enter a new address below</p>
+              </div>
+            )}
             <AddressInput
               value={address}
               onChange={setAddress}
@@ -198,9 +237,28 @@ export default function CheckoutPage() {
               <span className="text-gray-500">Delivery fee</span>
               <span className="text-gray-900">{deliveryFee} MAD</span>
             </div>
+            {referralCredits > 0 && (
+              <label className="flex items-center justify-between cursor-pointer py-1">
+                <span className="text-sm text-gray-600">
+                  Use referral credit ({referralCredits} MAD)
+                </span>
+                <input
+                  type="checkbox"
+                  checked={useCredit}
+                  onChange={(e) => setUseCredit(e.target.checked)}
+                  className="w-4 h-4 accent-[#E05A23]"
+                />
+              </label>
+            )}
+            {useCredit && creditApplied > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Credit applied</span>
+                <span>-{creditApplied} MAD</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold border-t border-gray-100 pt-2">
               <span className="text-gray-900">Total</span>
-              <span className="text-gray-900">{total} MAD</span>
+              <span className="text-gray-900">{finalTotal} MAD</span>
             </div>
           </div>
 
@@ -209,7 +267,7 @@ export default function CheckoutPage() {
             disabled={loading}
             className="w-full py-4 bg-[#E05A23] text-white rounded-2xl font-bold text-base hover:bg-orange-600 transition-colors disabled:opacity-60 cursor-pointer"
           >
-            {loading ? "Placing order..." : `Place order · ${total} MAD`}
+            {loading ? "Placing order..." : `Place order · ${finalTotal} MAD`}
           </button>
         </form>
       </div>
