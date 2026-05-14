@@ -18,6 +18,7 @@ export default function FavoritesPage() {
   const [uid, setUid]                 = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -34,8 +35,8 @@ export default function FavoritesPage() {
     if (favorites.length === 0) { setLoading(false); setRestaurants([]); return; }
     setLoading(true);
     Promise.all(favorites.map(getRestaurant))
-      .then((results) => setRestaurants(results.filter(Boolean) as Restaurant[]))
-      .catch((err) => console.error("Failed to load favorites:", err))
+      .then((results) => setRestaurants(results.filter((r): r is Restaurant => r !== null)))
+      .catch((err) => { console.error("Failed to load favorites:", err); setError("Failed to load your favorites. Please refresh."); })
       .finally(() => setLoading(false));
   }, [uid, favorites.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -47,6 +48,10 @@ export default function FavoritesPage() {
           <Heart className="w-5 h-5 fill-red-500 text-red-500" />
           <h1 className="text-2xl font-bold text-gray-900">Favorites</h1>
         </div>
+
+        {error && (
+          <p className="text-red-500 text-sm mb-4">{error}</p>
+        )}
 
         {!loading && restaurants.length === 0 ? (
           <div className="text-center py-20">
