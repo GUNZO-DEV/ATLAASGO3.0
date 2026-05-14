@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { LANDMARKS, ZONES } from "@/constants/zones";
-import { calculateFee, getDeliveryFee, isLateNight, formatMAD } from "@/lib/pricing";
+import { calculateSurgeFee, isSurge, getDeliveryFee, isLateNight, formatMAD } from "@/lib/pricing";
 import { auth } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { track } from "@/lib/analytics";
@@ -68,11 +68,14 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
   const [phone, setPhone] = useState(auth.currentUser?.phoneNumber?.replace("+", "") ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pendingCount, setPendingCount] = useState(0);
+  const [onlineDriverCount, setOnlineDriverCount] = useState(0);
   const formOpenedAt = useRef<number>(Date.now());
 
   const lateNight = isLateNight();
   const baseFee   = getDeliveryFee(zone);
-  const totalFee  = calculateFee(zone);
+  const totalFee = calculateSurgeFee(zone, pendingCount, onlineDriverCount);
+  const surging  = isSurge(pendingCount, onlineDriverCount);
 
   // Fire order_form_opened once on mount
   useEffect(() => {
@@ -80,6 +83,20 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
     formOpenedAt.current = Date.now();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch live pending order count and online driver count for surge pricing
+  useEffect(() => {
+    if (!zone) return;
+    async function fetchCounts() {
+      const [pendingSnap, driversSnap] = await Promise.all([
+        getDocs(query(collection(db, "orders"), where("status", "==", "pending"), where("zone", "==", zone))),
+        getDocs(query(collection(db, "users"), where("role", "==", "driver"), where("isOnline", "==", true), where("zone", "==", zone))),
+      ]);
+      setPendingCount(pendingSnap.size);
+      setOnlineDriverCount(driversSnap.size);
+    }
+    fetchCounts();
+  }, [zone]);
 
   const buildLocation = (landmark: string, details: string) =>
     details.trim() ? `${landmark} — ${details.trim()}` : landmark;
@@ -96,7 +113,7 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
     track("order_started", { customerId, zone, pickup, dropoff });
 
     try {
-      const fee = calculateFee(zone);
+      const fee = calculateSurgeFee(zone, pendingCount, onlineDriverCount);
       const ref = await addDoc(collection(db, "orders"), {
         customerId,
         items: [{ description: description.trim() }],
@@ -106,6 +123,12 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
         status: "pending",
         zone,
         fee,
+        surgeFee: isSurge(pendingCount, onlineDriverCount) ? fee - getDeliveryFee(zone) : 0,
+        statusHistory: [{
+          status: "pending",
+          timestamp: new Date().toISOString(),
+          actorId: customerId,
+        }],
         timestamp: new Date().toISOString(),
       });
 
@@ -227,6 +250,11 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
               <span className="text-xs font-semibold text-indigo-700 flex items-center gap-1">
                 🌙 Late Night Rate
                 <span className="font-normal text-indigo-500">(11 PM – 5 AM)</span>
+                {surging && (
+                  <span className="ml-2 text-xs bg-orange-100 text-orange-600 font-bold px-2 py-0.5 rounded-full">
+                    ⚡ Surge
+                  </span>
+                )}
               </span>
               <span className="text-[11px] text-indigo-500">
                 Base {formatMAD(baseFee)} × 1.5 multiplier
@@ -236,6 +264,11 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
             <span className="text-xs font-semibold text-emerald-atlaasgo flex items-center gap-1">
               ✓ Standard rate
               <span className="font-normal text-gray-500 capitalize">· {zone}</span>
+              {surging && (
+                <span className="ml-2 text-xs bg-orange-100 text-orange-600 font-bold px-2 py-0.5 rounded-full">
+                  ⚡ Surge
+                </span>
+              )}
             </span>
           )}
         </div>
