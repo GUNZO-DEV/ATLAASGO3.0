@@ -12,6 +12,7 @@ import {
   ZelligeBg,
   DishTile,
   RestaurantBanner,
+  Sprite,
 } from "@/components/atlas";
 
 // ─── Animation helpers ────────────────────────────────────────────
@@ -37,29 +38,29 @@ const staggerItem = {
 
 // ─── Prototype-exact data ────────────────────────────────────────
 const FOOD_CATS = [
-  { id: "tagine", name: "Tagines", hue: 18 },
-  { id: "couscous", name: "Couscous", hue: 38 },
-  { id: "sandwich", name: "Bocadillo", hue: 200 },
-  { id: "patisserie", name: "Pâtisseries", hue: 340 },
-  { id: "atay", name: "Atay & Café", hue: 150 },
-  { id: "pizza", name: "Pizza", hue: 6 },
-  { id: "petitdej", name: "Petit Déj", hue: 50 },
-  { id: "healthy", name: "Healthy", hue: 130 },
-  { id: "grill", name: "Grillades", hue: 24 },
-  { id: "friture", name: "Friture", hue: 210 },
-  { id: "rotisserie", name: "Poulet Rôti", hue: 48 },
-  { id: "zaazaa", name: "Zâazâa", hue: 90 },
-  { id: "boulangerie", name: "Pâtisserie Fr.", hue: 330 },
-  { id: "international", name: "Tacos & Burger", hue: 12 },
+  { id: "tagine", name: "Tagines", hue: 18, img: "cat:tagine" },
+  { id: "couscous", name: "Couscous", hue: 38, img: "cat:couscous" },
+  { id: "sandwich", name: "Bocadillo", hue: 200, img: "cat:sandwich" },
+  { id: "patisserie", name: "Pâtisseries", hue: 340, img: "cat:patisserie" },
+  { id: "atay", name: "Atay & Café", hue: 150, img: "cat:atay" },
+  { id: "pizza", name: "Pizza", hue: 6, img: "cat:pizza" },
+  { id: "petitdej", name: "Petit Déj", hue: 50, img: "cat:petitdej" },
+  { id: "healthy", name: "Healthy", hue: 130, img: "cat:healthy" },
+  { id: "grill", name: "Grillades", hue: 24, img: "cat:grill" },
+  { id: "friture", name: "Friture", hue: 210, img: "cat:friture" },
+  { id: "rotisserie", name: "Poulet Rôti", hue: 48, img: "cat:rotisserie" },
+  { id: "zaazaa", name: "Zâazâa", hue: 90, img: "cat:zaazaa" },
+  { id: "boulangerie", name: "Pâtisserie Fr.", hue: 330, img: "cat:boulangerie" },
+  { id: "international", name: "Tacos & Burger", hue: 12, img: "cat:international" },
 ];
 
 const MARKET_CATS = [
-  { id: "marche", name: "Marché", hue: 120 },
-  { id: "poissonnerie", name: "Poissonnerie", hue: 190 },
-  { id: "boucherie", name: "Boucherie", hue: 4 },
-  { id: "cremerie", name: "Crèmerie", hue: 60 },
-  { id: "epicerie", name: "Épicerie", hue: 30 },
-  { id: "maison", name: "Maison", hue: 215 },
+  { id: "marche", name: "Marché", hue: 120, img: "cat:marche" },
+  { id: "poissonnerie", name: "Poissonnerie", hue: 190, img: "cat:poissonnerie" },
+  { id: "boucherie", name: "Boucherie", hue: 4, img: "cat:boucherie" },
+  { id: "cremerie", name: "Crèmerie", hue: 60, img: "cat:epicerie" },
+  { id: "epicerie", name: "Épicerie", hue: 30, img: "cat:epicerie" },
+  { id: "maison", name: "Maison", hue: 215, img: "cat:maison" },
 ];
 
 const DEALS = [
@@ -69,12 +70,12 @@ const DEALS = [
 ];
 
 const RESTAURANTS = [
-  { id: "darnaji", name: "Dar Naji", tagline: "Cuisine marocaine traditionnelle", city: "Rabat · Médina", rating: 4.8, reviews: 2340, eta: "20–30 min", fee: "12 DH", distance: "1.2 km", badges: ["Top-rated", "Halal"], tileHue: 18 },
-  { id: "cafeclock", name: "Café Clock", tagline: "Camel burger & comfort food", city: "Fès · Médina", rating: 4.7, reviews: 1820, eta: "25–35 min", fee: "15 DH", distance: "0.8 km", badges: ["Beldi"], tileHue: 38 },
-  { id: "snacktanjia", name: "Snack Tanjia", tagline: "Spécialités marrakchies", city: "Marrakech · Jemâa", rating: 4.9, reviews: 5210, eta: "15–25 min", fee: "9 DH", distance: "0.5 km", badges: ["Bestseller"], tileHue: 6 },
-  { id: "atayco", name: "Atay & Co", tagline: "Thé à la menthe & sucreries", city: "Casablanca · Maârif", rating: 4.6, reviews: 980, eta: "10–15 min", fee: "7 DH", distance: "0.3 km", badges: ["Free delivery"], tileHue: 150 },
-  { id: "riadmogador", name: "Riad Mogador", tagline: "Fine dining marocain", city: "Essaouira · Port", rating: 4.8, reviews: 1240, eta: "30–40 min", fee: "18 DH", distance: "2.1 km", badges: ["Premium"], tileHue: 200 },
-  { id: "baladi", name: "Baladi Healthy", tagline: "Bowls & jus pressés", city: "Casablanca · Anfa", rating: 4.5, reviews: 612, eta: "20–25 min", fee: "10 DH", distance: "1.0 km", badges: ["Healthy"], tileHue: 130 },
+  { id: "darnaji", name: "Dar Naji", tagline: "Cuisine marocaine traditionnelle", city: "Rabat · Médina", rating: 4.8, reviews: 2340, eta: "20–30 min", fee: "12 DH", distance: "1.2 km", badges: ["Top-rated", "Halal"], tileHue: 18, img: "rest:darnaji" },
+  { id: "cafeclock", name: "Café Clock", tagline: "Camel burger & comfort food", city: "Fès · Médina", rating: 4.7, reviews: 1820, eta: "25–35 min", fee: "15 DH", distance: "0.8 km", badges: ["Beldi"], tileHue: 38, img: "rest:cafeclock" },
+  { id: "snacktanjia", name: "Snack Tanjia", tagline: "Spécialités marrakchies", city: "Marrakech · Jemâa", rating: 4.9, reviews: 5210, eta: "15–25 min", fee: "9 DH", distance: "0.5 km", badges: ["Bestseller"], tileHue: 6, img: "rest:snacktanjia" },
+  { id: "atayco", name: "Atay & Co", tagline: "Thé à la menthe & sucreries", city: "Casablanca · Maârif", rating: 4.6, reviews: 980, eta: "10–15 min", fee: "7 DH", distance: "0.3 km", badges: ["Free delivery"], tileHue: 150, img: "rest:atayco" },
+  { id: "riadmogador", name: "Riad Mogador", tagline: "Fine dining marocain", city: "Essaouira · Port", rating: 4.8, reviews: 1240, eta: "30–40 min", fee: "18 DH", distance: "2.1 km", badges: ["Premium"], tileHue: 200, img: "rest:riadmogador" },
+  { id: "baladi", name: "Baladi Healthy", tagline: "Bowls & jus pressés", city: "Casablanca · Anfa", rating: 4.5, reviews: 612, eta: "20–25 min", fee: "10 DH", distance: "1.0 km", badges: ["Healthy"], tileHue: 130, img: "rest:baladi" },
 ];
 
 const TONES: Record<string, string> = {
@@ -83,11 +84,44 @@ const TONES: Record<string, string> = {
   navy: "#1B2440",
 };
 
+// ─── Fluid-width sprite (for restaurant banners in grid) ────────
+// Uses percentage-based background-position so it scales with container width.
+import { SPRITES, SPRITE_SRC, SRC_DIMS } from "@/components/atlas/sprites";
+
+function RestaurantSprite({ id, height }: { id: string; height: number }) {
+  const slice = SPRITES[id];
+  if (!slice) return <RestaurantBanner hue={18} height={height} />;
+  const [srcKey, sx, sy, sw, sh] = slice;
+  const src = SPRITE_SRC[srcKey];
+  const [srcW, srcH] = SRC_DIMS[srcKey] ?? [2816, 1536];
+  // Express crop as percentages of the source dimensions
+  const bgPosX = (sx / (srcW - sw)) * 100;
+  const bgPosY = (sy / (srcH - sh)) * 100;
+  const bgSizeX = (srcW / sw) * 100;
+  const bgSizeY = (srcH / sh) * 100;
+  return (
+    <div
+      style={{
+        width: "100%",
+        height,
+        backgroundImage: `url(${src})`,
+        backgroundSize: `${bgSizeX}% ${bgSizeY}%`,
+        backgroundPosition: `${bgPosX}% ${bgPosY}%`,
+        backgroundRepeat: "no-repeat",
+      }}
+    />
+  );
+}
+
 // ─── Category carousel tile ─────────────────────────────────────
-function CatTile({ name, hue, size = 66, radius = 16 }: { name: string; hue: number; size?: number; radius?: number }) {
+function CatTile({ name, hue, img, size = 66, radius = 16 }: { name: string; hue: number; img?: string; size?: number; radius?: number }) {
   return (
     <button className="flex flex-col items-center gap-2 cursor-pointer shrink-0 group">
-      <DishTile hue={hue} size={size} radius={radius} />
+      {img ? (
+        <Sprite id={img} width={size} height={size} radius={radius} />
+      ) : (
+        <DishTile hue={hue} size={size} radius={radius} />
+      )}
       <span className="text-[11px] font-bold text-navy group-hover:text-brand transition leading-tight text-center max-w-[72px]">
         {name}
       </span>
@@ -162,23 +196,23 @@ export default function Home() {
           </motion.div>
 
           {/* Right: floating dish cards */}
-          <div className="relative" style={{ height: 380 }}>
+          <div className="relative hidden md:block" style={{ height: 380 }}>
             <div className="absolute" style={{ top: 20, right: 80, transform: "rotate(-6deg)", animation: "atlasFloat 6s ease-in-out infinite" }}>
               <div className="bg-white rounded-3xl shadow-2xl" style={{ padding: 14 }}>
-                <DishTile hue={38} size={160} radius={18} label="tagine-poulet" />
+                <Sprite id="hero:tagine" width={160} height={160} radius={18} />
                 <div className="mt-2.5 font-bold text-navy">Tagine Poulet</div>
                 <div className="text-xs text-navy-soft">Dar Naji · 68 DH</div>
               </div>
             </div>
             <div className="absolute" style={{ top: 130, right: 250, transform: "rotate(8deg)", animation: "atlasFloat 7s ease-in-out infinite reverse" }}>
               <div className="bg-white rounded-[20px] shadow-xl" style={{ padding: 12 }}>
-                <DishTile hue={150} size={100} radius={14} label="atay" />
+                <Sprite id="hero:atay" width={100} height={100} radius={14} />
                 <div className="mt-2 text-xs font-bold text-navy">Atay · 18 DH</div>
               </div>
             </div>
             <div className="absolute" style={{ top: 200, right: 30, transform: "rotate(-4deg)", animation: "atlasFloat 5s ease-in-out infinite" }}>
               <div className="bg-white rounded-[20px] shadow-xl" style={{ padding: 12 }}>
-                <DishTile hue={18} size={120} radius={14} label="pastilla" />
+                <Sprite id="hero:pastilla" width={120} height={120} radius={14} />
                 <div className="mt-2 text-xs font-bold text-navy">Pastilla · 75 DH</div>
               </div>
             </div>
@@ -201,7 +235,7 @@ export default function Home() {
         </div>
         <div className="flex gap-3.5 overflow-x-auto pb-2">
           {FOOD_CATS.map((c) => (
-            <CatTile key={c.id} name={c.name} hue={c.hue} size={66} radius={16} />
+            <CatTile key={c.id} name={c.name} hue={c.hue} img={c.img} size={66} radius={16} />
           ))}
         </div>
       </section>
@@ -223,7 +257,7 @@ export default function Home() {
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {MARKET_CATS.map((c) => (
-              <CatTile key={c.id} name={c.name} hue={c.hue} size={60} radius={14} />
+              <CatTile key={c.id} name={c.name} hue={c.hue} img={c.img} size={60} radius={14} />
             ))}
           </div>
         </div>
@@ -289,7 +323,7 @@ export default function Home() {
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 24px 50px rgba(27,36,64,0.14)"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(27,36,64,0.05)"; }}
             >
-              <RestaurantBanner hue={r.tileHue} height={150} />
+              <RestaurantSprite id={r.img} height={150} />
               <div style={{ padding: 18 }}>
                 <div className="flex justify-between items-start gap-2.5">
                   <div>
@@ -369,18 +403,15 @@ export default function Home() {
           </motion.div>
 
           {/* Right: photo collage + floating quote */}
-          <motion.div {...fadeUp(0.15)} className="relative" style={{ height: 380 }}>
+          <motion.div {...fadeUp(0.15)} className="relative hidden md:block" style={{ height: 380 }}>
             <div className="absolute overflow-hidden" style={{ top: 0, right: 80, transform: "rotate(-3deg)", boxShadow: "0 14px 32px rgba(27,36,64,0.14)", borderRadius: 18 }}>
-              <RestaurantBanner hue={18} height={160} />
-              <div style={{ width: 240 }} />
+              <Sprite id="rest:darnaji" width={240} height={160} radius={18} />
             </div>
             <div className="absolute overflow-hidden" style={{ top: 130, right: 240, transform: "rotate(4deg)", boxShadow: "0 14px 32px rgba(27,36,64,0.14)", borderRadius: 18 }}>
-              <RestaurantBanner hue={150} height={140} />
-              <div style={{ width: 220 }} />
+              <Sprite id="rest:atayco" width={220} height={140} radius={18} />
             </div>
             <div className="absolute overflow-hidden" style={{ top: 200, right: 30, transform: "rotate(-2deg)", boxShadow: "0 14px 32px rgba(27,36,64,0.14)", borderRadius: 18 }}>
-              <RestaurantBanner hue={130} height={150} />
-              <div style={{ width: 230 }} />
+              <Sprite id="rest:baladi" width={230} height={150} radius={18} />
             </div>
             {/* Floating quote */}
             <div
@@ -441,7 +472,7 @@ export default function Home() {
               </div>
               <div style={{ width: 200 }} className="relative">
                 <div style={{ transform: "rotate(-4deg)", borderRadius: 14, overflow: "hidden", boxShadow: "0 8px 22px rgba(27,36,64,0.10)" }}>
-                  <RestaurantBanner hue={18} height={180} />
+                  <Sprite id="rest:darnaji" width={200} height={180} radius={14} />
                 </div>
                 <div className="absolute bg-brand text-white text-[11px] font-extrabold rounded-full shadow-lg" style={{ top: 12, right: -8, padding: "6px 12px", transform: "rotate(4deg)", boxShadow: "0 4px 10px rgba(229,90,38,0.35)" }}>
                   +25% revenu
