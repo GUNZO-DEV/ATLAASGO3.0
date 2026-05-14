@@ -1,7 +1,7 @@
 // app/orders/[id]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, RefreshCw } from "lucide-react";
@@ -24,6 +24,7 @@ export default function OrderTrackingPage() {
   const [order, setOrder]     = useState<RichOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [canReview, setCanReview] = useState(false);
+  const reviewCheckedRef = useRef(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -36,13 +37,14 @@ export default function OrderTrackingPage() {
     const unsub = onSnapshot(doc(db, "orders", id), (snap) => {
       if (!snap.exists()) { setLoading(false); return; }
       setOrder({ id: snap.id, ...snap.data() } as RichOrder);
-      // Check if user can leave a review
+      // Check if user can leave a review (only once per delivered order)
       const currentUser = auth.currentUser;
-      if (currentUser && (snap.data() as Record<string, unknown>)?.status === "delivered") {
+      if (currentUser && (snap.data() as Record<string, unknown>)?.status === "delivered" && !reviewCheckedRef.current) {
+        reviewCheckedRef.current = true;
         getDoc(doc(db, "users", currentUser.uid)).then((userSnap) => {
           const reviewed: string[] = userSnap.data()?.reviewedOrderIds ?? [];
           setCanReview(!reviewed.includes(id));
-        }).catch(() => {});
+        }).catch((err) => console.error("Failed to check review eligibility:", err));
       }
       setLoading(false);
     });

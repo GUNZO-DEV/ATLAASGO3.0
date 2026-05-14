@@ -58,6 +58,7 @@ export default function ReviewPage() {
     try {
       await submitReview(uid, orderId, order.restaurantId ?? "", rating, comment);
       toast.success("Review submitted!");
+      setLoading(false);
       router.push(`/orders/${orderId}`);
     } catch {
       toast.error("Failed to submit review");
