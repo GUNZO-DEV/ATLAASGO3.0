@@ -6,18 +6,19 @@ import { db } from "@/lib/firebase";
 import type { Order, OrderStatus } from "@/types/order";
 
 const STEPS: { status: OrderStatus; label: string }[] = [
-  { status: "pending", label: "Order Received" },
-  { status: "assigned", label: "Finding Driver" },
+  { status: "pending",   label: "Order Received" },
+  { status: "accepted",  label: "Driver Accepted" },
   { status: "picked_up", label: "On the Way" },
   { status: "delivered", label: "Delivered" },
 ];
 
 const STEP_INDEX: Record<OrderStatus, number> = {
-  pending: 0,
-  assigned: 1,
+  pending:   0,
+  accepted:  1,
   picked_up: 2,
   delivered: 3,
   cancelled: 0,
+  expired:   0,
 };
 
 interface Props {

@@ -12,18 +12,20 @@ import type { Order, OrderStatus } from "@/types/order";
 
 const STATUS_STYLES: Record<OrderStatus, { dot: string; text: string; badge: string }> = {
   pending:   { dot: "bg-yellow-400",  text: "text-yellow-400",  badge: "bg-yellow-400/10 text-yellow-400  border-yellow-400/30" },
-  assigned:  { dot: "bg-blue-400",    text: "text-blue-400",    badge: "bg-blue-400/10   text-blue-400    border-blue-400/30"   },
+  accepted:  { dot: "bg-blue-400",    text: "text-blue-400",    badge: "bg-blue-400/10   text-blue-400    border-blue-400/30"   },
   picked_up: { dot: "bg-purple-400",  text: "text-purple-400",  badge: "bg-purple-400/10 text-purple-400  border-purple-400/30" },
   delivered: { dot: "bg-emerald-400", text: "text-emerald-400", badge: "bg-emerald-400/10 text-emerald-400 border-emerald-400/30" },
   cancelled: { dot: "bg-red-500",     text: "text-red-500",     badge: "bg-red-500/10    text-red-400     border-red-500/30"    },
+  expired:   { dot: "bg-gray-400",    text: "text-gray-400",    badge: "bg-gray-400/10   text-gray-400    border-gray-400/30"   },
 };
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending:   "Pending",
-  assigned:  "Assigned",
+  accepted:  "Accepted",
   picked_up: "On the Way",
   delivered: "Delivered",
   cancelled: "Cancelled",
+  expired:   "Expired",
 };
 
 type ActionKey = `${string}-cancel` | `${string}-complete`;
@@ -133,7 +135,7 @@ export default function AdminMonitorPage() {
     ? orders
     : orders.filter((o) => o.status === statusFilter);
 
-  const counts = (["pending", "assigned", "picked_up", "delivered", "cancelled"] as OrderStatus[]).reduce(
+  const counts = (["pending", "accepted", "picked_up", "delivered", "cancelled", "expired"] as OrderStatus[]).reduce(
     (acc, s) => ({ ...acc, [s]: orders.filter((o) => o.status === s).length }),
     {} as Record<OrderStatus, number>
   );
@@ -165,7 +167,7 @@ export default function AdminMonitorPage() {
 
         {/* stat cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {(["pending", "assigned", "picked_up", "delivered", "cancelled"] as OrderStatus[]).map((s) => {
+          {(["pending", "accepted", "picked_up", "delivered", "cancelled", "expired"] as OrderStatus[]).map((s) => {
             const st = STATUS_STYLES[s];
             return (
               <button

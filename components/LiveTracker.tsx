@@ -17,17 +17,18 @@ const DeliveryMap = dynamic(() => import("@/components/DeliveryMap"), {
 
 const STEPS: { status: OrderStatus; label: string }[] = [
   { status: "pending",   label: "Searching for Driver" },
-  { status: "assigned",  label: "Driver Assigned" },
+  { status: "accepted",  label: "Driver Accepted" },
   { status: "picked_up", label: "On the Way" },
   { status: "delivered", label: "Delivered" },
 ];
 
 const STEP_INDEX: Record<OrderStatus, number> = {
   pending:   0,
-  assigned:  1,
+  accepted:  1,
   picked_up: 2,
   delivered: 3,
   cancelled: 0,
+  expired:   0,
 };
 
 const MOSAIC_BG = "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23006747' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")";
@@ -72,7 +73,7 @@ export default function LiveTracker({ customerId, onNoActiveOrder }: Props) {
     const q = query(
       collection(db, "orders"),
       where("customerId", "==", customerId),
-      where("status", "in", ["pending", "assigned", "picked_up"]),
+      where("status", "in", ["pending", "accepted", "picked_up"]),
       orderBy("timestamp", "desc"),
       limit(1)
     );

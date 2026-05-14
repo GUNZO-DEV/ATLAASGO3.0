@@ -12,10 +12,11 @@ import { track } from "@/lib/analytics";
 
 const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
   pending:   { label: "Pending",    color: "bg-yellow-100 text-yellow-700" },
-  assigned:  { label: "Assigned",   color: "bg-blue-100 text-blue-700" },
+  accepted:  { label: "Accepted",   color: "bg-blue-100 text-blue-700" },
   picked_up: { label: "On the Way", color: "bg-purple-100 text-purple-700" },
   delivered: { label: "Delivered",  color: "bg-emerald-100 text-emerald-700" },
   cancelled: { label: "Cancelled",  color: "bg-red-100 text-red-600" },
+  expired:   { label: "Expired",    color: "bg-gray-100 text-gray-500" },
 };
 
 function timeElapsed(timestamp: string): string {
@@ -83,7 +84,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const q = query(
       collection(db, "orders"),
-      where("status", "in", ["pending", "assigned", "picked_up"])
+      where("status", "in", ["pending", "accepted", "picked_up"])
     );
 
     return onSnapshot(q, async (snap) => {
@@ -140,7 +141,7 @@ export default function AdminDashboardPage() {
 
         {/* Summary pills */}
         <div className="flex flex-wrap gap-3">
-          {(["pending", "assigned", "picked_up"] as OrderStatus[]).map((s) => {
+          {(["pending", "accepted", "picked_up"] as OrderStatus[]).map((s) => {
             const count = orders.filter((o) => o.status === s).length;
             return (
               <div key={s} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_LABELS[s].color}`}>

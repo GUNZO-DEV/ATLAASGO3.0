@@ -120,7 +120,7 @@ export default function DriverPage() {
     const q = query(
       collection(db, "orders"),
       where("driverId", "==", driverId),
-      where("status", "in", ["assigned", "picked_up"])
+      where("status", "in", ["accepted", "picked_up"])
     );
     return onSnapshot(q, (snap) =>
       setActive(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Order)))
@@ -179,7 +179,7 @@ export default function DriverPage() {
     setLoading(orderId + "accepting");
     try {
       const now = Date.now();
-      await updateDoc(doc(db, "orders", orderId), { status: "assigned", driverId, assignedAt: new Date(now).toISOString() });
+      await updateDoc(doc(db, "orders", orderId), { status: "accepted", driverId, acceptedAt: new Date(now).toISOString() });
       acceptedAt.current.set(orderId, now);
       const seenAt = orderSeenAt.current.get(orderId);
       const secondsToAccept = seenAt ? Math.round((now - seenAt) / 1000) : 0;
@@ -298,7 +298,7 @@ export default function DriverPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    {order.status === "assigned" && (
+                    {order.status === "accepted" && (
                       <motion.button
                         whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}
                         onClick={() => updateStatus(order.id!, "picked_up")}

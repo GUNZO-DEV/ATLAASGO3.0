@@ -28,7 +28,7 @@ service cloud.firestore {
 
       // READ
       // ┌ customer reads their own order (any status)
-      // ├ assigned driver reads their own active order
+      // ├ accepted driver reads their own active order
       // ├ any online driver can see the pending pool
       // └ admin sees everything
       allow read: if isSignedIn() && (
@@ -73,27 +73,27 @@ service cloud.firestore {
       }
 
       // An online driver accepts a pending order.
-      // They may set driverId (to themselves) and flip status to 'assigned'.
+      // They may set driverId (to themselves) and flip status to 'accepted'.
       // Every other field is frozen.
       function driverAccept() {
         return callerIsOnline() &&
           resource.data.status == 'pending' &&
-          request.resource.data.status == 'assigned' &&
+          request.resource.data.status == 'accepted' &&
           request.resource.data.driverId == request.auth.uid &&
           coreFieldsUnchanged();
       }
 
-      // The assigned driver advances the order through the remaining states.
+      // The accepted driver advances the order through the remaining states.
       // driverId is now also frozen — it cannot be reassigned mid-delivery.
       function driverProgress() {
         let isAssignedDriver = request.auth.uid == resource.data.driverId;
         let validTransition  =
-          (resource.data.status == 'assigned'  && request.resource.data.status == 'picked_up') ||
+          (resource.data.status == 'accepted'  && request.resource.data.status == 'picked_up') ||
           (resource.data.status == 'picked_up' && request.resource.data.status == 'delivered');
         return isAssignedDriver &&
           validTransition &&
           coreFieldsUnchanged() &&
-          // driverId must not change once the order is assigned
+          // driverId must not change once the order is accepted
           request.resource.data.driverId == resource.data.driverId;
       }
 
