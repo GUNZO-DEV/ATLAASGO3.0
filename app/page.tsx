@@ -5,7 +5,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import {
   UtensilsCrossed, Navigation, CheckCircle2,
   Mountain, Building2, Store,
-  ArrowDown, Zap,
+  ArrowDown, Zap, ShoppingBag,
 } from "lucide-react";
 
 const IconX = () => (
@@ -173,6 +173,15 @@ export default function Home() {
 
           {/* CTA buttons */}
           <motion.div variants={staggerItem} className="flex flex-col sm:flex-row gap-3 w-full max-w-xs sm:max-w-none justify-center">
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+              <Link
+                href="/restaurants"
+                className="inline-flex items-center gap-2 bg-[#E05A23] text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/25"
+              >
+                <ShoppingBag className="w-5 h-5" />
+                Browse Restaurants
+              </Link>
+            </motion.div>
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
               <Link
                 href="/register"

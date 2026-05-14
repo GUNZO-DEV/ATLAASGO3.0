@@ -10,8 +10,9 @@ import LiveTracker from "@/components/LiveTracker";
 import OrderHistory from "@/components/OrderHistory";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Truck, Clock, LayoutDashboard, LogOut } from "lucide-react";
+import { Truck, Clock, LayoutDashboard, LogOut, ShoppingBag } from "lucide-react";
 import type { OrderStatus } from "@/types/order";
 import dynamic from "next/dynamic";
 
@@ -226,6 +227,22 @@ export default function DashboardPage() {
                 />
               </div>
             )}
+          </motion.div>
+
+          {/* ── Browse restaurants CTA ── */}
+          <motion.div variants={item}>
+            <Link
+              href="/restaurants"
+              className="flex items-center justify-between bg-[#E05A23] text-white rounded-2xl px-5 py-4 shadow-md shadow-orange-200 mb-4"
+            >
+              <div>
+                <p className="font-bold text-base">Order food</p>
+                <p className="text-orange-100 text-sm mt-0.5">Browse restaurants near you</p>
+              </div>
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <ShoppingBag className="w-5 h-5 text-white" />
+              </div>
+            </Link>
           </motion.div>
 
           {/* ── Order history ── */}
