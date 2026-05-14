@@ -1,49 +1,188 @@
+/* Cairo for Arabic/Darija text */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F6EEDC;
+  --foreground: #1B2440;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 
-  /* Atlaasgo brand — orange + navy */
-  --color-brand:            #E05A23;
-  --color-brand-dark:       #C44D1A;
-  --color-brand-light:      #F07848;
-  /* Keep emerald-atlaasgo alias so existing code keeps compiling */
-  --color-emerald-atlaasgo: #E05A23;
-  --color-navy:             #1E2D4A;
-  --color-navy-dark:        #13203A;
-  --color-navy-light:       #2B3F63;
-  /* Keep gold alias pointing to a warm sand to avoid compile errors */
-  --color-gold:             #E05A23;
-  --color-gold-light:       #F07848;
-  --color-gold-dark:        #C44D1A;
+  /* ── Atlas brand palette ───────────────────────────────────── */
+  --color-brand:            #E55A26;
+  --color-brand-dark:       #C8481A;
+  --color-brand-light:      #FBD9C6;
+  --color-brand-tint:       #FCEAD9;
+
+  /* Backward-compatible aliases */
+  --color-emerald-atlaasgo: #E55A26;
+  --color-gold:             #E55A26;
+  --color-gold-light:       #FBD9C6;
+  --color-gold-dark:        #C8481A;
+
+  /* Cream */
+  --color-cream:            #F6EEDC;
+  --color-cream-2:          #FBF6E7;
+
+  /* Navy */
+  --color-navy:             #1B2440;
+  --color-navy-2:           #2A3658;
+  --color-navy-soft:        #5A6584;
+  --color-navy-dark:        #1B2440;
+  --color-navy-light:       #2A3658;
+
+  /* Accents */
+  --color-mint:             #2EC089;
+  --color-saffron:          #F2B53A;
+  --color-rose:             #D9486F;
+
+  /* Lines */
+  --color-line:             rgba(27,36,64,0.08);
+  --color-line-2:           rgba(27,36,64,0.14);
 }
 
-/* ─── Premium floating animation for form food icons ──────────── */
+/* ─── Atlas keyframe animations ──────────────────────────────── */
+
+@keyframes atlasLogoPop {
+  0%   { transform: scale(0.7) rotate(-8deg); opacity: 0; }
+  60%  { transform: scale(1.12) rotate(3deg); opacity: 1; }
+  80%  { transform: scale(0.96) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes atlasPinDrop {
+  0%   { transform: translateY(-40px) scale(0.7); opacity: 0; }
+  60%  { transform: translateY(6px) scale(1.08); opacity: 1; }
+  80%  { transform: translateY(-3px) scale(0.97); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes atlasFadeUp {
+  0%   { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes atlasFadeIn {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes atlasSlideUp {
+  0%   { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes atlasSlideInRight {
+  0%   { transform: translateX(60px); opacity: 0; }
+  100% { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes atlasSlideInLeft {
+  0%   { transform: translateX(-60px); opacity: 0; }
+  100% { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes atlasSlideInRightDrawer {
+  0%   { transform: translateX(100%); opacity: 0; }
+  100% { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes atlasShimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes atlasPulse {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%       { transform: scale(1.05); opacity: 0.85; }
+}
+
+@keyframes atlasFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-7px); }
+}
+
+@keyframes atlasConfetti {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(80px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes atlasSuccessPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  80%  { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes atlasBarGrow {
+  0%   { width: 0%; }
+  100% { width: var(--bar-width, 100%); }
+}
+
+@keyframes atlasFillH {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  100% { transform: scaleX(1); transform-origin: left; }
+}
+
+@keyframes atlasRowIn {
+  0%   { opacity: 0; transform: translateX(-12px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes atlasMarkerDrop {
+  0%   { transform: translateY(-30px) scale(0.8); opacity: 0; }
+  65%  { transform: translateY(4px) scale(1.05);  opacity: 1; }
+  80%  { transform: translateY(-2px) scale(0.98); }
+  100% { transform: translateY(0) scale(1);       opacity: 1; }
+}
+
+@keyframes atlasSpin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Legacy keyframes kept for backward compatibility */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-7px); }
 }
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+
+@keyframes order-ping {
+  0%   { box-shadow: 0 0 0 0    rgba(229,90,38,0.55), 0 2px 12px rgba(229,90,38,0.12); }
+  60%  { box-shadow: 0 0 0 10px rgba(229,90,38,0),    0 2px 12px rgba(229,90,38,0.12); }
+  100% { box-shadow: 0 0 0 0    rgba(229,90,38,0),    0 2px 12px rgba(229,90,38,0.12); }
 }
 
-/* ─── Driver alert: pulsing glow ring on new order cards ─────── */
-@keyframes order-ping {
-  0%   { box-shadow: 0 0 0 0    rgba(224,90,35,0.55), 0 2px 12px rgba(224,90,35,0.12); }
-  60%  { box-shadow: 0 0 0 10px rgba(224,90,35,0),    0 2px 12px rgba(224,90,35,0.12); }
-  100% { box-shadow: 0 0 0 0    rgba(224,90,35,0),    0 2px 12px rgba(224,90,35,0.12); }
-}
-.animate-order-ping {
-  animation: order-ping 1s ease-out 4; /* 4 pulses then stops */
-}
+/* ─── Animation utility classes ──────────────────────────────── */
+
+.animate-atlas-logo-pop         { animation: atlasLogoPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-atlas-pin-drop         { animation: atlasPinDrop 0.55s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-atlas-fade-up          { animation: atlasFadeUp 0.4s ease both; }
+.animate-atlas-fade-in          { animation: atlasFadeIn 0.35s ease both; }
+.animate-atlas-slide-up         { animation: atlasSlideUp 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-atlas-slide-in-right   { animation: atlasSlideInRight 0.35s ease both; }
+.animate-atlas-slide-in-left    { animation: atlasSlideInLeft 0.35s ease both; }
+.animate-atlas-slide-in-drawer  { animation: atlasSlideInRightDrawer 0.3s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-atlas-shimmer          { animation: atlasShimmer 1.6s linear infinite; }
+.animate-atlas-pulse            { animation: atlasPulse 2s ease-in-out infinite; }
+.animate-atlas-float            { animation: atlasFloat 3s ease-in-out infinite; }
+.animate-atlas-confetti         { animation: atlasConfetti 0.8s ease-out both; }
+.animate-atlas-success-pop      { animation: atlasSuccessPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-atlas-bar-grow         { animation: atlasBarGrow 0.6s ease both; }
+.animate-atlas-fill-h           { animation: atlasFillH 0.5s ease both; }
+.animate-atlas-row-in           { animation: atlasRowIn 0.3s ease both; }
+.animate-atlas-marker-drop      { animation: atlasMarkerDrop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-atlas-spin             { animation: atlasSpin 1s linear infinite; }
+
+/* Legacy utility classes */
+.animate-float      { animation: float 3s ease-in-out infinite; }
+.animate-order-ping { animation: order-ping 1s ease-out 4; }
 
 @layer components {
   /* Glass bento card */
@@ -53,27 +192,20 @@
 
   /* Moroccan geometric pattern card */
   .card-moroccan {
-    @apply bg-white rounded-2xl p-6 border border-brand/20 shadow-[0_2px_12px_rgba(224,90,35,0.10)];
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23E05A23' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    @apply bg-white rounded-2xl p-6 border border-brand/20 shadow-[0_2px_12px_rgba(229,90,38,0.10)];
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23E55A26' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 
   .btn-primary {
-    @apply bg-brand hover:bg-brand-dark text-white font-semibold py-2 px-5 rounded-lg transition
-           border border-brand-light/40 shadow-[0_2px_10px_rgba(224,90,35,0.3)]
-           hover:shadow-[0_4px_16px_rgba(224,90,35,0.45)] disabled:opacity-50 cursor-pointer;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    @apply bg-brand hover:bg-brand-dark text-white font-semibold py-2 px-5 rounded-full transition
+           border border-brand-light/40 shadow-[0_2px_10px_rgba(229,90,38,0.3)]
+           hover:shadow-[0_4px_16px_rgba(229,90,38,0.45)] disabled:opacity-50 cursor-pointer;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
   letter-spacing: 0.01em;
 }
