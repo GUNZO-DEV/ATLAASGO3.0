@@ -50,3 +50,40 @@ export const ZONES: Zone[] = [
     lng: -1.9086,
   },
 ];
+
+export interface ZoneConfig {
+  id: string;
+  name: string;
+  baseFee: number;
+  surgeMultiplier: number;
+  active: boolean;
+  centerLat: number;
+  centerLng: number;
+}
+
+export const ZONE_CONFIGS: Record<string, ZoneConfig> = {
+  ifrane: {
+    id: "ifrane",
+    name: "Ifrane",
+    baseFee: 15,
+    surgeMultiplier: 1.5,
+    active: true,
+    centerLat: 33.5228,
+    centerLng: -5.1128,
+  },
+  oujda: {
+    id: "oujda",
+    name: "Oujda",
+    baseFee: 10,
+    surgeMultiplier: 1.5,
+    active: true,
+    centerLat: 34.6819,
+    centerLng: -1.9086,
+  },
+};
+
+export function getZoneConfig(zone: string): ZoneConfig {
+  const config = ZONE_CONFIGS[zone.toLowerCase()];
+  if (!config) throw new Error(`Unknown zone: ${zone}`);
+  return config;
+}
