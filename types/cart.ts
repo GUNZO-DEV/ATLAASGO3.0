@@ -13,7 +13,8 @@ export interface Cart {
   restaurantName: string;
   ownerId: string;
   participants: string[];
-  participantNames: Record<string, string>; // uid -> display name
+  /** uid -> display name. Every uid in participants[] has an entry here. */
+  participantNames: Record<string, string>;
   items: CartItem[];
   status: "active" | "checked_out";
   createdAt: string;

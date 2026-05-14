@@ -12,6 +12,7 @@ export interface StatusHistoryEntry {
   actorId: string;
 }
 
+/** At least one of `itemId` or `name` should be present. All fields optional for legacy compat. */
 export interface OrderItem {
   description?: string; // legacy field — kept for backward compat
   itemId?: string;
