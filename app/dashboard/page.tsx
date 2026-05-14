@@ -126,13 +126,12 @@ export default function DashboardPage() {
   if (checking) {
     return (
       <main
-        className="min-h-screen px-4 py-10"
-        style={{ background: "linear-gradient(135deg, #f0faf5 0%, #ffffff 50%, #fffbf0 100%)" }}
+        className="min-h-screen bg-cream px-4 py-10"
       >
         <div className="max-w-2xl mx-auto flex flex-col gap-6">
           <div className="animate-pulse">
-            <div className="h-7 w-32 bg-gray-200 rounded-xl mb-2" />
-            <div className="h-4 w-48 bg-gray-100 rounded-xl" />
+            <div className="h-7 w-32 bg-cream-2 rounded-xl mb-2" />
+            <div className="h-4 w-48 bg-cream-2 rounded-xl" />
           </div>
           <DashboardSkeleton />
         </div>
@@ -142,8 +141,7 @@ export default function DashboardPage() {
 
   return (
     <main
-      className="min-h-screen px-4 py-10"
-      style={{ background: "linear-gradient(135deg, #f0faf5 0%, #ffffff 50%, #fffbf0 100%)" }}
+      className="min-h-screen bg-cream px-4 py-10"
     >
       <div className="max-w-2xl mx-auto">
         <motion.div
@@ -157,18 +155,18 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2">
                 <LayoutDashboard className="w-5 h-5 text-emerald-atlaasgo" strokeWidth={1.8} />
-                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                <h1 className="text-2xl font-extrabold text-navy tracking-[-0.02em] font-[family-name:var(--font-display)]">
                   {userName ? `Hey, ${userName.split(" ")[0]}` : "Dashboard"}
                 </h1>
               </div>
-              <p className="text-gray-400 text-sm pl-7">Place and track your deliveries</p>
+              <p className="text-navy-soft text-sm pl-7">Place and track your deliveries</p>
             </div>
             <motion.button
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               onClick={handleSignOut}
               disabled={signingOut}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-xl font-medium transition cursor-pointer disabled:opacity-50 shrink-0"
+              className="flex items-center gap-1.5 text-xs text-navy-soft hover:text-red-500 border border-line hover:border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-xl font-medium transition cursor-pointer disabled:opacity-50 shrink-0"
             >
               <LogOut className="w-3.5 h-3.5" strokeWidth={1.8} />
               {signingOut ? "…" : "Sign out"}
@@ -182,8 +180,8 @@ export default function DashboardPage() {
                 <Truck className="w-4 h-4 text-emerald-atlaasgo" strokeWidth={1.8} />
               </div>
               <div>
-                <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Delivery</p>
-                <p className="text-sm font-bold text-gray-800">15 MAD flat</p>
+                <p className="text-[11px] text-navy-soft font-medium uppercase tracking-wider">Delivery</p>
+                <p className="text-sm font-bold text-navy">15 MAD flat</p>
               </div>
             </div>
             <div className="card-glass flex items-center gap-3">
@@ -191,8 +189,8 @@ export default function DashboardPage() {
                 <Clock className="w-4 h-4 text-gold" strokeWidth={1.8} />
               </div>
               <div>
-                <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Avg. Time</p>
-                <p className="text-sm font-bold text-gray-800">~25 min</p>
+                <p className="text-[11px] text-navy-soft font-medium uppercase tracking-wider">Avg. Time</p>
+                <p className="text-sm font-bold text-navy">~25 min</p>
               </div>
             </div>
           </motion.div>
@@ -253,7 +251,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div data-ph-capture-attribute-section="order-form" className="p-6">
-                <h2 className="text-base font-bold text-gray-900 mb-5 tracking-tight">
+                <h2 className="text-base font-bold text-navy mb-5 tracking-tight">
                   {prefill ? "Reorder" : "New Order"}
                 </h2>
                 <OrderForm
@@ -286,7 +284,7 @@ export default function DashboardPage() {
           {/* ── Recommended restaurants ── */}
           {recommended.length > 0 && (
             <motion.div variants={item} className="mb-4">
-              <h2 className="font-bold text-gray-800 text-base mb-3">Recommended for you</h2>
+              <h2 className="font-bold text-navy text-base mb-3">Recommended for you</h2>
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                 {recommended.map((r) => (
                   <div key={r.id} className="shrink-0 w-48">
@@ -301,11 +299,11 @@ export default function DashboardPage() {
           <motion.div variants={item}>
             <Link
               href="/restaurants"
-              className="flex items-center justify-between bg-[#E05A23] text-white rounded-2xl px-5 py-4 shadow-md shadow-orange-200 mb-4"
+              className="flex items-center justify-between bg-brand text-white rounded-2xl px-5 py-4 shadow-md shadow-brand/20 mb-4"
             >
               <div>
                 <p className="font-bold text-base">Order food</p>
-                <p className="text-orange-100 text-sm mt-0.5">Browse restaurants near you</p>
+                <p className="text-white/80 text-sm mt-0.5">Browse restaurants near you</p>
               </div>
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                 <ShoppingBag className="w-5 h-5 text-white" />

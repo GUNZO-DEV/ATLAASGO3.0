@@ -15,7 +15,7 @@ export default function RestaurantCard({ restaurant }: { restaurant: Restaurant 
   return (
     <Link
       href={`/restaurants/${restaurant.id}`}
-      className="group block rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      className="group block rounded-2xl overflow-hidden bg-white shadow-[0_4px_14px_rgba(27,36,64,0.06)] hover:shadow-[0_14px_30px_rgba(27,36,64,0.10)] hover:-translate-y-1 transition-all duration-200 cursor-pointer"
     >
       {/* Cover */}
       <div className="relative h-36 bg-gray-100">
@@ -46,17 +46,17 @@ export default function RestaurantCard({ restaurant }: { restaurant: Restaurant 
           className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow cursor-pointer hover:scale-110 transition-transform"
         >
           <Heart
-            className={`w-4 h-4 transition-colors ${fav ? "fill-red-500 text-red-500" : "text-gray-400"}`}
+            className={`w-4 h-4 transition-colors ${fav ? "fill-red-500 text-red-500" : "text-navy-soft"}`}
           />
         </button>
       </div>
 
       {/* Info */}
       <div className="p-3">
-        <h3 className="font-semibold text-gray-900 text-sm truncate">{restaurant.name}</h3>
-        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+        <h3 className="font-semibold text-navy text-sm truncate">{restaurant.name}</h3>
+        <div className="flex items-center gap-2 mt-1 text-xs text-navy-soft">
           <span className="flex items-center gap-0.5">
-            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+            <Star className="w-3 h-3 fill-saffron text-saffron" />
             {restaurant.rating.toFixed(1)}
           </span>
           <span>·</span>
@@ -73,7 +73,7 @@ export default function RestaurantCard({ restaurant }: { restaurant: Restaurant 
           {restaurant.cuisine.slice(0, 2).map((c) => (
             <span
               key={c}
-              className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full capitalize"
+              className="text-xs bg-brand-tint text-brand-dark px-2 py-0.5 rounded-full capitalize"
             >
               {c.replace("-", " ")}
             </span>

@@ -114,7 +114,7 @@ export default function CheckoutPage() {
   if (!cart) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-cream">
       <div className="max-w-lg mx-auto px-4 pt-8 pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -122,24 +122,24 @@ export default function CheckoutPage() {
             href={`/restaurants/${cart.restaurantId}`}
             className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-700" />
+            <ChevronLeft className="w-5 h-5 text-navy" />
           </Link>
-          <h1 className="text-xl font-bold text-gray-900">Checkout</h1>
+          <h1 className="text-xl font-extrabold text-navy tracking-[-0.02em] font-[family-name:var(--font-display)]">Checkout</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Order summary */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <h2 className="font-semibold text-gray-900 text-sm mb-3">
+          <div className="bg-white rounded-2xl p-4 shadow-[0_4px_14px_rgba(27,36,64,0.06)]">
+            <h2 className="font-semibold text-navy text-sm mb-3">
               Order from {cart.restaurantName}
             </h2>
             <div className="space-y-1.5">
               {cart.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between text-sm">
-                  <span className="text-gray-600">
+                  <span className="text-navy-soft">
                     {item.quantity}× {item.name}
                   </span>
-                  <span className="text-gray-900 font-medium">
+                  <span className="text-navy font-medium">
                     {item.price * item.quantity} MAD
                   </span>
                 </div>
@@ -148,16 +148,16 @@ export default function CheckoutPage() {
           </div>
 
           {/* Delivery address */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-            <h2 className="font-semibold text-gray-900 text-sm">Delivery address</h2>
+          <div className="bg-white rounded-2xl p-4 shadow-[0_4px_14px_rgba(27,36,64,0.06)] space-y-3">
+            <h2 className="font-semibold text-navy text-sm">Delivery address</h2>
             {addresses.length > 0 && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                <label className="block text-xs font-medium text-navy-soft mb-1.5">
                   Saved addresses
                 </label>
                 <select
                   onChange={(e) => { if (e.target.value) setAddress(e.target.value); }}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E05A23] bg-white"
+                  className="w-full px-3 py-2.5 border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand bg-white"
                 >
                   <option value="">— Select a saved address —</option>
                   {addresses.map((a) => (
@@ -166,7 +166,7 @@ export default function CheckoutPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">Or enter a new address below</p>
+                <p className="text-xs text-navy-soft mt-1">Or enter a new address below</p>
               </div>
             )}
             <AddressInput
@@ -179,13 +179,13 @@ export default function CheckoutPage() {
               value={addressNote}
               onChange={(e) => setAddressNote(e.target.value)}
               placeholder="Apartment, floor, landmark (optional)"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E05A23]"
+              className="w-full px-4 py-3 border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
 
           {/* Delivery time */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <h2 className="font-semibold text-gray-900 text-sm mb-3">Delivery time</h2>
+          <div className="bg-white rounded-2xl p-4 shadow-[0_4px_14px_rgba(27,36,64,0.06)]">
+            <h2 className="font-semibold text-navy text-sm mb-3">Delivery time</h2>
             <div className="flex gap-2">
               {(["asap", "scheduled"] as const).map((mode) => (
                 <button
@@ -194,8 +194,8 @@ export default function CheckoutPage() {
                   onClick={() => setScheduleMode(mode)}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
                     scheduleMode === mode
-                      ? "border-[#E05A23] bg-orange-50 text-[#E05A23]"
-                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      ? "border-brand bg-brand-tint text-brand"
+                      : "border-line text-navy-soft hover:border-line-2"
                   }`}
                 >
                   {mode === "asap" ? <Clock className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
@@ -210,14 +210,14 @@ export default function CheckoutPage() {
                 onChange={(e) => setScheduledFor(e.target.value)}
                 min={new Date(Date.now() + 30 * 60000).toISOString().slice(0, 16)}
                 required
-                className="mt-3 w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E05A23]"
+                className="mt-3 w-full px-4 py-3 border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand"
               />
             )}
           </div>
 
           {/* Notes */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <h2 className="font-semibold text-gray-900 text-sm mb-3">
+          <div className="bg-white rounded-2xl p-4 shadow-[0_4px_14px_rgba(27,36,64,0.06)]">
+            <h2 className="font-semibold text-navy text-sm mb-3">
               Order notes (optional)
             </h2>
             <textarea
@@ -225,49 +225,49 @@ export default function CheckoutPage() {
               onChange={(e) => setOrderNote(e.target.value)}
               placeholder="Any special requests..."
               rows={2}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E05A23] resize-none"
+              className="w-full px-4 py-3 border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
             />
           </div>
 
           {/* Fee breakdown */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+          <div className="bg-white rounded-2xl p-4 shadow-[0_4px_14px_rgba(27,36,64,0.06)] space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="text-gray-900">{subtotal} MAD</span>
+              <span className="text-navy-soft">Subtotal</span>
+              <span className="text-navy">{subtotal} MAD</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Delivery fee</span>
-              <span className="text-gray-900">{deliveryFee} MAD</span>
+              <span className="text-navy-soft">Delivery fee</span>
+              <span className="text-navy">{deliveryFee} MAD</span>
             </div>
             {referralCredits > 0 && (
               <label className="flex items-center justify-between cursor-pointer py-1">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-navy-soft">
                   Use referral credit ({referralCredits} MAD)
                 </span>
                 <input
                   type="checkbox"
                   checked={useCredit}
                   onChange={(e) => setUseCredit(e.target.checked)}
-                  className="w-4 h-4 accent-[#E05A23]"
+                  className="w-4 h-4 accent-brand"
                 />
               </label>
             )}
             {useCredit && creditApplied > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
+              <div className="flex justify-between text-sm text-mint">
                 <span>Credit applied</span>
                 <span>-{creditApplied} MAD</span>
               </div>
             )}
-            <div className="flex justify-between font-bold border-t border-gray-100 pt-2">
-              <span className="text-gray-900">Total</span>
-              <span className="text-gray-900">{finalTotal} MAD</span>
+            <div className="flex justify-between font-bold border-t border-line pt-2">
+              <span className="text-navy">Total</span>
+              <span className="text-navy">{finalTotal} MAD</span>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-[#E05A23] text-white rounded-2xl font-bold text-base hover:bg-orange-600 transition-colors disabled:opacity-60 cursor-pointer"
+            className="w-full py-4 bg-brand text-white rounded-2xl font-bold text-base hover:bg-brand-dark transition-colors disabled:opacity-60 cursor-pointer"
           >
             {loading ? "Placing order..." : `Place order · ${finalTotal} MAD`}
           </button>

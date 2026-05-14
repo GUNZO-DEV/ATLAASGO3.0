@@ -86,16 +86,16 @@ export default function RestaurantPage() {
 
   if (loading || !restaurant) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#E05A23] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-cream">
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8">
+    <div className="min-h-screen bg-cream pb-24 lg:pb-8">
       {/* Hero */}
-      <div className="relative h-52 bg-gray-200">
+      <div className="relative h-52 bg-cream-2">
         {restaurant.coverImage && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -109,10 +109,10 @@ export default function RestaurantPage() {
           href="/restaurants"
           className="absolute top-4 left-4 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow"
         >
-          <ChevronLeft className="w-5 h-5 text-gray-700" />
+          <ChevronLeft className="w-5 h-5 text-navy" />
         </Link>
         <div className="absolute bottom-4 left-4 right-4">
-          <h1 className="text-2xl font-bold text-white">{restaurant.name}</h1>
+          <h1 className="text-2xl font-extrabold tracking-[-0.02em] font-[family-name:var(--font-display)] text-white">{restaurant.name}</h1>
           <div className="flex items-center gap-3 text-white/80 text-xs mt-1">
             <span className="flex items-center gap-1">
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
@@ -132,7 +132,7 @@ export default function RestaurantPage() {
       </div>
 
       {/* Sticky category nav */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm px-4 py-3">
+      <div className="sticky top-0 z-20 bg-white border-b border-line shadow-sm px-4 py-3">
         <MenuCategoryNav
           categories={menu.map((m) => m.category)}
           activeCategory={activeCategory}
@@ -166,12 +166,12 @@ export default function RestaurantPage() {
 
       {/* Mobile sticky cart bar */}
       {cart && cart.items.length > 0 && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 shadow-lg z-30">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-line shadow-lg z-30">
           <Link
             href="/checkout"
-            className="flex items-center justify-between bg-[#E05A23] text-white px-4 py-3 rounded-xl font-semibold text-sm"
+            className="flex items-center justify-between bg-brand text-white px-4 py-3 rounded-xl font-semibold text-sm"
           >
-            <span className="bg-orange-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+            <span className="bg-brand-dark text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
               {cart.items.reduce((s, i) => s + i.quantity, 0)}
             </span>
             <span>View cart</span>
@@ -184,21 +184,21 @@ export default function RestaurantPage() {
       {showClearModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="font-bold text-gray-900 mb-2">Start a new cart?</h3>
-            <p className="text-sm text-gray-500 mb-5">
+            <h3 className="font-bold text-navy mb-2">Start a new cart?</h3>
+            <p className="text-sm text-navy-soft mb-5">
               You have items from <strong>{cart?.restaurantName}</strong>. Clear your cart to order
               from <strong>{pendingItem?.restaurantName}</strong>?
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowClearModal(false)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                className="flex-1 py-2.5 border border-line rounded-xl text-sm font-medium text-navy-soft hover:bg-cream cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmClear}
-                className="flex-1 py-2.5 bg-[#E05A23] text-white rounded-xl text-sm font-medium hover:bg-orange-600 cursor-pointer"
+                className="flex-1 py-2.5 bg-brand text-white rounded-xl text-sm font-medium hover:bg-brand-dark cursor-pointer"
               >
                 Clear & add
               </button>

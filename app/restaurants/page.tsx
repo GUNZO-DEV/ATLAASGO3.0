@@ -33,15 +33,15 @@ export default function RestaurantsPage() {
   }, [zone]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-cream">
       <FloatingNavbar />
       <div className="max-w-7xl mx-auto px-4 pt-24 pb-12">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Restaurants near you</h1>
-        <p className="text-gray-500 mb-6 text-sm">
-          Delivering to{" "}
+        <h1 className="text-2xl font-extrabold text-navy tracking-[-0.02em] font-[family-name:var(--font-display)] mb-1">Restaurants autour de toi</h1>
+        <p className="text-navy-soft mb-6 text-sm">
+          Livraison à{" "}
           <button
             onClick={() => setZone(zone === "ifrane" ? "oujda" : "ifrane")}
-            className="font-medium text-[#E05A23] underline cursor-pointer capitalize"
+            className="font-medium text-brand underline cursor-pointer capitalize"
           >
             {zone}
           </button>
