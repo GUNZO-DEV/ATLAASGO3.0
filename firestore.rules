@@ -3,13 +3,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── shared helpers ───────────────────────────────────────────────────────
-
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Safely read a field from the caller's user document (no error if missing)
     function callerProfile() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -18,19 +15,11 @@ service cloud.firestore {
       return isSignedIn() && callerProfile().get('role', '') == 'admin';
     }
 
-    // A driver is "online" when their users/{uid}.status == 'online'
     function callerIsOnline() {
       return isSignedIn() && callerProfile().get('status', '') == 'online';
     }
 
-    // ─── orders ───────────────────────────────────────────────────────────────
     match /orders/{orderId} {
-
-      // READ
-      // ┌ customer reads their own order (any status)
-      // ├ accepted driver reads their own active order
-      // ├ any online driver can see the pending pool
-      // └ admin sees everything
       allow read: if isSignedIn() && (
         isAdmin() ||
         request.auth.uid == resource.data.customerId ||
@@ -38,43 +27,28 @@ service cloud.firestore {
         (resource.data.status == 'pending' && callerIsOnline())
       );
 
-      // CREATE
-      // Customer creates an order for themselves.
-      // - status must start as 'pending'
-      // - driverId must not be set at creation
-      // - immutable core fields must be present
       allow create: if isSignedIn() &&
         request.auth.uid == request.resource.data.customerId &&
         request.resource.data.status == 'pending' &&
         !('driverId' in request.resource.data) &&
         request.resource.data.keys().hasAll(['customerId','items','status','zone','timestamp']);
 
-      // UPDATE — four permitted actors, each with strict field constraints
       allow update: if isSignedIn() && (
-        isAdmin()          ||
-        customerCancel()   ||
-        driverAccept()     ||
+        isAdmin()        ||
+        customerCancel() ||
+        driverAccept()   ||
         driverProgress()
       );
 
-      // DELETE — admin only (soft-cancel via status is preferred)
       allow delete: if isAdmin();
 
-      // ── update functions ────────────────────────────────────────────────────
-
-      // Customer may only cancel their own order while it is still pending.
-      // Only 'status' changes; every other field is frozen.
       function customerCancel() {
         return request.auth.uid == resource.data.customerId &&
           resource.data.status == 'pending' &&
           request.resource.data.status == 'cancelled' &&
-          coreFieldsUnchanged() &&
-          !('driverId' in request.resource.data);
+          coreFieldsUnchanged();
       }
 
-      // An online driver accepts a pending order.
-      // They may set driverId (to themselves) and flip status to 'accepted'.
-      // Every other field is frozen.
       function driverAccept() {
         return callerIsOnline() &&
           resource.data.status == 'pending' &&
@@ -83,51 +57,40 @@ service cloud.firestore {
           coreFieldsUnchanged();
       }
 
-      // The accepted driver advances the order through the remaining states.
-      // driverId is now also frozen — it cannot be reassigned mid-delivery.
       function driverProgress() {
         let isAssignedDriver = request.auth.uid == resource.data.driverId;
-        let validTransition  =
+        let validTransition =
           (resource.data.status == 'accepted'  && request.resource.data.status == 'picked_up') ||
           (resource.data.status == 'picked_up' && request.resource.data.status == 'delivered');
         return isAssignedDriver &&
           validTransition &&
           coreFieldsUnchanged() &&
-          // driverId must not change once the order is accepted
           request.resource.data.driverId == resource.data.driverId;
       }
 
-      // Fields that must never change after the order is created.
-      // This also covers the 'zone' field, which determines the delivery fee —
-      // preventing a customer from changing the zone to get a cheaper rate.
       function coreFieldsUnchanged() {
         return request.resource.data.customerId == resource.data.customerId &&
-          request.resource.data.zone      == resource.data.zone      &&
-          request.resource.data.items     == resource.data.items     &&
+          request.resource.data.zone      == resource.data.zone &&
+          request.resource.data.items     == resource.data.items &&
           request.resource.data.timestamp == resource.data.timestamp;
       }
     }
 
-    // ─── users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      // Users read/write their own profile; admins read all
       allow read:   if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if isSignedIn() && request.auth.uid == userId;
-      // Users may update their own profile (e.g. toggle online/offline status)
-      // Admins may update any profile (e.g. grant admin role)
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
 
-    // ─── driver_stats ─────────────────────────────────────────────────────────
-    // Written by the EarningsCard component (client-side, per-driver)
     match /driver_stats/{driverId} {
       allow read:  if isSignedIn() && (request.auth.uid == driverId || isAdmin());
-      allow write: if isSignedIn() &&  request.auth.uid == driverId;
+      allow write: if isSignedIn() && request.auth.uid == driverId;
     }
 
-    // ─── zones (reference data) ───────────────────────────────────────────────
-    allow read:  if true;
-    allow write: if isAdmin();
+    match /zones/{zoneId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
   }
 }
