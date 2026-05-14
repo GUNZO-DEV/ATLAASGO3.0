@@ -81,6 +81,21 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
+
+      match /reviews/{reviewId} {
+        allow read:   if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow create: if isSignedIn() && request.auth.uid == userId;
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+
+      match /notifications/{notifId} {
+        allow read:   if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && request.auth.uid == userId
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     match /driver_stats/{driverId} {
@@ -120,6 +135,16 @@ service cloud.firestore {
         request.auth.uid in resource.data.participants
       );
       allow delete: if isAdmin();
+    }
+
+    match /social_feed/{restaurantId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    match /popular_items/{itemId} {
+      allow read:  if true;
+      allow write: if isAdmin();
     }
   }
 }
