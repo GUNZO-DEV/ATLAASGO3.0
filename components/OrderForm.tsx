@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { LANDMARKS, ZONES } from "@/constants/zones";
@@ -158,6 +159,17 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
 
       {/* Description */}
       <div>
+        <div className="flex gap-3 mb-3">
+          {["🍕", "🥗", "☕", "🍔", "🧃"].map((emoji, i) => (
+            <span
+              key={emoji}
+              className="text-xl animate-float select-none"
+              style={{ animationDelay: `${i * 0.35}s` }}
+            >
+              {emoji}
+            </span>
+          ))}
+        </div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           What do you need?
         </label>
@@ -238,13 +250,15 @@ export default function OrderForm({ customerId, onOrderPlaced, prefill }: Props)
       </div>
 
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button
+      <motion.button
         type="submit"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.96 }}
         disabled={loading || !pickupLandmark || !dropoffLandmark}
         className="btn-primary w-full"
       >
         {loading ? "Placing order..." : `Request Delivery · ${formatMAD(totalFee)}`}
-      </button>
+      </motion.button>
     </form>
   );
 }

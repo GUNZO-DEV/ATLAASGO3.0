@@ -19,6 +19,7 @@ export type AtlaasgoEvent =
   | { event: "driver_went_online";   props: { driverId: string } }
   | { event: "driver_went_offline";  props: { driverId: string } }
   | { event: "user_registered";      props: { uid: string; email: string } }
+  | { event: "user_logged_in";       props: { uid: string; email: string } }
   | { event: "admin_order_cancelled";props: { adminId: string; orderId: string } };
 
 // ─── helper ───────────────────────────────────────────────────────────────────
