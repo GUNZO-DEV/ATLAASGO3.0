@@ -33,3 +33,27 @@ export function calculateFee(zone: string, at: Date = new Date()): number {
 export function formatMAD(amount: number): string {
   return `${amount} MAD`;
 }
+
+// ─── Surge pricing ────────────────────────────────────────────────────────────
+import { getZoneConfig } from "@/constants/zones";
+
+const SURGE_RATIO_THRESHOLD = 2.0;
+
+export function isSurge(pendingOrders: number, onlineDrivers: number): boolean {
+  if (onlineDrivers === 0) return false;
+  return pendingOrders / onlineDrivers > SURGE_RATIO_THRESHOLD;
+}
+
+export function calculateSurgeFee(
+  zone: string,
+  pendingOrders: number,
+  onlineDrivers: number,
+  at: Date = new Date()
+): number {
+  const config = getZoneConfig(zone);
+  const base = config.baseFee;
+  const multiplier = isSurge(pendingOrders, onlineDrivers)
+    ? config.surgeMultiplier
+    : 1;
+  return Math.round(base * multiplier * 2) / 2;
+}
