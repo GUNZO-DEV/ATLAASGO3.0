@@ -10,7 +10,7 @@ import EarningsCard from "@/components/EarningsCard";
 import AvailabilityToggle from "@/components/AvailabilityToggle";
 import DriverSkeleton from "@/components/DriverSkeleton";
 import { motion } from "framer-motion";
-import { Zap, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { signOut } from "firebase/auth";
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
@@ -18,6 +18,15 @@ import { track, identifyUser } from "@/lib/analytics";
 import { playDing } from "@/lib/sound";
 import { startTabAlert, stopTabAlert } from "@/lib/tabAlert";
 import type { Order } from "@/types/order";
+import dynamic from "next/dynamic";
+
+const SceneCanvas       = dynamic(() => import("@/lib/r3f/canvas"),            { ssr: false });
+const TruckModel        = dynamic(() => import("@/components/3d/TruckModel"),  { ssr: false });
+const BarChart3D        = dynamic(() => import("@/components/3d/BarChart3D"),  { ssr: false });
+const DashboardLighting = dynamic(
+  () => import("@/lib/r3f/lighting").then((m) => ({ default: m.DashboardLighting })),
+  { ssr: false }
+);
 
 const WHATSAPP_MSG = encodeURIComponent(
   "Salam, this is your Atlaasgo driver! I am on my way with your order."
@@ -40,6 +49,15 @@ export default function DriverPage() {
   const acceptedAt   = useRef<Map<string, number>>(new Map());
   // IDs of orders currently showing the ping animation
   const [alertIds, setAlertIds] = useState<Set<string>>(new Set());
+  const [weeklyEarnings] = useState([
+    { label: "Mon", value: 0 },
+    { label: "Tue", value: 0 },
+    { label: "Wed", value: 0 },
+    { label: "Thu", value: 0 },
+    { label: "Fri", value: 0 },
+    { label: "Sat", value: 45 },
+    { label: "Sun", value: 30 },
+  ]);
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -229,11 +247,17 @@ export default function DriverPage() {
 
           {/* ── Header ── */}
           <motion.div variants={staggerItem} className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-emerald-atlaasgo" strokeWidth={1.8} />
+            <div className="flex items-center gap-4">
+              {/* 3D Truck */}
+              <div className="w-24 h-16 flex-shrink-0 rounded-xl overflow-hidden" style={{ background: "rgba(30,45,74,0.4)" }}>
+                <SceneCanvas camera={{ fov: 50, position: [0, 0.5, 3] }}>
+                  <DashboardLighting />
+                  <TruckModel isOnline={isOnline} />
+                </SceneCanvas>
+              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Driver Dashboard</h1>
-                <p className="text-gray-400 text-sm">Manage your deliveries</p>
+                <p className="text-gray-400 text-sm">{isOnline ? "You are online" : "You are offline"}</p>
               </div>
             </div>
             <motion.button
@@ -256,6 +280,17 @@ export default function DriverPage() {
             <div className="card-glass !p-4">
               <EarningsCard driverId={driverId!} />
             </div>
+          </motion.div>
+
+          {/* ── Weekly Earnings Chart ── */}
+          <motion.div variants={staggerItem} className="w-full h-44 rounded-2xl overflow-hidden relative" style={{ background: "rgba(30,45,74,0.4)" }}>
+            <div className="absolute top-3 left-4 z-10">
+              <p className="text-white/40 text-xs">This week</p>
+            </div>
+            <SceneCanvas camera={{ fov: 50, position: [0, 2, 6] }}>
+              <DashboardLighting />
+              <BarChart3D data={weeklyEarnings} maxHeight={2.5} />
+            </SceneCanvas>
           </motion.div>
 
           {/* ── Active orders ── */}
