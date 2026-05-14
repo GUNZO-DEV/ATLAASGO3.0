@@ -9,6 +9,19 @@ import { motion } from "framer-motion";
 import AdminTableSkeleton from "@/components/AdminTableSkeleton";
 import type { Order, OrderStatus } from "@/types/order";
 import { track } from "@/lib/analytics";
+import dynamic from "next/dynamic";
+
+const SceneCanvas       = dynamic(() => import("@/lib/r3f/canvas"),              { ssr: false });
+const CityMap3D         = dynamic(() => import("@/components/3d/CityMap3D"),     { ssr: false });
+const DonutChart3D      = dynamic(() => import("@/components/3d/DonutChart3D"),  { ssr: false });
+const MapLighting       = dynamic(
+  () => import("@/lib/r3f/lighting").then((m) => ({ default: m.MapLighting })),
+  { ssr: false }
+);
+const DashboardLighting = dynamic(
+  () => import("@/lib/r3f/lighting").then((m) => ({ default: m.DashboardLighting })),
+  { ssr: false }
+);
 
 const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
   pending:   { label: "Pending",    color: "bg-yellow-100 text-yellow-700" },
@@ -104,6 +117,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Scatter active orders on the Ifrane map (placeholder coords until real GPS stored)
+  const orderDots = orders
+    .filter((o) => ["pending", "accepted", "picked_up"].includes(o.status))
+    .map((o, i) => ({
+      id: o.id ?? String(i),
+      lat: 33.5228 + (Math.sin(i * 1.5) * 0.012),
+      lng: -5.1128 + (Math.cos(i * 1.5) * 0.012),
+      color:
+        o.status === "pending"   ? "#e05a23" :
+        o.status === "accepted"  ? "#3b82f6" : "#06b6d4",
+    }));
+
+  const donutSegments = [
+    { label: "Delivered", value: orders.filter((o) => o.status === "delivered").length,                         color: "#22c55e" },
+    { label: "Active",    value: orders.filter((o) => ["accepted","picked_up"].includes(o.status)).length,      color: "#3b82f6" },
+    { label: "Pending",   value: orders.filter((o) => o.status === "pending").length,                           color: "#e05a23" },
+    { label: "Cancelled", value: orders.filter((o) => ["cancelled","expired"].includes(o.status)).length,       color: "#6b7280" },
+  ].filter((s) => s.value > 0);
+
   if (checking) {
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -150,6 +182,31 @@ export default function AdminDashboardPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* 3D Live Map + Stats */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {/* Birds-eye city map */}
+          <div className="lg:col-span-2 h-56 rounded-2xl overflow-hidden relative" style={{ background: '#1e2d4a' }}>
+            <SceneCanvas camera={{ fov: 55, position: [0, 10, 0.01] }}>
+              <MapLighting />
+              <CityMap3D zone="ifrane" dots={orderDots} />
+            </SceneCanvas>
+            <div className="absolute top-3 left-4">
+              <span className="text-white/50 text-xs font-medium">Live Orders — Ifrane</span>
+            </div>
+          </div>
+          {/* Stats donut */}
+          <div className="h-56 rounded-2xl overflow-hidden relative" style={{ background: 'rgba(30,45,74,0.6)' }}>
+            <SceneCanvas camera={{ fov: 45, position: [0, 0, 4] }}>
+              <DashboardLighting />
+              <DonutChart3D
+                segments={donutSegments.length > 0 ? donutSegments : [{ label: "No orders", value: 1, color: "#2b3f63" }]}
+                label={String(orders.length)}
+              />
+            </SceneCanvas>
+            <p className="absolute bottom-4 left-0 right-0 text-center text-white/40 text-xs">Total orders</p>
+          </div>
         </div>
 
         {orders.length === 0 ? (
