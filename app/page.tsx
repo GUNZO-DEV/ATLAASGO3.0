@@ -121,7 +121,8 @@ export default function Home() {
         className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 overflow-hidden"
         style={{ background: "linear-gradient(135deg, #1E2D4A 0%, #13203A 55%, #0D1628 100%)" }}
       >
-        <div className="sticky top-0 h-screen absolute inset-0">
+        {/* 3D background — fixed behind text */}
+        <div className="absolute inset-0">
           <Hero3D />
         </div>
 
