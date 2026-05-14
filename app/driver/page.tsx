@@ -19,6 +19,7 @@ import { playDing } from "@/lib/sound";
 import { startTabAlert, stopTabAlert } from "@/lib/tabAlert";
 import type { Order } from "@/types/order";
 import dynamic from "next/dynamic";
+import { sendWhatsAppLink } from "@/lib/notifications";
 
 const SceneCanvas       = dynamic(() => import("@/lib/r3f/canvas"),            { ssr: false });
 const TruckModel        = dynamic(() => import("@/components/3d/TruckModel"),  { ssr: false });
@@ -180,12 +181,15 @@ export default function DriverPage() {
     });
   }, [driverId]);
 
-  const updateStatus = async (orderId: string, status: string) => {
+  const updateStatus = async (orderId: string, status: string, order?: Order) => {
     setLoading(orderId + status);
     try {
       await updateDoc(doc(db, "orders", orderId), { status });
       if (status === "picked_up" && driverId) {
         track("driver_picked_up", { driverId, orderId });
+      }
+      if (status === "delivered" && order?.phone) {
+        sendWhatsAppLink(order.phone, "order_delivered", {});
       }
     } finally {
       setLoading(null);
@@ -204,6 +208,11 @@ export default function DriverPage() {
       track("driver_order_accepted", { driverId, orderId, zone: order.zone, secondsToAccept });
       stopTabAlert();
       toast.success("Let's go! Navigate to pickup.", { icon: "🛵", duration: 5000 });
+
+      // Notify customer via WhatsApp
+      if (order.phone) {
+        sendWhatsAppLink(order.phone, "driver_accepted", {});
+      }
     } finally {
       setLoading(null);
     }
@@ -346,7 +355,7 @@ export default function DriverPage() {
                     {order.status === "picked_up" && (
                       <motion.button
                         whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}
-                        onClick={() => updateStatus(order.id!, "delivered")}
+                        onClick={() => updateStatus(order.id!, "delivered", order)}
                         disabled={loading === order.id + "delivered"}
                         className="btn-primary flex-1 text-sm"
                       >
