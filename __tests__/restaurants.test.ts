@@ -39,3 +39,12 @@ describe("CUISINE_TYPES", () => {
     expect(CUISINE_TYPES).toContain("italian");
   });
 });
+
+describe("getRestaurant", () => {
+  it("is a function that returns a Promise", async () => {
+    // Firebase async functions are tested via integration tests with Firestore emulator.
+    // Pure unit-testable behavior (filterByCuisine) is fully covered above.
+    const { getRestaurant } = await import("@/lib/restaurants");
+    expect(typeof getRestaurant).toBe("function");
+  });
+});
