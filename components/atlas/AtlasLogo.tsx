@@ -18,25 +18,21 @@ export default function AtlasLogo({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Mountain body */}
+      {/* Mountain shape */}
+      <path d="M8 52 L24 26 L34 38 L42 30 L56 52 Z" fill={color} />
+      {/* Cream valley overlay */}
       <path
-        d="M8 52L26 16L34 30L42 18L56 52H8Z"
+        d="M26 52 C26 42 28 36 32 32 C36 36 38 42 38 52 Z"
+        fill="#FBF6E7"
+        opacity={0.9}
+      />
+      {/* Teardrop pin */}
+      <path
+        d="M32 6 C26 6 22 10 22 16 C22 22 32 30 32 30 C32 30 42 22 42 16 C42 10 38 6 32 6 Z"
         fill={color}
-        opacity={0.15}
       />
-      <path
-        d="M8 52L26 16L34 30L42 18L56 52"
-        stroke={color}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      {/* Pin at peak */}
-      <circle cx="32" cy="14" r="6" fill={color} />
-      <circle cx="32" cy="14" r="2.5" fill="white" />
-      {/* Pin point */}
-      <path d="M32 20L35 14H29L32 20Z" fill={color} />
+      {/* Circle inside pin */}
+      <circle cx="32" cy="16" r="4" fill="#FBF6E7" />
     </svg>
   );
 }

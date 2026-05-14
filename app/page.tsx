@@ -2,27 +2,16 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Star,
-  Clock,
-  MapPin,
-  Check,
-  Phone,
-  Truck,
-  ChevronRight,
-  Search,
-  UtensilsCrossed,
-  Bike,
-} from "lucide-react";
+import { Star, Clock, Check, Phone, ChevronRight, Search } from "lucide-react";
 import Link from "next/link";
-import CityModal from "@/components/CityModal";
 import FloatingNavbar from "@/components/FloatingNavbar";
 import {
   AtlasLogo,
   AtlasWordmark,
   AtlasButton,
   ZelligeBg,
-  CategoryPill,
+  DishTile,
+  RestaurantBanner,
 } from "@/components/atlas";
 
 // ─── Animation helpers ────────────────────────────────────────────
@@ -39,691 +28,469 @@ function fadeUp(delay = 0) {
 
 const stagger = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.05 },
-  },
+  show: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.05 } },
 };
 const staggerItem = {
   hidden: { opacity: 0, y: 24 },
   show: { opacity: 1, y: 0, transition: { duration: 0.55, ease } },
 };
 
-// ─── Data ─────────────────────────────────────────────────────────
-const FOOD_CATEGORIES = [
-  { icon: "🍲", label: "Tagines" },
-  { icon: "🥘", label: "Couscous" },
-  { icon: "🫓", label: "Msemen" },
-  { icon: "🍰", label: "Pâtisseries" },
-  { icon: "🥗", label: "Salades" },
-  { icon: "🍕", label: "Pizza" },
-  { icon: "🍔", label: "Burgers" },
-  { icon: "🌮", label: "Tacos" },
-  { icon: "🥤", label: "Jus frais" },
-  { icon: "🫖", label: "Thé" },
+// ─── Prototype-exact data ────────────────────────────────────────
+const FOOD_CATS = [
+  { id: "tagine", name: "Tagines", hue: 18 },
+  { id: "couscous", name: "Couscous", hue: 38 },
+  { id: "sandwich", name: "Bocadillo", hue: 200 },
+  { id: "patisserie", name: "Pâtisseries", hue: 340 },
+  { id: "atay", name: "Atay & Café", hue: 150 },
+  { id: "pizza", name: "Pizza", hue: 6 },
+  { id: "petitdej", name: "Petit Déj", hue: 50 },
+  { id: "healthy", name: "Healthy", hue: 130 },
+  { id: "grill", name: "Grillades", hue: 24 },
+  { id: "friture", name: "Friture", hue: 210 },
+  { id: "rotisserie", name: "Poulet Rôti", hue: 48 },
+  { id: "zaazaa", name: "Zâazâa", hue: 90 },
+  { id: "boulangerie", name: "Pâtisserie Fr.", hue: 330 },
+  { id: "international", name: "Tacos & Burger", hue: 12 },
 ];
 
-const MARKET_CATEGORIES = [
-  { icon: "🛒", label: "Marché" },
-  { icon: "🥖", label: "Boulangerie" },
-  { icon: "🧴", label: "Hygiène" },
-  { icon: "🧺", label: "Épicerie fine" },
-  { icon: "💊", label: "Pharmacie" },
-  { icon: "🐱", label: "Animaux" },
+const MARKET_CATS = [
+  { id: "marche", name: "Marché", hue: 120 },
+  { id: "poissonnerie", name: "Poissonnerie", hue: 190 },
+  { id: "boucherie", name: "Boucherie", hue: 4 },
+  { id: "cremerie", name: "Crèmerie", hue: 60 },
+  { id: "epicerie", name: "Épicerie", hue: 30 },
+  { id: "maison", name: "Maison", hue: 215 },
 ];
 
 const DEALS = [
-  {
-    bg: "linear-gradient(135deg, #E55A26 0%, #C8481A 100%)",
-    discount: "−20%",
-    title: "sur les tagines",
-    condition: "Min. 80 DH · Ce soir seulement",
-    textColor: "text-white",
-  },
-  {
-    bg: "linear-gradient(135deg, #2EC089 0%, #1EA070 100%)",
-    discount: "Livraison",
-    title: "gratuite",
-    condition: "Commande > 120 DH · Tous restos",
-    textColor: "text-white",
-  },
-  {
-    bg: "linear-gradient(135deg, #F2B53A 0%, #E09A20 100%)",
-    discount: "Menu",
-    title: "à 49 DH",
-    condition: "Plat + boisson · Sélection du jour",
-    textColor: "text-white",
-  },
+  { id: "d1", title: "Atay offert", sub: "Avec toute commande > 80 DH", cta: "Profiter", tone: "mint" },
+  { id: "d2", title: "−25% sur les Tagines", sub: "Tous les vendredis chez Dar Naji", cta: "Voir", tone: "orange" },
+  { id: "d3", title: "Livraison gratuite", sub: "Jusqu’à 21h ce soir", cta: "Commander", tone: "navy" },
 ];
 
 const RESTAURANTS = [
-  {
-    name: "Dar Naji",
-    tagline: "Cuisine beldi authentique",
-    city: "Rabat",
-    rating: 4.8,
-    reviews: 547,
-    eta: "20–30 min",
-    fee: "12 DH",
-    badges: ["Halal", "Popular"],
-    bannerHue: 25,
-  },
-  {
-    name: "Café Clock",
-    tagline: "Fusion marocaine-moderne",
-    city: "Fès",
-    rating: 4.7,
-    reviews: 312,
-    eta: "25–35 min",
-    fee: "15 DH",
-    badges: ["Healthy"],
-    bannerHue: 160,
-  },
-  {
-    name: "Snack Tanjia",
-    tagline: "Street food Marrakech",
-    city: "Marrakech",
-    rating: 4.5,
-    reviews: 189,
-    eta: "15–25 min",
-    fee: "10 DH",
-    badges: ["Halal", "Livraison offerte"],
-    bannerHue: 340,
-  },
-  {
-    name: "Atay & Co",
-    tagline: "Thé, jus, brunch",
-    city: "Casa",
-    rating: 4.9,
-    reviews: 723,
-    eta: "10–20 min",
-    fee: "8 DH",
-    badges: ["Popular"],
-    bannerHue: 200,
-  },
-  {
-    name: "Baladi Market",
-    tagline: "Épicerie bio locale",
-    city: "Casa",
-    rating: 4.6,
-    reviews: 256,
-    eta: "30–40 min",
-    fee: "Gratuit",
-    badges: ["Bio"],
-    bannerHue: 120,
-  },
-  {
-    name: "Riad Mogador",
-    tagline: "Saveurs d'Essaouira",
-    city: "Essaouira",
-    rating: 4.8,
-    reviews: 401,
-    eta: "35–45 min",
-    fee: "18 DH",
-    badges: ["Halal", "Healthy"],
-    bannerHue: 260,
-  },
+  { id: "darnaji", name: "Dar Naji", tagline: "Cuisine marocaine traditionnelle", city: "Rabat · Médina", rating: 4.8, reviews: 2340, eta: "20–30 min", fee: "12 DH", distance: "1.2 km", badges: ["Top-rated", "Halal"], tileHue: 18 },
+  { id: "cafeclock", name: "Café Clock", tagline: "Camel burger & comfort food", city: "Fès · Médina", rating: 4.7, reviews: 1820, eta: "25–35 min", fee: "15 DH", distance: "0.8 km", badges: ["Beldi"], tileHue: 38 },
+  { id: "snacktanjia", name: "Snack Tanjia", tagline: "Spécialités marrakchies", city: "Marrakech · Jemâa", rating: 4.9, reviews: 5210, eta: "15–25 min", fee: "9 DH", distance: "0.5 km", badges: ["Bestseller"], tileHue: 6 },
+  { id: "atayco", name: "Atay & Co", tagline: "Thé à la menthe & sucreries", city: "Casablanca · Maârif", rating: 4.6, reviews: 980, eta: "10–15 min", fee: "7 DH", distance: "0.3 km", badges: ["Free delivery"], tileHue: 150 },
+  { id: "riadmogador", name: "Riad Mogador", tagline: "Fine dining marocain", city: "Essaouira · Port", rating: 4.8, reviews: 1240, eta: "30–40 min", fee: "18 DH", distance: "2.1 km", badges: ["Premium"], tileHue: 200 },
+  { id: "baladi", name: "Baladi Healthy", tagline: "Bowls & jus pressés", city: "Casablanca · Anfa", rating: 4.5, reviews: 612, eta: "20–25 min", fee: "10 DH", distance: "1.0 km", badges: ["Healthy"], tileHue: 130 },
 ];
 
-const BADGE_COLORS: Record<string, string> = {
-  Halal: "bg-[#FBD9C6] text-[#C8481A]",
-  Healthy: "bg-[#D4F5E7] text-[#1A7A52]",
-  Popular: "bg-[#FEF0CC] text-[#9A6B0A]",
-  Bio: "bg-[#D4F5E7] text-[#1A7A52]",
-  "Livraison offerte": "bg-[#E3F2FF] text-[#1565C0]",
+const TONES: Record<string, string> = {
+  mint: "#2EC089",
+  orange: "#E55A26",
+  navy: "#1B2440",
 };
 
-const FOOTER_LINKS = {
-  Atlaas: [
-    { label: "Commander", href: "/restaurants" },
-    { label: "Nos villes", href: "#" },
-    { label: "Offres du jour", href: "#" },
-    { label: "Application mobile", href: "#" },
-  ],
-  Restaurants: [
-    { label: "Devenir partenaire", href: "#" },
-    { label: "Espace partenaire", href: "#" },
-    { label: "FAQ partenaires", href: "#" },
-  ],
-  Aide: [
-    { label: "Centre d'aide", href: "#" },
-    { label: "Conditions d'utilisation", href: "#" },
-    { label: "Politique de confidentialité", href: "#" },
-    { label: "Contact", href: "mailto:salam@atlaasgo.com" },
-  ],
-};
+// ─── Category carousel tile ─────────────────────────────────────
+function CatTile({ name, hue, size = 66, radius = 16 }: { name: string; hue: number; size?: number; radius?: number }) {
+  return (
+    <button className="flex flex-col items-center gap-2 cursor-pointer shrink-0 group">
+      <DishTile hue={hue} size={size} radius={radius} />
+      <span className="text-[11px] font-bold text-navy group-hover:text-brand transition leading-tight text-center max-w-[72px]">
+        {name}
+      </span>
+    </button>
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────
 export default function Home() {
-  const [activeFoodCategory, setActiveFoodCategory] = useState(0);
-  const [activeMarketCategory, setActiveMarketCategory] = useState(0);
-
   return (
-    <main className="flex flex-col bg-white overflow-x-hidden">
+    <main className="flex flex-col overflow-x-hidden" style={{ background: "#F6EEDC" }}>
       <FloatingNavbar />
-      <CityModal />
 
       {/* ══════════════════════════════════════════════════════════
-          1. HERO
+          1. HERO — orange gradient, exact prototype match
       ══════════════════════════════════════════════════════════ */}
-      <section
-        className="relative min-h-[580px] flex flex-col justify-center overflow-hidden pt-20"
-        style={{ background: "linear-gradient(135deg, #E55A26 0%, #C8481A 100%)" }}
-      >
-        <ZelligeBg opacity={0.08} color="white" />
+      <section className="relative overflow-hidden" style={{ borderBottom: "1px solid rgba(27,36,64,0.08)" }}>
+        <div className="absolute inset-0" style={{ background: "linear-gradient(110deg, #E55A26 0%, #C8481A 100%)" }} />
+        <ZelligeBg opacity={0.14} color="#fff" />
 
-        <div
-          className="relative z-10 mx-auto w-full px-6"
-          style={{ maxWidth: 1200 }}
-        >
-          <div
-            className="grid items-center"
-            style={{ gridTemplateColumns: "1.1fr 1fr", gap: 56 }}
-          >
-            {/* Left: copy */}
-            <motion.div
-              variants={stagger}
-              initial="hidden"
-              animate="show"
-              className="flex flex-col gap-6 py-16"
-            >
-              <motion.h1
-                variants={staggerItem}
-                className="text-5xl font-extrabold text-white leading-[1.08] tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Commandez ce que vous aimez, livré en 30 min.
-              </motion.h1>
-
-              <motion.p
-                variants={staggerItem}
-                className="text-white/75 text-lg leading-relaxed max-w-md"
-              >
-                Des restaurants locaux aux épiceries — livraison rapide, prix fixe, paiement à la livraison.
-              </motion.p>
-
-              <motion.div
-                variants={staggerItem}
-                className="flex flex-wrap gap-3"
-              >
-                <AtlasButton variant="primary" className="!bg-white !text-brand hover:!bg-cream">
-                  Commander maintenant
-                </AtlasButton>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-full font-bold text-sm px-6 py-3 border-[1.5px] border-white/70 text-white hover:bg-white/10 transition-all duration-200"
-                >
-                  Devenir coursier
-                </button>
-              </motion.div>
-
-              {/* Stats row */}
-              <motion.div
-                variants={staggerItem}
-                className="flex flex-wrap items-center gap-6 pt-2"
-              >
-                {[
-                  { val: "1 284", label: "commandes aujourd'hui" },
-                  { val: "23 min", label: "temps moyen" },
-                  { val: "320+", label: "restaurants" },
-                ].map(({ val, label }) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <span className="text-white font-extrabold text-xl tabular-nums">{val}</span>
-                    <span className="text-white/60 text-sm">{label}</span>
-                  </div>
-                ))}
-              </motion.div>
+        <div className="relative" style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 32px 56px", display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 40, alignItems: "center" }}>
+          {/* Left copy */}
+          <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col">
+            {/* Badge */}
+            <motion.div variants={staggerItem} className="mb-3.5">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-xs font-bold" style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(6px)" }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-mint" />
+                Livraison en 25 min en moyenne
+              </span>
             </motion.div>
 
-            {/* Right: food cards placeholder */}
-            <motion.div
-              initial={{ opacity: 0, x: 32 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.75, ease, delay: 0.2 }}
-              className="relative py-16 flex items-center justify-center"
+            {/* Heading */}
+            <motion.h1
+              variants={staggerItem}
+              className="text-white leading-none"
+              style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 56, letterSpacing: "-0.03em", lineHeight: 1.02 }}
             >
-              <div className="relative w-full max-w-sm h-72">
-                {/* Floating card 1 */}
-                <motion.div
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute top-0 left-4 w-44 h-36 rounded-2xl shadow-2xl"
-                  style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.4)" }}
-                >
-                  <div className="w-full h-20 rounded-t-2xl" style={{ background: "linear-gradient(135deg, #F2B53A, #E55A26)" }} />
-                  <div className="px-3 py-2">
-                    <p className="text-white text-xs font-bold">Tagine Beldi</p>
-                    <p className="text-white/70 text-[10px]">Dar Naji · 25 DH</p>
+              Le goût du Maroc,<br />livré en un clic.
+            </motion.h1>
+
+            {/* Subtext */}
+            <motion.p variants={staggerItem} className="mt-3.5" style={{ fontSize: 17, color: "rgba(255,255,255,0.85)", maxWidth: 460, lineHeight: 1.5 }}>
+              Tagines, couscous, atay, pastilla — des cuisines locales jusqu&apos;à ta porte, à Casa, Rabat, Marrakech et Fès.
+            </motion.p>
+
+            {/* Buttons */}
+            <motion.div variants={staggerItem} className="flex gap-2.5 mt-6">
+              <AtlasButton variant="dark">
+                <Search className="w-4 h-4" />
+                Découvrir
+              </AtlasButton>
+              <button className="inline-flex items-center justify-center gap-2 rounded-full font-bold text-[15px] cursor-pointer" style={{ background: "#fff", color: "#1B2440", border: "none", padding: "14px 22px" }}>
+                Atay offert · &gt; 80 DH
+              </button>
+            </motion.div>
+
+            {/* Stats */}
+            <motion.div variants={staggerItem} className="flex gap-8 mt-8 text-white">
+              {[
+                { n: "320+", l: "restaurants" },
+                { n: "8", l: "villes" },
+                { n: "4.8★", l: "satisfaction" },
+              ].map((s, i) => (
+                <div key={s.l} style={{ animation: `atlasFadeUp 700ms ${300 + i * 120}ms both` }}>
+                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 28, fontVariantNumeric: "tabular-nums" }}>
+                    {s.n}
                   </div>
-                </motion.div>
-                {/* Floating card 2 */}
-                <motion.div
-                  animate={{ y: [0, 6, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-                  className="absolute top-16 right-0 w-44 h-36 rounded-2xl shadow-2xl"
-                  style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.4)" }}
-                >
-                  <div className="w-full h-20 rounded-t-2xl" style={{ background: "linear-gradient(135deg, #2EC089, #1B2440)" }} />
-                  <div className="px-3 py-2">
-                    <p className="text-white text-xs font-bold">Couscous Royal</p>
-                    <p className="text-white/70 text-[10px]">Café Clock · 55 DH</p>
-                  </div>
-                </motion.div>
-                {/* Floating card 3 */}
-                <motion.div
-                  animate={{ y: [0, -5, 0] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1.4 }}
-                  className="absolute bottom-0 left-16 w-44 h-36 rounded-2xl shadow-2xl"
-                  style={{ background: "rgba(255,255,255,0.22)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.4)" }}
-                >
-                  <div className="w-full h-20 rounded-t-2xl" style={{ background: "linear-gradient(135deg, #D9486F, #F2B53A)" }} />
-                  <div className="px-3 py-2">
-                    <p className="text-white text-xs font-bold">Jus d'Avocat</p>
-                    <p className="text-white/70 text-[10px]">Atay & Co · 18 DH</p>
-                  </div>
-                </motion.div>
+                  <div style={{ fontSize: 12, opacity: 0.85 }}>{s.l}</div>
+                </div>
+              ))}
+            </motion.div>
+          </motion.div>
+
+          {/* Right: floating dish cards */}
+          <div className="relative" style={{ height: 380 }}>
+            <div className="absolute" style={{ top: 20, right: 80, transform: "rotate(-6deg)", animation: "atlasFloat 6s ease-in-out infinite" }}>
+              <div className="bg-white rounded-3xl shadow-2xl" style={{ padding: 14 }}>
+                <DishTile hue={38} size={160} radius={18} label="tagine-poulet" />
+                <div className="mt-2.5 font-bold text-navy">Tagine Poulet</div>
+                <div className="text-xs text-navy-soft">Dar Naji · 68 DH</div>
               </div>
-            </motion.div>
+            </div>
+            <div className="absolute" style={{ top: 130, right: 250, transform: "rotate(8deg)", animation: "atlasFloat 7s ease-in-out infinite reverse" }}>
+              <div className="bg-white rounded-[20px] shadow-xl" style={{ padding: 12 }}>
+                <DishTile hue={150} size={100} radius={14} label="atay" />
+                <div className="mt-2 text-xs font-bold text-navy">Atay · 18 DH</div>
+              </div>
+            </div>
+            <div className="absolute" style={{ top: 200, right: 30, transform: "rotate(-4deg)", animation: "atlasFloat 5s ease-in-out infinite" }}>
+              <div className="bg-white rounded-[20px] shadow-xl" style={{ padding: 12 }}>
+                <DishTile hue={18} size={120} radius={14} label="pastilla" />
+                <div className="mt-2 text-xs font-bold text-navy">Pastilla · 75 DH</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════
-          2. CATEGORY CAROUSEL
+          2. CATEGORIES — À manger
       ══════════════════════════════════════════════════════════ */}
-      <section className="py-16 bg-cream-2">
-        <div className="mx-auto px-6" style={{ maxWidth: 1200 }}>
-          <motion.div {...fadeUp()} className="mb-8">
-            <h2
-              className="text-3xl font-extrabold text-navy tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Qu'est-ce qui te fait envie ?
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 32px 8px", width: "100%" }}>
+        <div className="flex items-baseline justify-between mb-3.5">
+          <div>
+            <h2 className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em" }}>
+              À manger
             </h2>
-            <p className="text-navy-soft text-base mt-1">
-              Explore par catégorie, commande en quelques taps.
-            </p>
-          </motion.div>
+            <p className="text-navy-soft text-[13px] mt-0.5">Restaurants & cuisines locales</p>
+          </div>
+          <span className="text-xs text-navy-soft font-semibold">{FOOD_CATS.length} catégories</span>
+        </div>
+        <div className="flex gap-3.5 overflow-x-auto pb-2">
+          {FOOD_CATS.map((c) => (
+            <CatTile key={c.id} name={c.name} hue={c.hue} size={66} radius={16} />
+          ))}
+        </div>
+      </section>
 
-          {/* Food categories */}
-          <motion.div {...fadeUp(0.1)} className="mb-6">
-            <p className="text-xs font-bold text-navy-soft uppercase tracking-widest mb-3">
-              🍽 À manger
-            </p>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {FOOD_CATEGORIES.map((cat, i) => (
-                <CategoryPill
-                  key={cat.label}
-                  icon={cat.icon}
-                  label={cat.label}
-                  active={activeFoodCategory === i}
-                  onClick={() => setActiveFoodCategory(i)}
-                />
-              ))}
+      {/* Categories — Marché Atlaas */}
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 8px", width: "100%" }}>
+        <div className="bg-white relative overflow-hidden" style={{ borderRadius: 22, padding: "22px 24px", border: "1.5px solid rgba(27,36,64,0.08)" }}>
+          <div className="absolute top-0 right-0 w-[200px] h-full pointer-events-none" style={{ background: "linear-gradient(90deg, transparent, rgba(46,192,137,0.08))" }} />
+          <div className="flex items-baseline justify-between mb-3.5 relative">
+            <div className="flex items-baseline gap-2.5">
+              <h2 className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 24, letterSpacing: "-0.02em" }}>
+                Marché Atlaas
+              </h2>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider bg-mint text-white px-2 py-1 rounded-full">
+                Livré en 15 min
+              </span>
             </div>
-          </motion.div>
-
-          {/* Market categories */}
-          <motion.div {...fadeUp(0.15)}>
-            <p className="text-xs font-bold text-navy-soft uppercase tracking-widest mb-3">
-              🛒 Marché
-            </p>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {MARKET_CATEGORIES.map((cat, i) => (
-                <CategoryPill
-                  key={cat.label}
-                  icon={cat.icon}
-                  label={cat.label}
-                  active={activeMarketCategory === i}
-                  onClick={() => setActiveMarketCategory(i)}
-                />
-              ))}
-            </div>
-          </motion.div>
+            <span className="text-xs text-navy-soft">Courses, primeur & dépannage · 7j/7</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {MARKET_CATS.map((c) => (
+              <CatTile key={c.id} name={c.name} hue={c.hue} size={60} radius={14} />
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════
-          3. DEALS
+          3. DEALS — Offres du moment
       ══════════════════════════════════════════════════════════ */}
-      <section className="py-16 bg-white">
-        <div className="mx-auto px-6" style={{ maxWidth: 1200 }}>
-          <motion.div {...fadeUp()} className="mb-8">
-            <h2
-              className="text-3xl font-extrabold text-navy tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Les bons plans du jour
-            </h2>
-          </motion.div>
-
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            className="grid grid-cols-1 sm:grid-cols-3 gap-5"
-          >
-            {DEALS.map((deal) => (
-              <motion.div
-                key={deal.title}
-                variants={staggerItem}
-                whileHover={{ y: -4, scale: 1.02 }}
-                className="rounded-3xl p-7 cursor-pointer relative overflow-hidden"
-                style={{ background: deal.bg }}
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 32px 12px", width: "100%" }}>
+        <h2 className="text-navy mb-3.5" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em" }}>
+          Offres du moment
+        </h2>
+        <div className="grid grid-cols-3 gap-4">
+          {DEALS.map((d) => {
+            const tone = TONES[d.tone] ?? TONES.navy;
+            return (
+              <div
+                key={d.id}
+                className="relative overflow-hidden text-white cursor-pointer"
+                style={{ borderRadius: 22, padding: 22, background: `linear-gradient(135deg, ${tone}, ${tone}dd)`, minHeight: 150 }}
               >
-                <ZelligeBg opacity={0.1} color="white" />
-                <div className="relative z-10">
-                  <p className="text-white/70 text-sm font-medium mb-1">{deal.discount}</p>
-                  <p className="text-white text-3xl font-extrabold leading-tight mb-3" style={{ fontFamily: "var(--font-display)" }}>
-                    {deal.title}
-                  </p>
-                  <p className="text-white/65 text-xs">{deal.condition}</p>
-                  <button className="mt-4 inline-flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-full transition">
-                    Profiter <ChevronRight className="w-3 h-3" />
+                <ZelligeBg opacity={0.16} color="#fff" />
+                <div className="relative">
+                  <div style={{ fontSize: 11, opacity: 0.8, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Offre</div>
+                  <div className="mt-1.5" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 24 }}>{d.title}</div>
+                  <div className="mt-1 text-[13px]" style={{ opacity: 0.92 }}>{d.sub}</div>
+                  <button className="mt-4 bg-white font-bold border-none cursor-pointer" style={{ color: tone, padding: "8px 16px", borderRadius: 999, fontSize: 13, fontFamily: "inherit" }}>
+                    {d.cta} →
                   </button>
                 </div>
-              </motion.div>
-            ))}
-          </motion.div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════
           4. RESTAURANT GRID
       ══════════════════════════════════════════════════════════ */}
-      <section className="py-16 bg-cream-2">
-        <div className="mx-auto px-6" style={{ maxWidth: 1200 }}>
-          <motion.div {...fadeUp()} className="flex items-center justify-between mb-8">
-            <div>
-              <h2
-                className="text-3xl font-extrabold text-navy tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Populaires autour de toi
-              </h2>
-              <p className="text-navy-soft text-base mt-1">Les restaurants les plus commandés cette semaine.</p>
-            </div>
-            <button className="hidden sm:inline-flex items-center gap-1 text-brand font-bold text-sm hover:text-brand-dark transition">
-              Voir tout <ChevronRight className="w-4 h-4" />
-            </button>
-          </motion.div>
-
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-          >
-            {RESTAURANTS.map((r) => (
-              <motion.div
-                key={r.name}
-                variants={staggerItem}
-                whileHover={{ y: -4, boxShadow: "0 20px 48px rgba(27,36,64,0.14)" }}
-                className="bg-white rounded-3xl overflow-hidden cursor-pointer border"
-                style={{ borderColor: "rgba(27,36,64,0.08)" }}
-              >
-                {/* Banner */}
-                <div
-                  className="h-32 relative"
-                  style={{
-                    background: `linear-gradient(135deg, hsl(${r.bannerHue}, 60%, 55%) 0%, hsl(${r.bannerHue + 20}, 55%, 40%) 100%)`,
-                  }}
-                >
-                  <div className="absolute top-3 right-3 flex gap-1.5 flex-wrap justify-end">
-                    {r.badges.map((badge) => (
-                      <span
-                        key={badge}
-                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${BADGE_COLORS[badge] ?? "bg-white/20 text-white"}`}
-                      >
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Body */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="font-extrabold text-navy text-base">{r.name}</h3>
-                    <div className="flex items-center gap-1 text-saffron">
-                      <Star className="w-3.5 h-3.5 fill-current" />
-                      <span className="text-xs font-bold text-navy">{r.rating}</span>
-                      <span className="text-xs text-navy-soft">({r.reviews})</span>
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 32px 64px", width: "100%" }}>
+        <div className="flex items-baseline justify-between mb-3.5">
+          <div>
+            <h2 className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em" }}>
+              Populaires autour de toi
+            </h2>
+            <p className="text-navy-soft text-[13px] mt-0.5">Les restaurants les plus commandés cette semaine</p>
+          </div>
+          <button className="bg-transparent border-none text-brand font-bold text-sm cursor-pointer" style={{ fontFamily: "inherit" }}>
+            Voir tout →
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-[18px]">
+          {RESTAURANTS.map((r) => (
+            <Link
+              key={r.id}
+              href={`/restaurants/${r.id}`}
+              className="bg-white border-none overflow-hidden text-left cursor-pointer block no-underline transition-all duration-200 hover:-translate-y-1.5"
+              style={{
+                borderRadius: 22,
+                boxShadow: "0 2px 8px rgba(27,36,64,0.05)",
+                fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 24px 50px rgba(27,36,64,0.14)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(27,36,64,0.05)"; }}
+            >
+              <RestaurantBanner hue={r.tileHue} height={150} />
+              <div style={{ padding: 18 }}>
+                <div className="flex justify-between items-start gap-2.5">
+                  <div>
+                    <div className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 19 }}>
+                      {r.name}
                     </div>
+                    <div className="text-navy-soft text-[13px] mt-0.5">{r.tagline}</div>
                   </div>
-                  <p className="text-navy-soft text-xs mb-3">{r.tagline}</p>
-
-                  <div className="flex items-center gap-4 text-navy-soft text-xs">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {r.city}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {r.eta}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Truck className="w-3 h-3" /> {r.fee}
-                    </span>
+                  <div className="flex items-center gap-1 bg-cream px-2.5 py-1 rounded-full shrink-0">
+                    <Star className="w-3 h-3 fill-saffron text-saffron" />
+                    <span className="text-[13px] font-bold text-navy">{r.rating}</span>
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </motion.div>
+                <div className="flex gap-3.5 mt-3 text-xs text-navy-soft">
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {r.eta}</span>
+                  <span className="flex items-center gap-1">🛵 {r.fee}</span>
+                </div>
+                <div className="flex gap-1.5 mt-3">
+                  {r.badges.map((b) => (
+                    <span
+                      key={b}
+                      className="text-[10px] font-bold uppercase tracking-wider bg-brand-tint text-brand-dark px-2 py-1 rounded-full"
+                      style={{ letterSpacing: "0.06em" }}
+                    >
+                      {b}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════
           5. MADE IN MOROCCO
       ══════════════════════════════════════════════════════════ */}
-      <section className="py-20 bg-cream-2 border-t" style={{ borderColor: "rgba(27,36,64,0.08)" }}>
-        <div className="mx-auto px-6" style={{ maxWidth: 1200 }}>
-          <div
-            className="grid items-center gap-14"
-            style={{ gridTemplateColumns: "1.1fr 1fr" }}
-          >
-            {/* Left */}
-            <motion.div
-              variants={stagger}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, margin: "-60px" }}
-              className="flex flex-col gap-6"
-            >
-              <motion.div variants={staggerItem}>
-                <span className="inline-flex items-center gap-2 bg-brand-tint text-brand text-xs font-bold px-4 py-1.5 rounded-full tracking-widest uppercase">
-                  🇲🇦 MADE IN MOROCCO · BY MOROCCANS
-                </span>
-              </motion.div>
+      <section className="relative overflow-hidden" style={{ background: "#FBF6E7", padding: "64px 0", borderTop: "1px solid rgba(27,36,64,0.08)" }}>
+        {/* Decorative blobs */}
+        <div className="absolute pointer-events-none" style={{ top: -120, left: -120, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(229,90,38,0.13), transparent 70%)" }} />
+        <div className="absolute pointer-events-none" style={{ bottom: -180, right: -100, width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(46,192,137,0.1), transparent 70%)" }} />
 
-              <motion.h2
-                variants={staggerItem}
-                className="text-4xl font-extrabold text-navy leading-tight tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Une plateforme marocaine,{" "}
-                <span className="text-brand">pensée pour le Maroc.</span>
-              </motion.h2>
-
-              <motion.p variants={staggerItem} className="text-navy-soft text-lg leading-relaxed">
-                Atlaas Go a été conçu à partir de zéro au Maroc, pour les Marocains. Nous comprenons les habitudes locales, les attentes des clients, et les besoins des restaurateurs de chez nous.
-              </motion.p>
-
-              {/* Stats */}
-              <motion.div
-                variants={staggerItem}
-                className="grid grid-cols-2 gap-4 pt-2"
-              >
-                {[
-                  { val: "100%", label: "Capital marocain" },
-                  { val: "320+", label: "Restaurants partenaires" },
-                  { val: "187", label: "Coursiers actifs" },
-                  { val: "8", label: "Villes couvertes" },
-                ].map(({ val, label }) => (
-                  <div
-                    key={label}
-                    className="bg-white rounded-2xl px-5 py-4 border"
-                    style={{ borderColor: "rgba(27,36,64,0.08)" }}
-                  >
-                    <p
-                      className="text-2xl font-extrabold text-navy tabular-nums"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {val}
-                    </p>
-                    <p className="text-navy-soft text-xs mt-0.5">{label}</p>
-                  </div>
-                ))}
-              </motion.div>
+        <div className="relative" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 32px", display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 56, alignItems: "center" }}>
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }}>
+            {/* Badge */}
+            <motion.div variants={staggerItem} className="mb-4">
+              <span className="inline-flex items-center gap-2 bg-white px-3.5 py-2 rounded-full text-xs font-extrabold text-brand tracking-wider shadow-sm">
+                <span className="text-sm">🇲🇦</span>
+                MADE IN MOROCCO · BY MOROCCANS
+              </span>
             </motion.div>
 
-            {/* Right: collage + quote */}
-            <motion.div {...fadeUp(0.15)} className="relative">
-              <div className="relative h-80 flex items-center justify-center">
-                {/* Decorative cards */}
-                <div
-                  className="absolute top-4 left-0 w-36 h-28 rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, #E55A26, #F2B53A)", transform: "rotate(-4deg)", boxShadow: "0 8px 24px rgba(229,90,38,0.25)" }}
-                />
-                <div
-                  className="absolute top-0 right-8 w-28 h-24 rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, #2EC089, #1B2440)", transform: "rotate(3deg)", boxShadow: "0 8px 24px rgba(46,192,137,0.2)" }}
-                />
-                <div
-                  className="absolute bottom-8 left-12 w-32 h-24 rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, #D9486F, #1B2440)", transform: "rotate(2deg)", boxShadow: "0 8px 24px rgba(217,72,111,0.2)" }}
-                />
-                <div
-                  className="absolute bottom-4 right-4 w-28 h-20 rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, #F2B53A, #2EC089)", transform: "rotate(-2deg)", boxShadow: "0 8px 24px rgba(242,181,58,0.2)" }}
-                />
+            {/* Heading */}
+            <motion.h2 variants={staggerItem} className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 48, letterSpacing: "-0.03em", lineHeight: 1.05 }}>
+              Une plateforme marocaine,<br /><span className="text-brand">pensée pour le Maroc.</span>
+            </motion.h2>
 
-                {/* Quote card */}
-                <div
-                  className="relative z-10 bg-white rounded-3xl shadow-2xl p-6 max-w-xs"
-                  style={{ border: "1px solid rgba(27,36,64,0.08)" }}
-                >
-                  <p className="text-navy font-bold text-base mb-2" style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}>
-                    &ldquo;Mzyan f Atlaas, koulchi b Darija&rdquo;
-                  </p>
-                  <p className="text-navy-soft text-sm">— Hicham, coursier à Casa</p>
+            {/* Body */}
+            <motion.p variants={staggerItem} className="text-navy-soft mt-[18px] leading-relaxed" style={{ fontSize: 16, maxWidth: 520 }}>
+              Atlaas Go est née à Casablanca en 2023. Notre équipe — designers, ingénieurs, opérateurs — travaille à Maârif, Rabat et Marrakech. Nous payons en dirhams, parlons en darija, et privilégions chaque jour les restaurants beldi de nos quartiers.
+            </motion.p>
+
+            {/* Stats — inline like prototype */}
+            <motion.div variants={staggerItem} className="flex gap-8 mt-7">
+              {[
+                { v: "100%", l: "capital marocain" },
+                { v: "320+", l: "restaurants partenaires" },
+                { v: "187", l: "coursiers actifs" },
+                { v: "8", l: "villes couvertes" },
+              ].map((s) => (
+                <div key={s.l}>
+                  <div className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 28, letterSpacing: "-0.02em" }}>{s.v}</div>
+                  <div className="text-navy-soft text-xs mt-0.5">{s.l}</div>
                 </div>
-              </div>
+              ))}
             </motion.div>
-          </div>
+          </motion.div>
+
+          {/* Right: photo collage + floating quote */}
+          <motion.div {...fadeUp(0.15)} className="relative" style={{ height: 380 }}>
+            <div className="absolute overflow-hidden" style={{ top: 0, right: 80, transform: "rotate(-3deg)", boxShadow: "0 14px 32px rgba(27,36,64,0.14)", borderRadius: 18 }}>
+              <RestaurantBanner hue={18} height={160} />
+              <div style={{ width: 240 }} />
+            </div>
+            <div className="absolute overflow-hidden" style={{ top: 130, right: 240, transform: "rotate(4deg)", boxShadow: "0 14px 32px rgba(27,36,64,0.14)", borderRadius: 18 }}>
+              <RestaurantBanner hue={150} height={140} />
+              <div style={{ width: 220 }} />
+            </div>
+            <div className="absolute overflow-hidden" style={{ top: 200, right: 30, transform: "rotate(-2deg)", boxShadow: "0 14px 32px rgba(27,36,64,0.14)", borderRadius: 18 }}>
+              <RestaurantBanner hue={130} height={150} />
+              <div style={{ width: 230 }} />
+            </div>
+            {/* Floating quote */}
+            <div
+              className="absolute bg-white shadow-xl animate-atlas-float"
+              style={{ bottom: 0, left: 0, padding: "16px 20px", borderRadius: 18, maxWidth: 280, borderLeft: "4px solid #E55A26" }}
+            >
+              <p className="text-navy font-bold leading-snug" style={{ fontFamily: '"Cairo", system-ui', fontSize: 18 }}>
+                « Mzyan f Atlaas, koulchi b Darija »
+              </p>
+              <p className="text-navy-soft text-[11px] mt-1.5">— Hicham, coursier à Casa</p>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════
-          6. JOIN US
+          6. JOIN US — restaurant + driver CTAs
       ══════════════════════════════════════════════════════════ */}
-      <section className="py-20 bg-cream">
-        <div className="mx-auto px-6" style={{ maxWidth: 1200 }}>
-          <motion.div {...fadeUp()} className="text-center mb-12">
-            <p className="text-xs font-bold text-brand uppercase tracking-widest mb-2">Rejoignez-nous</p>
-            <h2
-              className="text-4xl font-extrabold text-navy tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Atlaas Go, c'est aussi vous.
+      <section style={{ background: "#F6EEDC", padding: "64px 0" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 32px" }}>
+          {/* Header */}
+          <motion.div {...fadeUp()} className="text-center mb-10">
+            <div className="text-xs font-extrabold text-brand uppercase tracking-widest">Rejoignez-nous</div>
+            <h2 className="text-navy mt-2" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 40, letterSpacing: "-0.03em" }}>
+              Atlaas Go, c&apos;est aussi vous.
             </h2>
+            <p className="text-navy-soft text-[15px] mt-2 mx-auto" style={{ maxWidth: 560 }}>
+              Restaurant, coursier ou entreprise — il y a une place pour chacun dans l&apos;écosystème Atlaas.
+            </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-5">
             {/* Restaurant card */}
             <motion.div
               {...fadeUp(0.05)}
-              className="bg-white rounded-3xl p-8 border flex flex-col gap-6"
-              style={{ borderColor: "rgba(27,36,64,0.08)" }}
+              className="bg-white relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
+              style={{ borderRadius: 24, padding: 36, display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "center", boxShadow: "0 4px 14px rgba(27,36,64,0.06)" }}
             >
-              <div className="w-14 h-14 rounded-2xl bg-brand-tint flex items-center justify-center text-2xl">
-                🍽️
-              </div>
               <div>
-                <h3
-                  className="text-2xl font-extrabold text-navy mb-2"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
+                <div className="w-[52px] h-[52px] rounded-[14px] bg-brand-tint text-brand-dark flex items-center justify-center text-2xl mb-4">🍽️</div>
+                <h3 className="text-navy" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em" }}>
                   Vous êtes un restaurant ?
                 </h3>
-                <p className="text-navy-soft leading-relaxed">
-                  Rejoignez la plus grande plateforme de livraison locale au Maroc et touchez des milliers de nouveaux clients chaque semaine.
+                <p className="text-navy-soft text-sm mt-2 leading-relaxed">
+                  Faites livrer vos plats à Casa, Rabat, Marrakech et plus. Tablette gratuite, support en darija, commission claire.
                 </p>
+                <ul className="list-none p-0 my-4 flex flex-col gap-2">
+                  {["Commission à partir de 15%", "Tablette + formation offertes", "Paiement sous 7 jours"].map((b) => (
+                    <li key={b} className="flex items-center gap-2 text-navy text-[13px]">
+                      <Check className="w-3.5 h-3.5 text-mint" strokeWidth={2.4} /> {b}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2.5">
+                  <AtlasButton variant="dark">Devenir partenaire →</AtlasButton>
+                  <AtlasButton variant="ghost">Parler à un manager</AtlasButton>
+                </div>
               </div>
-              <ul className="flex flex-col gap-3">
-                {[
-                  "Commission à partir de 15%",
-                  "Tablette + formation offertes",
-                  "Paiement sous 7 jours",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-navy text-sm font-medium">
-                    <span className="w-5 h-5 rounded-full bg-mint/20 flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3 text-mint" />
-                    </span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex gap-3 mt-auto">
-                <AtlasButton variant="dark">Devenir partenaire</AtlasButton>
-                <AtlasButton variant="ghost">Parler à un manager</AtlasButton>
+              <div style={{ width: 200 }} className="relative">
+                <div style={{ transform: "rotate(-4deg)", borderRadius: 14, overflow: "hidden", boxShadow: "0 8px 22px rgba(27,36,64,0.10)" }}>
+                  <RestaurantBanner hue={18} height={180} />
+                </div>
+                <div className="absolute bg-brand text-white text-[11px] font-extrabold rounded-full shadow-lg" style={{ top: 12, right: -8, padding: "6px 12px", transform: "rotate(4deg)", boxShadow: "0 4px 10px rgba(229,90,38,0.35)" }}>
+                  +25% revenu
+                </div>
               </div>
             </motion.div>
 
             {/* Driver card */}
             <motion.div
               {...fadeUp(0.1)}
-              className="relative rounded-3xl p-8 overflow-hidden flex flex-col gap-6"
-              style={{ background: "#1B2440" }}
+              className="text-white relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
+              style={{ background: "#1B2440", borderRadius: 24, padding: 36, display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "center", boxShadow: "0 4px 14px rgba(27,36,64,0.06)" }}
             >
-              <ZelligeBg opacity={0.06} color="white" />
-              <div className="relative z-10 w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
-                <Bike className="w-7 h-7 text-white" />
-              </div>
-              <div className="relative z-10">
-                <h3
-                  className="text-2xl font-extrabold text-white mb-2"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
+              <ZelligeBg opacity={0.07} color="#fff" />
+              <div className="relative">
+                <div className="w-[52px] h-[52px] rounded-[14px] bg-brand text-white flex items-center justify-center mb-4 text-xl">
+                  🛵
+                </div>
+                <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, letterSpacing: "-0.02em" }}>
                   Devenez coursier Atlaas
                 </h3>
-                <p className="text-white/65 leading-relaxed">
-                  Travaillez à votre rythme, gagnez bien. Rejoignez nos 187 coursiers actifs dans 8 villes.
+                <p className="text-sm mt-2 leading-relaxed" style={{ opacity: 0.8 }}>
+                  Vos horaires, votre moto, vos gains. Bonus de zone chaude, support 7j/7, paiement chaque semaine.
                 </p>
-              </div>
-              <ul className="relative z-10 flex flex-col gap-3">
-                {[
-                  "Jusqu'à 4 500 DH / semaine",
-                  "Bonus heures de pointe",
-                  "Assurance accident incluse",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-white text-sm font-medium">
-                    <span className="w-5 h-5 rounded-full bg-mint/25 flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3 text-mint" />
-                    </span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Earnings preview */}
-              <div
-                className="relative z-10 bg-white/10 rounded-2xl p-4 border border-white/15"
-              >
-                <p className="text-white/50 text-xs mb-1">Gains cette semaine</p>
-                <p className="text-white text-3xl font-extrabold tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
-                  2 184 DH
-                </p>
-                <p className="text-white/50 text-xs mt-0.5">76 courses · 32h</p>
-                <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full w-4/5 rounded-full bg-mint" />
+                <ul className="list-none p-0 my-4 flex flex-col gap-2">
+                  {["Jusqu’à 4 500 DH / semaine", "Bonus heures de pointe", "Assurance accident incluse"].map((b) => (
+                    <li key={b} className="flex items-center gap-2 text-[13px]">
+                      <Check className="w-3.5 h-3.5 text-mint" strokeWidth={2.4} /> {b}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2.5">
+                  <AtlasButton variant="primary">Postuler coursier →</AtlasButton>
+                  <button className="inline-flex items-center justify-center gap-2 rounded-full font-bold text-sm px-[18px] py-3 cursor-pointer" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.2)", fontFamily: "inherit", fontSize: 14 }}>
+                    Comment ça marche
+                  </button>
                 </div>
               </div>
-
-              <div className="relative z-10 flex gap-3 mt-auto">
-                <AtlasButton variant="primary">Postuler coursier</AtlasButton>
-                <button className="inline-flex items-center justify-center gap-2 rounded-full font-bold text-sm px-5 py-3 border-[1.5px] border-white/30 text-white hover:bg-white/10 transition-all duration-200">
-                  Comment ça marche
-                </button>
+              {/* Earnings widget */}
+              <div style={{ width: 200 }} className="relative">
+                <div style={{ background: "rgba(255,255,255,0.10)", backdropFilter: "blur(8px)", borderRadius: 18, padding: 18, border: "1.5px solid rgba(255,255,255,0.14)", transform: "rotate(3deg)" }}>
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider" style={{ opacity: 0.7 }}>Cette semaine</div>
+                  <div className="mt-1" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 30 }}>2 184 DH</div>
+                  <div className="text-[11px] mt-0.5" style={{ opacity: 0.75 }}>76 courses · 32h</div>
+                  <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.16)" }}>
+                    <div className="h-full rounded-full bg-brand" style={{ width: "78%" }} />
+                  </div>
+                  <div className="text-[10px] mt-1.5" style={{ opacity: 0.7 }}>Objectif 2 800 DH</div>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -733,141 +500,93 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════════
           7. SUPPORT / CONTACT
       ══════════════════════════════════════════════════════════ */}
-      <section
-        className="py-20 bg-cream-2 border-t"
-        style={{ borderColor: "rgba(27,36,64,0.08)" }}
-      >
-        <div className="mx-auto px-6" style={{ maxWidth: 1200 }}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-start">
-            {/* Left */}
-            <motion.div {...fadeUp()} className="flex flex-col gap-4">
-              <p className="text-xs font-bold text-brand uppercase tracking-widest">Support · 7j/7</p>
-              <h2
-                className="text-4xl font-extrabold text-navy leading-tight tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                On est là si t'as besoin.
-              </h2>
-              <p className="text-navy-soft text-lg leading-relaxed max-w-sm">
-                Une question sur ta commande, un problème avec un paiement, ou juste un retour ? Notre équipe répond 7j/7, en darija ou en français.
-              </p>
-            </motion.div>
+      <section style={{ background: "#FBF6E7", padding: "56px 0", borderTop: "1px solid rgba(27,36,64,0.08)" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 32px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "center" }}>
+          {/* Left */}
+          <motion.div {...fadeUp()}>
+            <div className="text-xs font-extrabold text-brand uppercase tracking-widest">Support · 7j/7</div>
+            <h2 className="text-navy mt-1.5" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 36, letterSpacing: "-0.02em" }}>
+              On est là si t&apos;as besoin.
+            </h2>
+            <p className="text-navy-soft text-[15px] mt-2" style={{ maxWidth: 480 }}>
+              Une question sur ta commande, un coursier qu&apos;on n&apos;a pas reçu, un partenariat — réponds-nous, on revient en moins d&apos;une heure.
+            </p>
+          </motion.div>
 
-            {/* Right: contact cards */}
-            <motion.div
-              variants={stagger}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, margin: "-60px" }}
-              className="flex flex-col gap-4"
-            >
-              {/* 2x2 email grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Général", email: "salam@atlaasgo.com" },
-                  { label: "Support", email: "support@atlaasgo.com" },
-                  { label: "Coursiers", email: "coursiers@atlaasgo.com" },
-                  { label: "Partenaires", email: "partenaires@atlaasgo.com" },
-                ].map(({ label, email }) => (
-                  <motion.a
-                    key={email}
-                    variants={staggerItem}
-                    href={`mailto:${email}`}
-                    className="bg-white rounded-2xl px-4 py-3.5 border hover:border-brand transition group"
-                    style={{ borderColor: "rgba(27,36,64,0.08)" }}
-                  >
-                    <p className="text-[10px] font-bold text-navy-soft uppercase tracking-wider mb-0.5">{label}</p>
-                    <p className="text-navy text-xs font-semibold group-hover:text-brand transition truncate">{email}</p>
-                  </motion.a>
-                ))}
-              </div>
+          {/* Right: contact grid */}
+          <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }}>
+            <div className="grid grid-cols-2 gap-3.5">
+              {[
+                { icon: "✉️", label: "Email général", value: "salam@atlaasgo.com", href: "mailto:salam@atlaasgo.com" },
+                { icon: "🛟", label: "Support client", value: "support@atlaasgo.com", href: "mailto:support@atlaasgo.com" },
+                { icon: "🛵", label: "Devenir coursier", value: "coursiers@atlaasgo.com", href: "mailto:coursiers@atlaasgo.com" },
+                { icon: "🍽️", label: "Restaurants", value: "partenaires@atlaasgo.com", href: "mailto:partenaires@atlaasgo.com" },
+              ].map((c) => (
+                <motion.a
+                  key={c.label}
+                  variants={staggerItem}
+                  href={c.href}
+                  className="bg-white flex flex-col gap-1 no-underline transition-all duration-200 hover:-translate-y-0.5"
+                  style={{ borderRadius: 14, padding: 16, border: "1px solid rgba(27,36,64,0.08)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#E55A26"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(27,36,64,0.08)"; }}
+                >
+                  <span className="text-xl">{c.icon}</span>
+                  <span className="text-[11px] font-bold text-navy-soft uppercase tracking-wider mt-1">{c.label}</span>
+                  <span className="text-sm font-bold text-navy" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace' }}>{c.value}</span>
+                </motion.a>
+              ))}
 
-              {/* Hotline banner */}
+              {/* Hotline — spans full width */}
               <motion.div
                 variants={staggerItem}
-                className="relative rounded-2xl p-5 overflow-hidden flex items-center gap-4"
-                style={{ background: "#1B2440" }}
+                className="col-span-2 flex items-center gap-3.5"
+                style={{ background: "#1B2440", color: "#fff", borderRadius: 14, padding: 16 }}
               >
-                <div className="w-10 h-10 rounded-full bg-mint/20 flex items-center justify-center shrink-0 text-lg">
-                  📞
-                </div>
+                <div className="w-11 h-11 rounded-full bg-mint flex items-center justify-center text-xl shrink-0">📞</div>
                 <div className="flex-1">
-                  <p className="text-white/50 text-xs mb-0.5">Hotline gratuite</p>
-                  <p className="text-white font-extrabold text-lg tabular-nums">+212 8 02 00 99 99</p>
+                  <div className="text-[11px] font-bold uppercase tracking-wider" style={{ opacity: 0.7 }}>Hotline gratuite · 7j/7 · 7h–minuit</div>
+                  <div className="font-extrabold text-lg mt-0.5" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace' }}>+212 8 02 00 99 99</div>
                 </div>
-                <button className="inline-flex items-center gap-2 bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-brand-dark transition shrink-0">
+                <button className="bg-brand text-white border-none rounded-full px-[18px] py-2.5 font-bold text-[13px] cursor-pointer flex items-center gap-2" style={{ fontFamily: "inherit" }}>
                   <Phone className="w-3.5 h-3.5" /> Appeler
                 </button>
               </motion.div>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════
           8. FOOTER
       ══════════════════════════════════════════════════════════ */}
-      <footer style={{ background: "#1B2440" }}>
-        <div
-          className="mx-auto px-6 py-16 grid gap-10"
-          style={{
-            maxWidth: 1200,
-            gridTemplateColumns: "1.4fr 1fr 1fr 1fr",
-          }}
-        >
-          {/* Brand col */}
-          <div className="flex flex-col gap-5">
-            <div className="flex items-center gap-2.5">
-              <AtlasLogo size={36} color="#E55A26" />
-              <AtlasWordmark size={18} color="#ffffff" />
+      <footer style={{ background: "#1B2440", color: "#fff", padding: "40px 0" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 32px", display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr", gap: 32 }}>
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <AtlasLogo size={32} color="#E55A26" />
+              <AtlasWordmark size={20} color="#fff" />
             </div>
-            <p className="text-white/45 text-sm leading-relaxed max-w-xs">
-              La plateforme de livraison locale 100% marocaine. Rapide, prix fixe, paiement à la livraison.
+            <p className="text-[13px] leading-relaxed max-w-[280px]" style={{ opacity: 0.7 }}>
+              La livraison marocaine, pensée pour les Marocains. Des saveurs authentiques, à toute heure.
             </p>
-            <div className="flex gap-2.5">
-              {["𝕏", "IG", "FB"].map((s) => (
-                <a
-                  key={s}
-                  href="#"
-                  className="w-8 h-8 rounded-lg bg-white/8 hover:bg-brand flex items-center justify-center text-white/50 hover:text-white text-xs font-bold transition"
-                >
-                  {s}
-                </a>
-              ))}
-            </div>
           </div>
-
-          {/* Link cols */}
-          {Object.entries(FOOTER_LINKS).map(([title, links]) => (
-            <div key={title} className="flex flex-col gap-3">
-              <p className="text-white/35 text-[10px] font-bold uppercase tracking-widest mb-1">{title}</p>
-              {links.map((l) => (
-                <Link
-                  key={l.label}
-                  href={l.href}
-                  className="text-white/55 hover:text-white text-sm transition w-fit"
-                >
-                  {l.label}
-                </Link>
+          {[
+            { t: "Atlaas", l: ["À propos", "Carrières", "Presse", "Blog"] },
+            { t: "Restaurants", l: ["Devenir partenaire", "Portail Pro", "Aide partenaire"] },
+            { t: "Aide", l: ["FAQ", "Contact", "Suivi", "Conditions"] },
+          ].map((col) => (
+            <div key={col.t}>
+              <div className="font-extrabold mb-3">{col.t}</div>
+              {col.l.map((x) => (
+                <div key={x} className="text-[13px] py-1" style={{ opacity: 0.7 }}>{x}</div>
               ))}
             </div>
           ))}
         </div>
-
-        {/* Bottom bar */}
-        <div
-          className="border-t"
-          style={{ borderColor: "rgba(255,255,255,0.08)" }}
-        >
-          <div
-            className="mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2"
-            style={{ maxWidth: 1200 }}
-          >
-            <p className="text-white/30 text-xs">
-              © 2026 Atlaas Go · Made with ❤️ au Maroc
-            </p>
-            <p className="text-white/20 text-xs">v2.4.1</p>
-          </div>
+        <div style={{ maxWidth: 1200, margin: "24px auto 0", padding: "24px 32px 0", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 12, opacity: 0.5, display: "flex", justifyContent: "space-between" }}>
+          <span>© 2026 Atlaas Go · Made with ❤️ au Maroc</span>
+          <span>v2.4.1</span>
         </div>
       </footer>
     </main>

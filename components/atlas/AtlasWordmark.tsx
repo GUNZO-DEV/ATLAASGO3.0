@@ -11,11 +11,11 @@ export default function AtlasWordmark({
 }) {
   return (
     <span
-      className={`font-[var(--font-display)] tracking-[-0.02em] select-none ${className}`}
-      style={{ fontSize: size, fontWeight: 800, letterSpacing: "-0.02em" }}
+      className={`tracking-[-0.02em] select-none ${className}`}
+      style={{ fontSize: size, fontWeight: 800, letterSpacing: "-0.02em", fontFamily: "var(--font-display)" }}
     >
       <span style={{ color }}>ATLAAS</span>
-      <span style={{ color: "#E55A26", marginLeft: size * 0.15 }}>GO</span>
+      <span style={{ color: "#E55A26" }}>GO</span>
     </span>
   );
 }
