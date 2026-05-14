@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Ensure Leaflet's CSS (which uses url() for marker images) is
-  // processed correctly by Next.js on all platforms including mobile.
   transpilePackages: ["leaflet", "react-leaflet"],
+  turbopack: {
+    root: __dirname,
+  },
   async rewrites() {
     return [
       {

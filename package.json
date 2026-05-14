@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
+    "dev": "npx next dev",
+    "build": "npx next build",
+    "start": "npx next start",
+    "lint": "npx eslint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -15,6 +15,7 @@
     "@react-three/fiber": "^9.6.1",
     "@react-three/postprocessing": "^3.0.4",
     "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/runtime": "^1.12.92",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.13.0",
     "framer-motion": "^12.38.0",

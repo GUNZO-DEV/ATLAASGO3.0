@@ -1,3 +1,5 @@
+import { getZoneConfig } from "@/constants/zones";
+
 const ZONE_FEES: Record<string, number> = {
   ifrane: 15,
   oujda:  10,
@@ -35,7 +37,6 @@ export function formatMAD(amount: number): string {
 }
 
 // ─── Surge pricing ────────────────────────────────────────────────────────────
-import { getZoneConfig } from "@/constants/zones";
 
 const SURGE_RATIO_THRESHOLD = 2.0;
 
