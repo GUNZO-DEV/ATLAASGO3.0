@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, LayoutDashboard, Zap, ChevronDown } from "lucide-react";
+import { LogOut, LayoutDashboard, Zap, ChevronDown, Bell } from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
 import Image from "next/image";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -18,9 +19,12 @@ interface UserInfo {
 export default function FloatingNavbar() {
   const [scrolled, setScrolled]     = useState(false);
   const [user, setUser]             = useState<UserInfo | null>(null);
+  const [uid, setUid]               = useState<string | null>(null);
   const [authReady, setAuthReady]   = useState(false);
   const [menuOpen, setMenuOpen]     = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  const { unreadCount } = useNotifications(uid);
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -36,6 +40,7 @@ export default function FloatingNavbar() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        setUid(firebaseUser.uid);
         try {
           const snap = await getDoc(doc(db, "users", firebaseUser.uid));
           const data = snap.data();
@@ -44,6 +49,7 @@ export default function FloatingNavbar() {
           setUser({ name: firebaseUser.email ?? "User", role: "customer" });
         }
       } else {
+        setUid(null);
         setUser(null);
       }
       setAuthReady(true);
@@ -102,6 +108,17 @@ export default function FloatingNavbar() {
             <>
               {user ? (
                 /* ── Logged-in user menu ── */
+                <>
+                  {/* Notification bell */}
+                  <Link href="/notifications" className="relative cursor-pointer p-1.5 rounded-xl hover:bg-gray-100 transition">
+                    <Bell className="w-5 h-5 text-gray-600" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#E05A23] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+
                 <div className="relative ml-1">
                   <button
                     onClick={() => setMenuOpen((o) => !o)}
@@ -157,6 +174,7 @@ export default function FloatingNavbar() {
                     )}
                   </AnimatePresence>
                 </div>
+                </>
               ) : (
                 /* ── Not logged in ── */
                 <>
