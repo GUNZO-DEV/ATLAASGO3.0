@@ -7,6 +7,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import ToasterProvider from "@/components/ToasterProvider";
 import PostHogProvider from "@/components/PostHogProvider";
 import PostHogPageView from "@/components/PostHogPageView";
+import { CartProvider } from "@/contexts/CartContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +39,7 @@ export default function RootLayout({
             <Suspense><PostHogPageView /></Suspense>
             <ToasterProvider />
             <OfflineBanner />
-            <ErrorBoundary>{children}</ErrorBoundary>
+            <ErrorBoundary><CartProvider>{children}</CartProvider></ErrorBoundary>
           </PostHogProvider>
         </body>
     </html>
