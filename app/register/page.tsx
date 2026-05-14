@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -9,6 +9,7 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { track, identifyUser } from "@/lib/analytics";
+import { generateReferralCode } from "@/lib/referral";
 import { requestFcmToken, saveFcmToken } from "@/lib/notifications";
 import PhoneLogin from "@/components/PhoneLogin";
 import { motion } from "framer-motion";
@@ -34,7 +35,14 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
+  const [refCode, setRefCode]   = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setRefCode(ref);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +51,22 @@ export default function RegisterPage() {
     try {
       if (mode === "register") {
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
+        const referralCode = generateReferralCode();
         await setDoc(doc(db, "users", user.uid), {
           name,
           email,
           createdAt: new Date().toISOString(),
           role: "customer",
+          referralCode,
+          referralCredits: 0,
+          reviewedOrderIds: [],
+          favorites: [],
+          savedAddresses: [],
         });
+        if (refCode) {
+          const { applyReferralOnRegister } = await import("@/lib/referral");
+          await applyReferralOnRegister(refCode, user.uid);
+        }
         identifyUser(user.uid, { email, name, role: "customer" });
         track("user_registered", { uid: user.uid, email });
         // Request FCM token in background — don't block redirect
