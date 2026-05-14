@@ -13,7 +13,12 @@ export interface StatusHistoryEntry {
 }
 
 export interface OrderItem {
-  description: string;
+  description?: string; // legacy field — kept for backward compat
+  itemId?: string;
+  name?: string;
+  price?: number;
+  quantity?: number;
+  note?: string;
 }
 
 export interface Order {
@@ -33,4 +38,14 @@ export interface Order {
   acceptedAt?: string;
   pickedUpAt?: string;
   deliveredAt?: string;
+  // Multi-restaurant fields (present on orders placed via /restaurants flow)
+  restaurantId?: string;
+  restaurantName?: string;
+  cartId?: string;
+  deliveryAddress?: string;
+  deliveryAddressNote?: string;
+  orderNote?: string;
+  scheduledFor?: string; // ISO timestamp; absent = ASAP
+  subtotal?: number;
+  total?: number;
 }
