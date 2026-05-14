@@ -224,6 +224,7 @@ export default function AdminDashboardPage() {
                     <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Order</th>
                     <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Driver</th>
                     <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Fee</th>
                     <th className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Elapsed</th>
                     <th className="px-5 py-3" />
                   </tr>
@@ -245,6 +246,14 @@ export default function AdminDashboardPage() {
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_LABELS[order.status].color}`}>
                           {STATUS_LABELS[order.status].label}
                         </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-700">
+                        <span>{order.fee ? `${order.fee} MAD` : "—"}</span>
+                        {(order as any).surgeFee ? (
+                          <span className="ml-1 text-xs text-orange-500">
+                            (+{(order as any).surgeFee} surge)
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-5 py-4 text-gray-400 font-mono text-xs" suppressHydrationWarning>
                         {timeElapsed(order.timestamp)}
