@@ -14,7 +14,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Truck, Clock, LayoutDashboard, LogOut, ShoppingBag } from "lucide-react";
 import type { OrderStatus } from "@/types/order";
+import type { Restaurant } from "@/types/restaurant";
 import dynamic from "next/dynamic";
+import { getRestaurants } from "@/lib/restaurants";
+import RestaurantCard from "@/components/RestaurantCard";
 
 const SceneCanvas       = dynamic(() => import("@/lib/r3f/canvas"),                  { ssr: false });
 const DeliveryOrb       = dynamic(() => import("@/components/3d/DeliveryOrb"),       { ssr: false });
@@ -54,6 +57,8 @@ export default function DashboardPage() {
   const [activeOrderStatus, setActiveOrderStatus] = useState<OrderStatus>("pending");
   const [driverDot, setDriverDot] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const [mapZone, setMapZone] = useState<"ifrane" | "oujda">("ifrane");
+  const [activeOrder, setActiveOrder] = useState<{ id: string; restaurantName?: string; status: string } | null>(null);
+  const [recommended, setRecommended] = useState<Restaurant[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -74,6 +79,37 @@ export default function DashboardPage() {
     });
     return () => unsub();
   }, [router]);
+
+  // Active order detection
+  useEffect(() => {
+    if (!userId) return;
+    let unsub: (() => void) | undefined;
+    Promise.all([
+      import("firebase/firestore"),
+      import("@/lib/firebase"),
+    ]).then(([{ collection, query, where, onSnapshot, limit }, { db: firestoreDb }]) => {
+      const q = query(
+        collection(firestoreDb, "orders"),
+        where("customerId", "==", userId),
+        where("status", "in", ["pending", "accepted", "picked_up"]),
+        limit(1)
+      );
+      unsub = onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setActiveOrder({ id: d.id, restaurantName: d.data().restaurantName, status: d.data().status });
+        } else {
+          setActiveOrder(null);
+        }
+      });
+    });
+    return () => unsub?.();
+  }, [userId]);
+
+  // Recommended restaurants
+  useEffect(() => {
+    getRestaurants("ifrane").then((list) => setRecommended(list.slice(0, 6)));
+  }, []);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -228,6 +264,38 @@ export default function DashboardPage() {
               </div>
             )}
           </motion.div>
+
+          {/* ── Active order banner ── */}
+          {activeOrder && (
+            <motion.div variants={item}>
+              <Link
+                href={`/orders/${activeOrder.id}`}
+                className="flex items-center justify-between bg-orange-500 text-white rounded-2xl px-5 py-3 mb-4 animate-pulse"
+              >
+                <div>
+                  <p className="font-semibold text-sm">
+                    {activeOrder.restaurantName ?? "Your order"} — {activeOrder.status.replace("_", " ")}
+                  </p>
+                  <p className="text-orange-100 text-xs mt-0.5">Tap to track your order</p>
+                </div>
+                <span className="text-white text-lg">→</span>
+              </Link>
+            </motion.div>
+          )}
+
+          {/* ── Recommended restaurants ── */}
+          {recommended.length > 0 && (
+            <motion.div variants={item} className="mb-4">
+              <h2 className="font-bold text-gray-800 text-base mb-3">Recommended for you</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {recommended.map((r) => (
+                  <div key={r.id} className="shrink-0 w-48">
+                    <RestaurantCard restaurant={r} />
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* ── Browse restaurants CTA ── */}
           <motion.div variants={item}>
