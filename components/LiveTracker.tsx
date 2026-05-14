@@ -60,9 +60,10 @@ function TrackerSkeleton() {
 interface Props {
   customerId: string;
   onNoActiveOrder: () => void;
+  onStatusChange?: (status: OrderStatus | null, zone: string | null) => void;
 }
 
-export default function LiveTracker({ customerId, onNoActiveOrder }: Props) {
+export default function LiveTracker({ customerId, onNoActiveOrder, onStatusChange }: Props) {
   const [order, setOrder] = useState<Order | null>(null);
   const [delivered, setDelivered] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,14 +81,17 @@ export default function LiveTracker({ customerId, onNoActiveOrder }: Props) {
     return onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const d = snapshot.docs[0];
-        setOrder({ id: d.id, ...d.data() } as Order);
+        const o = { id: d.id, ...d.data() } as Order;
+        setOrder(o);
         setDelivered(null);
+        onStatusChange?.(o.status, o.zone ?? null);
       } else {
         setOrder(null);
+        onStatusChange?.(null, null);
       }
       setLoading(false);
     });
-  }, [customerId]);
+  }, [customerId, onStatusChange]);
 
   useEffect(() => {
     const q = query(

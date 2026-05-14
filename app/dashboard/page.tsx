@@ -12,6 +12,20 @@ import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Truck, Clock, LayoutDashboard, LogOut } from "lucide-react";
+import type { OrderStatus } from "@/types/order";
+import dynamic from "next/dynamic";
+
+const SceneCanvas       = dynamic(() => import("@/lib/r3f/canvas"),                  { ssr: false });
+const DeliveryOrb       = dynamic(() => import("@/components/3d/DeliveryOrb"),       { ssr: false });
+const DashboardLighting = dynamic(
+  () => import("@/lib/r3f/lighting").then((m) => ({ default: m.DashboardLighting })),
+  { ssr: false }
+);
+const CityMap3D   = dynamic(() => import("@/components/3d/CityMap3D"),  { ssr: false });
+const MapLighting = dynamic(
+  () => import("@/lib/r3f/lighting").then((m) => ({ default: m.MapLighting })),
+  { ssr: false }
+);
 
 interface Prefill {
   description: string;
@@ -36,6 +50,9 @@ export default function DashboardPage() {
   const [prefill, setPrefill]         = useState<Prefill | undefined>();
   const [checking, setChecking]       = useState(true);
   const [signingOut, setSigningOut]   = useState(false);
+  const [activeOrderStatus, setActiveOrderStatus] = useState<OrderStatus>("pending");
+  const [driverDot, setDriverDot] = useState<{ id: string; lat: number; lng: number } | null>(null);
+  const [mapZone, setMapZone] = useState<"ifrane" | "oujda">("ifrane");
   const router = useRouter();
 
   useEffect(() => {
@@ -143,6 +160,44 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
+          {/* ── DeliveryOrb 3D status visualization ── */}
+          {hasActiveOrder && (
+            <motion.div variants={item}>
+              <div className="w-full h-48 rounded-3xl overflow-hidden relative mb-0" style={{ background: 'rgba(30,45,74,0.4)' }}>
+                <SceneCanvas camera={{ fov: 50, position: [0, 0, 4] }}>
+                  <DashboardLighting />
+                  <DeliveryOrb status={activeOrderStatus} />
+                </SceneCanvas>
+                <div className="absolute bottom-3 left-0 right-0 text-center">
+                  <span className="text-white/60 text-xs font-medium uppercase tracking-wider">
+                    {activeOrderStatus === "pending"   && "Waiting for a driver…"}
+                    {activeOrderStatus === "accepted"  && "Driver on the way"}
+                    {activeOrderStatus === "picked_up" && "Your order is en route"}
+                    {activeOrderStatus === "delivered" && "Delivered! 🎉"}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── CityMap3D live tracking ── */}
+          {(activeOrderStatus === "accepted" || activeOrderStatus === "picked_up") && hasActiveOrder && (
+            <motion.div variants={item}>
+              <div className="w-full h-64 rounded-3xl overflow-hidden relative" style={{ background: '#1e2d4a' }}>
+                <SceneCanvas camera={{ fov: 60, position: [0, 8, 0.01] }}>
+                  <MapLighting />
+                  <CityMap3D
+                    zone={mapZone}
+                    dots={driverDot ? [{ ...driverDot, color: "#e05a23" }] : []}
+                  />
+                </SceneCanvas>
+                <div className="absolute top-3 left-4">
+                  <span className="text-white/50 text-xs">Live tracking</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* ── Live tracker / Order form ── */}
           <motion.div variants={item} className="card-glass !p-0 overflow-hidden">
             {hasActiveOrder ? (
@@ -153,6 +208,10 @@ export default function DashboardPage() {
                 <LiveTracker
                   customerId={userId!}
                   onNoActiveOrder={() => setHasActiveOrder(false)}
+                  onStatusChange={(status, zone) => {
+                    if (status) setActiveOrderStatus(status);
+                    if (zone === "ifrane" || zone === "oujda") setMapZone(zone);
+                  }}
                 />
               </div>
             ) : (
