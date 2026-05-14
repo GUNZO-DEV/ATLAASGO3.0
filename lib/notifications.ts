@@ -67,7 +67,7 @@ export async function requestFcmToken(): Promise<string | null> {
 
   try {
     const { getMessaging, getToken } = await import("firebase/messaging");
-    const { default: app } = await import("firebase/app");
+    const { default: app } = await import("@/lib/firebase");
     const messaging = getMessaging(app);
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
