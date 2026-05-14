@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, query, orderBy, limit, getDocs, where,
+  collection, query, orderBy, limit, getDocs, where, getDoc, doc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import FloatingNavbar from "@/components/FloatingNavbar";
@@ -35,6 +35,7 @@ export default function CommunityPage() {
   const [popular, setPopular]         = useState<PopularItem[]>([]);
   const [newArrivals, setNewArrivals] = useState<Restaurant[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -45,6 +46,7 @@ export default function CommunityPage() {
 
   useEffect(() => {
     async function load() {
+      try {
       // Trending: from social_feed ordered by trendingScore
       const feedSnap = await getDocs(
         query(collection(db, "social_feed"), orderBy("trendingScore", "desc"), limit(5))
@@ -53,11 +55,9 @@ export default function CommunityPage() {
       const trendingRestaurants = await Promise.all(
         feedSnap.docs.map(async (feedDoc) => {
           const feedData = feedDoc.data();
-          const restSnap = await getDocs(
-            query(collection(db, "restaurants"), where("__name__", "==", feedDoc.id), limit(1))
-          );
-          if (restSnap.empty) return null;
-          const r = { id: restSnap.docs[0].id, ...restSnap.docs[0].data() } as Restaurant;
+          const restSnap = await getDoc(doc(db, "restaurants", feedDoc.id));
+          if (!restSnap.exists()) return null;
+          const r = { id: restSnap.id, ...restSnap.data() } as Restaurant;
           return { ...r, recentOrderCount: feedData.recentOrderCount ?? 0 };
         })
       );
@@ -81,7 +81,12 @@ export default function CommunityPage() {
       );
       setNewArrivals(newSnap.docs.map(d => ({ id: d.id, ...d.data() } as Restaurant)));
 
-      setLoading(false);
+      } catch (err) {
+        console.error("Community page load error:", err);
+        setError("Failed to load community data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -90,6 +95,9 @@ export default function CommunityPage() {
     <div className="min-h-screen bg-gray-50">
       <FloatingNavbar />
       <div className="max-w-2xl mx-auto px-4 pt-24 pb-12 space-y-10">
+        {error && (
+          <p className="text-red-500 text-sm text-center">{error}</p>
+        )}
 
         {/* Trending Now */}
         <section>
@@ -122,7 +130,7 @@ export default function CommunityPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{r.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5 capitalize">
-                      {r.cuisine.join(" · ")}
+                      {(r.cuisine ?? []).join(" · ")}
                     </p>
                   </div>
                   <span className="shrink-0 text-xs bg-orange-50 text-[#E05A23] font-bold px-2 py-1 rounded-full">
@@ -135,12 +143,18 @@ export default function CommunityPage() {
         </section>
 
         {/* Popular Items */}
-        {popular.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Star className="w-5 h-5 text-yellow-400" />
-              <h2 className="text-lg font-bold text-gray-900">Popular Items</h2>
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Star className="w-5 h-5 text-yellow-400" />
+            <h2 className="text-lg font-bold text-gray-900">Popular Items</h2>
+          </div>
+          {loading ? (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="shrink-0 w-36 h-40 bg-gray-200 rounded-2xl animate-pulse" />
+              ))}
             </div>
+          ) : popular.length === 0 ? null : (
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
               {popular.map((item) => (
                 <Link
@@ -159,22 +173,28 @@ export default function CommunityPage() {
                     <p className="text-xs text-gray-400">{item.price} MAD</p>
                     <div className="flex items-center gap-0.5 mt-1">
                       <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs text-gray-500">{item.averageRating.toFixed(1)}</span>
+                      <span className="text-xs text-gray-500">{item.averageRating?.toFixed(1) ?? "–"}</span>
                     </div>
                   </div>
                 </Link>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* New This Month */}
-        {newArrivals.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              <h2 className="text-lg font-bold text-gray-900">New This Month</h2>
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-purple-500" />
+            <h2 className="text-lg font-bold text-gray-900">New This Month</h2>
+          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="h-40 bg-gray-200 rounded-2xl animate-pulse" />
+              ))}
             </div>
+          ) : newArrivals.length === 0 ? null : (
             <div className="grid grid-cols-2 gap-3">
               {newArrivals.map((r) => (
                 <div key={r.id} className="relative">
@@ -185,8 +205,8 @@ export default function CommunityPage() {
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </div>
   );
