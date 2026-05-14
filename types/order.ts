@@ -1,4 +1,16 @@
-export type OrderStatus = "pending" | "assigned" | "picked_up" | "delivered" | "cancelled";
+export type OrderStatus =
+  | "pending"
+  | "accepted"
+  | "picked_up"
+  | "delivered"
+  | "cancelled"
+  | "expired";
+
+export interface StatusHistoryEntry {
+  status: OrderStatus;
+  timestamp: string; // ISO string
+  actorId: string;
+}
 
 export interface OrderItem {
   description: string;
@@ -15,5 +27,10 @@ export interface Order {
   status: OrderStatus;
   zone: string;
   fee?: number;        // stored at creation; may be absent on legacy orders
+  surgeFee?: number;
+  statusHistory?: StatusHistoryEntry[];
   timestamp: string;
+  acceptedAt?: string;
+  pickedUpAt?: string;
+  deliveredAt?: string;
 }
