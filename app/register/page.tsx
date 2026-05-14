@@ -9,6 +9,7 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { track, identifyUser } from "@/lib/analytics";
+import { requestFcmToken, saveFcmToken } from "@/lib/notifications";
 import PhoneLogin from "@/components/PhoneLogin";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -50,12 +51,20 @@ export default function RegisterPage() {
         });
         identifyUser(user.uid, { email, name, role: "customer" });
         track("user_registered", { uid: user.uid, email });
+        // Request FCM token in background — don't block redirect
+        requestFcmToken().then((token) => {
+          if (token) saveFcmToken(user.uid, token);
+        }).catch(() => {/* notifications are optional */});
       } else {
         const { user } = await signInWithEmailAndPassword(auth, email, password);
         const snap = await getDoc(doc(db, "users", user.uid));
         const data = snap.data();
         identifyUser(user.uid, { email, name: data?.name, role: data?.role ?? "customer" });
         track("user_logged_in", { uid: user.uid, email });
+        // Request FCM token in background — don't block redirect
+        requestFcmToken().then((token) => {
+          if (token) saveFcmToken(user.uid, token);
+        }).catch(() => {/* notifications are optional */});
       }
       router.push("/dashboard");
     } catch (err: unknown) {
