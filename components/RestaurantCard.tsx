@@ -2,10 +2,16 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Clock, ShoppingBag } from "lucide-react";
+import { Star, Clock, ShoppingBag, Heart } from "lucide-react";
 import type { Restaurant } from "@/types/restaurant";
+import { useFavorites } from "@/hooks/useFavorites";
+import { auth } from "@/lib/firebase";
 
 export default function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
+  const uid = auth.currentUser?.uid ?? null;
+  const { isFavorite, toggle } = useFavorites(uid);
+  const fav = isFavorite(restaurant.id);
+
   return (
     <Link
       href={`/restaurants/${restaurant.id}`}
@@ -32,6 +38,17 @@ export default function RestaurantCard({ restaurant }: { restaurant: Restaurant 
             </span>
           </div>
         )}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            toggle(restaurant.id);
+          }}
+          className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow cursor-pointer hover:scale-110 transition-transform"
+        >
+          <Heart
+            className={`w-4 h-4 transition-colors ${fav ? "fill-red-500 text-red-500" : "text-gray-400"}`}
+          />
+        </button>
       </div>
 
       {/* Info */}
