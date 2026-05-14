@@ -92,5 +92,34 @@ service cloud.firestore {
       allow read:  if true;
       allow write: if isAdmin();
     }
+
+    match /restaurants/{restaurantId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /categories/{categoryId} {
+        allow read: if true;
+        allow write: if isAdmin();
+
+        match /items/{itemId} {
+          allow read: if true;
+          allow write: if isAdmin();
+        }
+      }
+    }
+
+    match /carts/{cartId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.ownerId ||
+        request.auth.uid in resource.data.participants
+      );
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.ownerId;
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.ownerId ||
+        request.auth.uid in resource.data.participants
+      );
+      allow delete: if isAdmin();
+    }
   }
 }
