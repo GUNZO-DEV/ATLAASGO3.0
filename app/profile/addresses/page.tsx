@@ -29,21 +29,34 @@ export default function AddressesPage() {
   const { addresses, add, remove, update } = useSavedAddresses(uid);
 
   const handleAdd = async (addr: Omit<SavedAddress, "id">) => {
-    await add(addr);
-    setShowForm(false);
-    toast.success("Address saved");
+    if (addresses.length >= 5) return;
+    try {
+      await add(addr);
+      setShowForm(false);
+      toast.success("Address saved");
+    } catch {
+      toast.error("Failed to save address");
+    }
   };
 
   const handleUpdate = async (addr: Omit<SavedAddress, "id">) => {
     if (!editing) return;
-    await update(editing.id, addr);
-    setEditing(null);
-    toast.success("Address updated");
+    try {
+      await update(editing.id, addr);
+      setEditing(null);
+      toast.success("Address updated");
+    } catch {
+      toast.error("Failed to update address");
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await remove(id);
-    toast.success("Address removed");
+    try {
+      await remove(id);
+      toast.success("Address removed");
+    } catch {
+      toast.error("Failed to remove address");
+    }
   };
 
   return (
