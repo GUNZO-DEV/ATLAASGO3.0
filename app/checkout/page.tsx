@@ -54,9 +54,11 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!userId) return;
-    getDoc(doc(db, "users", userId)).then((snap) => {
-      if (snap.exists()) setReferralCredits(snap.data().referralCredits ?? 0);
-    });
+    getDoc(doc(db, "users", userId))
+      .then((snap) => {
+        if (snap.exists()) setReferralCredits(snap.data().referralCredits ?? 0);
+      })
+      .catch((err) => console.error("Failed to fetch referral credits:", err));
   }, [userId]);
 
   const total = subtotal + deliveryFee;
@@ -95,12 +97,12 @@ export default function CheckoutPage() {
         timestamp:     now,
       });
 
+      await checkOut();
       if (useCredit && creditApplied > 0 && userId) {
         await updateDoc(doc(db, "users", userId), {
           referralCredits: increment(-creditApplied),
         });
       }
-      await checkOut();
       toast.success("Order placed!");
       router.push(`/orders/${orderRef.id}`);
     } catch {
