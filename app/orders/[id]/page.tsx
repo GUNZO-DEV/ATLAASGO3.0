@@ -5,13 +5,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, RefreshCw } from "lucide-react";
-import { onSnapshot, doc } from "firebase/firestore";
+import { onSnapshot, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import OrderTimeline from "@/components/OrderTimeline";
 import type { Order, OrderItem } from "@/types/order";
 
-interface RichOrder extends Order {
+interface RichOrder extends Omit<Order, "items"> {
   restaurantName?: string;
   deliveryAddress?: string;
   items?: (OrderItem & { quantity?: number; price?: number })[];
@@ -23,6 +23,7 @@ export default function OrderTrackingPage() {
   const router  = useRouter();
   const [order, setOrder]     = useState<RichOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [canReview, setCanReview] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -35,6 +36,14 @@ export default function OrderTrackingPage() {
     const unsub = onSnapshot(doc(db, "orders", id), (snap) => {
       if (!snap.exists()) { setLoading(false); return; }
       setOrder({ id: snap.id, ...snap.data() } as RichOrder);
+      // Check if user can leave a review
+      const currentUser = auth.currentUser;
+      if (currentUser && (snap.data() as Record<string, unknown>)?.status === "delivered") {
+        getDoc(doc(db, "users", currentUser.uid)).then((userSnap) => {
+          const reviewed: string[] = userSnap.data()?.reviewedOrderIds ?? [];
+          setCanReview(!reviewed.includes(id));
+        }).catch(() => {});
+      }
       setLoading(false);
     });
     return unsub;
@@ -136,6 +145,14 @@ export default function OrderTrackingPage() {
           >
             <RefreshCw className="w-4 h-4" />
             Order again
+          </Link>
+        )}
+        {order.status === "delivered" && canReview && (
+          <Link
+            href={`/orders/${id}/review`}
+            className="flex items-center justify-center gap-2 w-full py-3.5 border-2 border-[#E05A23] text-[#E05A23] rounded-2xl font-semibold text-sm hover:bg-orange-50 transition-colors mt-3"
+          >
+            ⭐ Rate your order
           </Link>
         )}
       </div>
