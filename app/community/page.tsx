@@ -125,11 +125,9 @@ export default function CommunityPage() {
                       {r.cuisine.join(" · ")}
                     </p>
                   </div>
-                  {(r.recentOrderCount ?? 0) > 0 && (
-                    <span className="shrink-0 text-xs bg-orange-50 text-[#E05A23] font-bold px-2 py-1 rounded-full">
-                      🔥 {r.recentOrderCount} today
-                    </span>
-                  )}
+                  <span className="shrink-0 text-xs bg-orange-50 text-[#E05A23] font-bold px-2 py-1 rounded-full">
+                    🔥 {r.recentOrderCount ?? 0} orders today
+                  </span>
                 </Link>
               ))}
             </div>
