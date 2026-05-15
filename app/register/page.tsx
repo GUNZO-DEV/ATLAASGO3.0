@@ -20,7 +20,7 @@ import React from "react";
 
 type Mode = "login" | "register";
 type AuthTab = "email" | "phone";
-type Role = "customer" | "merchant" | "rider";
+type Role = "customer" | "admin" | "rider";
 
 const ease = [0.25, 0.46, 0.45, 0.94] as [number, number, number, number];
 const fadeUp = {
@@ -97,7 +97,7 @@ export default function RegisterPage() {
           if (token) saveFcmToken(user.uid, token);
         }).catch(() => {/* notifications are optional */});
       }
-      if (role === "merchant") router.push("/merchant");
+      if (role === "admin") router.push("/admin/dashboard");
       else if (role === "rider") router.push("/driver");
       else router.push("/dashboard");
     } catch (err: unknown) {
@@ -155,7 +155,7 @@ export default function RegisterPage() {
       }
       requestFcmToken().then((token) => { if (token) saveFcmToken(user.uid, token); }).catch(() => {});
       // Route based on role
-      if (role === "merchant") router.push("/merchant");
+      if (role === "admin") router.push("/admin/dashboard");
       else if (role === "rider") router.push("/driver");
       else router.push("/dashboard");
     } catch (err: unknown) {
@@ -223,7 +223,7 @@ export default function RegisterPage() {
           <div className="flex gap-2 mb-6">
             {([
               { value: "customer", label: "Client", icon: ShoppingBag },
-              { value: "merchant", label: "Restaurant", icon: Store },
+              { value: "admin", label: "Admin", icon: Store },
               { value: "rider", label: "Coursier", icon: Bike },
             ] as { value: Role; label: string; icon: React.ComponentType<{ className?: string }> }[]).map((r) => {
               const Icon = r.icon;
@@ -352,7 +352,7 @@ export default function RegisterPage() {
             </>
           ) : (
             <PhoneLogin onSuccess={() => {
-              if (role === "merchant") router.push("/merchant");
+              if (role === "admin") router.push("/admin/dashboard");
               else if (role === "rider") router.push("/driver");
               else router.push("/dashboard");
             }} />
