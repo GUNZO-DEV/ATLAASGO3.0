@@ -12,9 +12,16 @@ export function useFavorites(uid: string | null) {
 
   useEffect(() => {
     if (!uid) return;
-    const unsub = onSnapshot(doc(db, "users", uid), (snap) => {
-      if (snap.exists()) setFavorites(snap.data().favorites ?? []);
-    });
+    const unsub = onSnapshot(
+      doc(db, "users", uid),
+      (snap) => {
+        if (snap.exists()) setFavorites(snap.data().favorites ?? []);
+      },
+      (err) => {
+        console.warn("favorites subscription failed:", err.code);
+        setFavorites([]);
+      }
+    );
     return unsub;
   }, [uid]);
 

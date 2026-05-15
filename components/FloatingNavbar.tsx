@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { LogOut, LayoutDashboard, Zap, ChevronDown, Bell, Search, ShoppingBag } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useCart } from "@/contexts/CartContext";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -23,9 +24,6 @@ const NAV_LINKS = [
   { label: "Profil",      href: "/profile/settings" },
 ];
 
-// Placeholder cart count — swap for real cart state/context as needed
-const CART_COUNT = 0;
-
 export default function FloatingNavbar() {
   const [scrolled, setScrolled]     = useState(false);
   const [user, setUser]             = useState<UserInfo | null>(null);
@@ -35,6 +33,7 @@ export default function FloatingNavbar() {
   const [signingOut, setSigningOut] = useState(false);
 
   const { unreadCount } = useNotifications(uid);
+  const { itemCount: cartCount } = useCart() ?? { itemCount: 0 };
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -148,9 +147,9 @@ export default function FloatingNavbar() {
           >
             <ShoppingBag className="w-4 h-4" />
             <span className="text-[13px] font-bold">Panier</span>
-            {CART_COUNT > 0 && (
+            {cartCount > 0 && (
               <span className="min-w-[20px] h-5 bg-brand text-white text-[11px] font-extrabold rounded-full flex items-center justify-center px-1.5">
-                {CART_COUNT > 9 ? "9+" : CART_COUNT}
+                {cartCount > 9 ? "9+" : cartCount}
               </span>
             )}
           </Link>

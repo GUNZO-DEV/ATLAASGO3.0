@@ -63,6 +63,16 @@ export default function RegisterPage() {
           favorites: [],
           savedAddresses: [],
         });
+
+        // Publish a public referralCodes mapping so this user's code
+        // can be resolved by future signups using ?ref=CODE.
+        try {
+          const { registerReferralCode } = await import("@/lib/referral");
+          await registerReferralCode(referralCode, user.uid);
+        } catch (refErr) {
+          console.warn("Failed to register referral code mapping:", refErr);
+        }
+
         if (refCode) {
           const { applyReferralOnRegister } = await import("@/lib/referral");
           await applyReferralOnRegister(refCode, user.uid);

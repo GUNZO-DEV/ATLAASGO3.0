@@ -53,24 +53,47 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Real-time listener on the cart doc
+  // Real-time listener on the cart doc.
+  // Only subscribe once we know the user is authenticated — Firestore rules
+  // require the caller to be the owner/participant, and an unauthenticated
+  // (or wrong-user) subscription would throw permission-denied.
   useEffect(() => {
     if (!cartId) return;
-    const unsub = onSnapshot(doc(db, "carts", cartId), (snap) => {
-      if (!snap.exists()) { clearCart(); return; }
-      const data = { id: snap.id, ...snap.data() } as Cart;
-      if (data.status === "checked_out") { clearCart(); return; }
-      setCart(data);
-      setIsLoading(false);
-
-      // Auto-join if current user isn't yet a participant
-      const uid  = auth.currentUser?.uid;
-      const name = auth.currentUser?.displayName ?? "Guest";
-      if (uid && !data.participants.includes(uid)) {
-        joinCart(cartId, uid, name);
+    let unsub: (() => void) | undefined;
+    const authUnsub = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        // Anonymous visit — clear stale cartId so we don't subscribe and 403.
+        setIsLoading(false);
+        return;
       }
+      unsub = onSnapshot(
+        doc(db, "carts", cartId),
+        (snap) => {
+          if (!snap.exists()) { clearCart(); return; }
+          const data = { id: snap.id, ...snap.data() } as Cart;
+          if (data.status === "checked_out") { clearCart(); return; }
+          setCart(data);
+          setIsLoading(false);
+
+          // Auto-join if current user isn't yet a participant
+          const uid  = user.uid;
+          const name = user.displayName ?? "Guest";
+          if (uid && !data.participants.includes(uid)) {
+            joinCart(cartId, uid, name);
+          }
+        },
+        (err) => {
+          // Orphaned cartId from a different account, or deleted cart.
+          // Drop it from localStorage so we don't keep retrying.
+          console.warn("Cart subscription failed, clearing local cart:", err.code);
+          clearCart();
+        }
+      );
     });
-    return unsub;
+    return () => {
+      authUnsub();
+      unsub?.();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartId]);
 

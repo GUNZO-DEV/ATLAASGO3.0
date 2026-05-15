@@ -18,9 +18,16 @@ export function useSavedAddresses(uid: string | null) {
 
   useEffect(() => {
     if (!uid) return;
-    const unsub = onSnapshot(doc(db, "users", uid), (snap) => {
-      if (snap.exists()) setAddresses(snap.data().savedAddresses ?? []);
-    });
+    const unsub = onSnapshot(
+      doc(db, "users", uid),
+      (snap) => {
+        if (snap.exists()) setAddresses(snap.data().savedAddresses ?? []);
+      },
+      (err) => {
+        console.warn("saved addresses subscription failed:", err.code);
+        setAddresses([]);
+      }
+    );
     return unsub;
   }, [uid]);
 

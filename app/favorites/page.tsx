@@ -3,22 +3,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Heart, ShoppingBag } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useFavorites } from "@/hooks/useFavorites";
 import { getRestaurant } from "@/lib/restaurants";
-import RestaurantGrid from "@/components/RestaurantGrid";
-import FloatingNavbar from "@/components/FloatingNavbar";
+import RestaurantSprite from "@/components/atlas/RestaurantSprite";
 import type { Restaurant } from "@/types/restaurant";
-import { Heart } from "lucide-react";
-import Link from "next/link";
 
 export default function FavoritesPage() {
   const router = useRouter();
+
   const [uid, setUid]                 = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -28,7 +27,7 @@ export default function FavoritesPage() {
     return unsub;
   }, [router]);
 
-  const { favorites } = useFavorites(uid);
+  const { favorites, toggle } = useFavorites(uid);
 
   useEffect(() => {
     if (!uid) return;
@@ -36,43 +35,93 @@ export default function FavoritesPage() {
     setLoading(true);
     Promise.all(favorites.map(getRestaurant))
       .then((results) => setRestaurants(results.filter((r): r is Restaurant => r !== null)))
-      .catch((err) => { console.error("Failed to load favorites:", err); setError("Failed to load your favorites. Please refresh."); })
+      .catch((err) => console.error("Failed to load favorites:", err))
       .finally(() => setLoading(false));
   }, [uid, favorites.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <FloatingNavbar />
-      <div className="max-w-7xl mx-auto px-4 pt-24 pb-12">
-        <div className="flex items-center gap-2 mb-6">
-          <Heart className="w-5 h-5 fill-red-500 text-red-500" />
-          <h1 className="text-2xl font-bold text-gray-900">Favorites</h1>
+    <div className="min-h-screen bg-[#F5F0E8]">
+      <div className="max-w-[1100px] mx-auto px-6 pt-8 pb-16">
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1
+            className="font-extrabold text-[32px] text-[#1B2440] leading-tight flex items-center gap-3"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            <Heart className="w-8 h-8 fill-[#E55A26] text-[#E55A26]" />
+            Mes favoris
+          </h1>
+          <p className="text-sm text-[#6B7A9E] mt-1">
+            {restaurants.length} restaurant{restaurants.length !== 1 ? "s" : ""} sauvegardé{restaurants.length !== 1 ? "s" : ""}
+          </p>
         </div>
 
-        {error && (
-          <p className="text-red-500 text-sm mb-4">{error}</p>
-        )}
-
-        {!loading && restaurants.length === 0 ? (
-          <div className="text-center py-20">
-            <Heart className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">No favorites yet</p>
-            <p className="text-gray-400 text-sm mt-1 mb-6">
-              Tap the heart on any restaurant to save it here
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 rounded-full border-[3px] border-[#E55A26] border-t-transparent animate-spin" />
+          </div>
+        ) : restaurants.length === 0 ? (
+          <div className="bg-white rounded-2xl p-10 text-center shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
+            <div className="w-16 h-16 rounded-2xl bg-[#FEF0E7] flex items-center justify-center mx-auto mb-4">
+              <Heart className="w-8 h-8 text-[#E55A26]" />
+            </div>
+            <h2
+              className="text-[22px] font-extrabold text-[#1B2440] mb-2"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Aucun favori pour l&apos;instant
+            </h2>
+            <p className="text-[#6B7A9E] text-sm mb-5">
+              Touchez le cœur sur n&apos;importe quel restaurant pour le sauvegarder ici.
             </p>
             <Link
               href="/restaurants"
-              className="inline-block bg-[#E05A23] text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors"
+              className="inline-flex items-center gap-2 bg-[#E55A26] hover:bg-[#C94D20] text-white font-bold px-6 py-3 rounded-full transition"
             >
-              Browse restaurants
+              <ShoppingBag className="w-4 h-4" />
+              Explorer les restos
             </Link>
           </div>
         ) : (
-          <RestaurantGrid
-            restaurants={restaurants}
-            selectedCuisines={[]}
-            loading={loading}
-          />
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            {restaurants.map((r) => (
+              <Link
+                key={r.id}
+                href={`/restaurants/${r.id}`}
+                className="bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-shadow group"
+              >
+                <div className="relative">
+                  <RestaurantSprite id={`rest:${r.id}`} height={140} radius={0} />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggle(r.id);
+                    }}
+                    className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/95 backdrop-blur flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
+                    aria-label="Retirer des favoris"
+                  >
+                    <Heart className="w-4 h-4 fill-[#E55A26] text-[#E55A26]" />
+                  </button>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-extrabold text-[#1B2440] text-sm leading-tight truncate">
+                    {r.name}
+                  </h3>
+                  <p className="text-[11px] text-[#6B7A9E] mt-0.5 truncate">{r.description}</p>
+                  <div className="flex items-center justify-between mt-2 text-[11px] text-[#6B7A9E]">
+                    <span className="flex items-center gap-1">
+                      <span className="text-[#F0A500]">★</span>
+                      <span className="font-bold text-[#1B2440]">{r.rating}</span>
+                    </span>
+                    <span>{r.estimatedDeliveryMins} min</span>
+                    <span className="font-medium">{r.deliveryFee} DH</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </div>

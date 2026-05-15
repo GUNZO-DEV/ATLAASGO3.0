@@ -28,13 +28,21 @@ export function useNotifications(uid: string | null) {
       collection(db, "users", uid, "notifications"),
       orderBy("createdAt", "desc")
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const notifs = snap.docs.map(
-        (d) => ({ id: d.id, ...d.data() } as AppNotification)
-      );
-      setNotifications(notifs);
-      setUnreadCount(notifs.filter((n) => !n.read).length);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const notifs = snap.docs.map(
+          (d) => ({ id: d.id, ...d.data() } as AppNotification)
+        );
+        setNotifications(notifs);
+        setUnreadCount(notifs.filter((n) => !n.read).length);
+      },
+      (err) => {
+        console.warn("notifications subscription failed:", err.code);
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    );
     return unsub;
   }, [uid]);
 
