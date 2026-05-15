@@ -7,7 +7,6 @@ import { auth } from "@/lib/firebase";
 import { useSavedAddresses } from "@/hooks/useSavedAddresses";
 import AddressCard from "@/components/AddressCard";
 import AddressForm from "@/components/AddressForm";
-import FloatingNavbar from "@/components/FloatingNavbar";
 import type { SavedAddress } from "@/hooks/useSavedAddresses";
 import { Plus, MapPin } from "lucide-react";
 import toast from "react-hot-toast";
@@ -60,17 +59,26 @@ export default function AddressesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <FloatingNavbar />
-      <div className="max-w-lg mx-auto px-4 pt-24 pb-12">
+    <div className="min-h-screen bg-[#F5F0E8]">
+      <div className="max-w-[700px] mx-auto px-6 pt-8 pb-16">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Saved Addresses</h1>
+          <div>
+            <h1
+              className="text-2xl font-extrabold text-[#1B2440]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Mes adresses
+            </h1>
+            <p className="text-sm text-[#6B7A9E] mt-1">
+              {addresses.length} / 5 adresses enregistrées
+            </p>
+          </div>
           {addresses.length < 5 && !showForm && !editing && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-1.5 text-sm text-[#E05A23] font-medium cursor-pointer"
+              className="flex items-center gap-1.5 bg-[#E55A26] text-white text-sm font-semibold px-4 py-2 rounded-full hover:bg-[#C94D20] transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Add
+              <Plus className="w-4 h-4" /> Ajouter
             </button>
           )}
         </div>
@@ -82,16 +90,23 @@ export default function AddressesPage() {
 
           {addresses.length === 0 && !showForm ? (
             <div className="text-center py-16">
-              <MapPin className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">No saved addresses</p>
-              <p className="text-gray-400 text-sm mt-1 mb-4">
-                Save your dorm, home, or office for faster checkout
+              <div className="w-16 h-16 rounded-full bg-[#FEF0E7] flex items-center justify-center mx-auto mb-4">
+                <MapPin className="w-8 h-8 text-[#E55A26]" />
+              </div>
+              <p
+                className="font-extrabold text-[#1B2440] text-base"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Aucune adresse enregistrée
+              </p>
+              <p className="text-[#6B7A9E] text-sm mt-1 mb-5">
+                Enregistrez votre résidence, domicile ou bureau pour commander plus vite
               </p>
               <button
                 onClick={() => setShowForm(true)}
-                className="bg-[#E05A23] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600 cursor-pointer"
+                className="bg-[#E55A26] text-white px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-[#C94D20] transition-colors cursor-pointer"
               >
-                Add address
+                Ajouter une adresse
               </button>
             </div>
           ) : (

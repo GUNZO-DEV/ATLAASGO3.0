@@ -11,6 +11,7 @@ import { auth, db } from "@/lib/firebase";
 import { subscribeToUserOrders, expireStaleOrders } from "@/lib/orders";
 import RestaurantSprite from "@/components/atlas/RestaurantSprite";
 import type { Order } from "@/types/order";
+import type { Restaurant } from "@/types/restaurant";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,11 +70,12 @@ function Skeleton() {
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [userId, setUserId]     = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("");
+  const [userId, setUserId]         = useState<string | null>(null);
+  const [userName, setUserName]     = useState<string>("");
   const [memberSince, setMemberSince] = useState<string>("");
-  const [orders, setOrders]     = useState<Order[]>([]);
-  const [checking, setChecking] = useState(true);
+  const [orders, setOrders]         = useState<Order[]>([]);
+  const [checking, setChecking]     = useState(true);
+  const [recommended, setRecommended] = useState<Restaurant[]>([]);
 
   // 1. Auth guard
   useEffect(() => {
@@ -104,6 +106,23 @@ export default function DashboardPage() {
     expireStaleOrders(userId).catch(() => {});
     const unsub = subscribeToUserOrders(userId, setOrders);
     return unsub;
+  }, [userId]);
+
+  // 3. Recommended restaurants — top 6 in user's zone sorted by rating
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      const { collection, query, where, orderBy, limit, getDocs } = await import("firebase/firestore");
+      const { db } = await import("@/lib/firebase");
+      // Fetch user zone first
+      const { doc, getDoc } = await import("firebase/firestore");
+      const snap = await getDoc(doc(db, "users", userId));
+      const zone = snap.data()?.zone ?? "ifrane";
+      const restSnap = await getDocs(
+        query(collection(db, "restaurants"), where("zone", "==", zone), orderBy("rating", "desc"), limit(6))
+      );
+      setRecommended(restSnap.docs.map(d => ({ id: d.id, ...d.data() } as Restaurant)));
+    })();
   }, [userId]);
 
   if (checking) return <Skeleton />;
@@ -152,6 +171,35 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* ── Pour vous — recommended restaurants ── */}
+        {recommended.length > 0 && (
+          <>
+            <h2 className="text-[20px] font-extrabold text-[#1B2440] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+              Pour vous
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-2 mb-8 scrollbar-hide">
+              {recommended.map((r) => (
+                <Link key={r.id} href={`/restaurants/${r.id}`} className="shrink-0 w-[200px] bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-shadow group">
+                  <div className="h-[110px] overflow-hidden">
+                    <RestaurantSprite id={`rest:${r.id}`} height={110} radius={0} />
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-extrabold text-[#1B2440] text-sm truncate">{r.name}</h3>
+                    <p className="text-[11px] text-[#6B7A9E] truncate mt-0.5">{r.description}</p>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[#6B7A9E]">
+                      <span className="flex items-center gap-0.5">
+                        <span className="text-[#F0A500]">★</span>
+                        <span className="font-bold text-[#1B2440]">{r.rating}</span>
+                      </span>
+                      <span>{r.estimatedDeliveryMins} min</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* ── Live order banner ── */}
         {liveOrder && (

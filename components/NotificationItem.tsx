@@ -22,30 +22,30 @@ export default function NotificationItem({ notification, onRead }: Props) {
   const content = (
     <div
       onClick={() => !notification.read && onRead(notification.id)}
-      className={`flex items-start gap-3 p-4 rounded-2xl cursor-pointer transition-colors ${
+      className={`flex items-start gap-3 p-4 cursor-pointer transition-colors ${
         notification.read
           ? "bg-white"
-          : "bg-orange-50 border-l-4 border-[#E05A23]"
+          : "bg-[#FEF0E7] border-l-4 border-[#E55A26]"
       }`}
     >
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-        notification.read ? "bg-gray-100" : "bg-orange-100"
+        notification.read ? "bg-[#F5F0E8]" : "bg-[#E55A26]/10"
       }`}>
-        <Icon className={`w-4 h-4 ${notification.read ? "text-gray-400" : "text-[#E05A23]"}`} />
+        <Icon className={`w-4 h-4 ${notification.read ? "text-[#6B7A9E]" : "text-[#E55A26]"}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-semibold ${notification.read ? "text-gray-700" : "text-gray-900"}`}>
+        <p className={`text-sm ${notification.read ? "font-medium text-[#1B2440]" : "font-bold text-[#1B2440]"}`}>
           {notification.title}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5">{notification.body}</p>
-        <p className="text-xs text-gray-300 mt-1">
-          {new Date(notification.createdAt).toLocaleDateString("en-MA", {
+        <p className="text-xs text-[#6B7A9E] mt-0.5">{notification.body}</p>
+        <p className="text-xs text-[#6B7A9E]/60 mt-1">
+          {new Date(notification.createdAt).toLocaleDateString("fr-MA", {
             month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
           })}
         </p>
       </div>
       {!notification.read && (
-        <span className="w-2 h-2 rounded-full bg-[#E05A23] shrink-0 mt-1.5" />
+        <span className="w-2 h-2 rounded-full bg-[#E55A26] shrink-0 mt-1.5" />
       )}
     </div>
   );

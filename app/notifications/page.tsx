@@ -6,7 +6,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useNotifications } from "@/hooks/useNotifications";
 import NotificationItem from "@/components/NotificationItem";
-import FloatingNavbar from "@/components/FloatingNavbar";
 import { Bell } from "lucide-react";
 
 export default function NotificationsPage() {
@@ -24,31 +23,57 @@ export default function NotificationsPage() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(uid);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <FloatingNavbar />
-      <div className="max-w-lg mx-auto px-4 pt-24 pb-12">
+    <div className="min-h-screen bg-[#F5F0E8]">
+      <div className="max-w-[700px] mx-auto px-6 pt-8 pb-16">
+
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+          <div>
+            <h1
+              className="text-2xl font-extrabold text-[#1B2440]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Notifications
+            </h1>
+            {unreadCount > 0 && (
+              <p className="text-sm text-[#6B7A9E] mt-0.5">
+                {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
           {unreadCount > 0 && (
             <button
               onClick={markAllRead}
-              className="text-sm text-[#E05A23] font-medium cursor-pointer hover:underline"
+              className="text-sm text-[#E55A26] font-semibold cursor-pointer hover:opacity-80 transition-opacity bg-[#E55A26]/10 px-4 py-2 rounded-xl"
             >
-              Mark all read
+              Tout marquer lu
             </button>
           )}
         </div>
 
+        {/* Section badge */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center gap-1.5 bg-white rounded-full px-3 py-1 shadow-[0_2px_10px_rgba(27,36,64,0.06)] text-xs font-semibold text-[#1B2440]">
+            <Bell className="w-3.5 h-3.5 text-[#E55A26]" />
+            Récentes
+          </span>
+        </div>
+
+        {/* Content */}
         {notifications.length === 0 ? (
-          <div className="text-center py-20">
-            <Bell className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">No notifications yet</p>
-            <p className="text-gray-400 text-sm mt-1">
-              Order updates and referral rewards will appear here
+          <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex flex-col items-center justify-center py-20 px-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-[#E55A26]/10 flex items-center justify-center mb-4">
+              <Bell className="w-7 h-7 text-[#E55A26]" />
+            </div>
+            <p className="text-base font-bold text-[#1B2440]" style={{ fontFamily: "var(--font-display)" }}>
+              Aucune notification
+            </p>
+            <p className="text-sm text-[#6B7A9E] mt-1 max-w-xs">
+              Les mises à jour de commande et récompenses de parrainage apparaîtront ici
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(27,36,64,0.06)] overflow-hidden divide-y divide-[#F5F0E8]">
             {notifications.map((n) => (
               <NotificationItem key={n.id} notification={n} onRead={markRead} />
             ))}

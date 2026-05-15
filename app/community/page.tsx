@@ -9,7 +9,6 @@ import {
   collection, query, orderBy, limit, getDocs, where, getDoc, doc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import FloatingNavbar from "@/components/FloatingNavbar";
 import RestaurantCard from "@/components/RestaurantCard";
 import type { Restaurant } from "@/types/restaurant";
 import { Flame, Star, Sparkles } from "lucide-react";
@@ -92,66 +91,115 @@ export default function CommunityPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <FloatingNavbar />
-      <div className="max-w-2xl mx-auto px-4 pt-24 pb-12 space-y-10">
+    <div className="min-h-screen bg-[#F5F0E8]">
+      <div className="max-w-[1100px] mx-auto px-6 pt-8 pb-16">
+
+        {/* ── Page header ── */}
+        <div className="mb-8">
+          <h1
+            className="font-extrabold text-[32px] text-[#1B2440] leading-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Communauté
+          </h1>
+          <p className="text-sm text-[#6B7A9E] mt-1">
+            Découvrez ce que la communauté AtlaasGo commande en ce moment
+          </p>
+        </div>
+
         {error && (
-          <p className="text-red-500 text-sm text-center">{error}</p>
+          <p className="text-red-500 text-sm text-center mb-6">{error}</p>
         )}
 
-        {/* Trending Now */}
-        <section>
+        {/* ── Trending Now ── */}
+        <section className="mb-10">
           <div className="flex items-center gap-2 mb-4">
-            <Flame className="w-5 h-5 text-[#E05A23]" />
-            <h2 className="text-lg font-bold text-gray-900">Trending Now</h2>
+            <span className="inline-flex items-center gap-1.5 bg-[#E55A26]/10 text-[#E55A26] text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full">
+              <Flame className="w-3 h-3" />
+              Trending Now
+            </span>
           </div>
+
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => (
-                <div key={i} className="h-20 bg-gray-200 rounded-2xl animate-pulse" />
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-white/60 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : trending.length === 0 ? (
-            <p className="text-gray-400 text-sm">No trending data yet — place some orders!</p>
+            <p className="text-[#6B7A9E] text-sm">
+              Pas encore de données de tendances — passez quelques commandes&nbsp;!
+            </p>
           ) : (
             <div className="space-y-3">
-              {trending.map((r) => (
+              {trending.map((r, idx) => (
                 <Link
                   key={r.id}
                   href={`/restaurants/${r.id}`}
-                  className="flex items-center gap-3 bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  className="block w-full bg-[#1B2440] text-white rounded-2xl p-4 relative overflow-hidden group cursor-pointer"
                 >
-                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 shrink-0">
-                    {r.coverImage && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.coverImage} alt={r.name} className="w-full h-full object-cover" />
-                    )}
+                  {/* Zellige dot pattern overlay */}
+                  <div
+                    className="absolute inset-0 pointer-events-none opacity-[0.12]"
+                    style={{
+                      backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)",
+                      backgroundSize: "20px 20px",
+                    }}
+                  />
+                  <div className="relative flex items-center gap-4">
+                    {/* Rank number */}
+                    <span
+                      className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 font-extrabold text-sm text-white/80"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      {idx + 1}
+                    </span>
+
+                    {/* Cover image */}
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-white/10 shrink-0">
+                      {r.coverImage && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.coverImage} alt={r.name} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+
+                    {/* Name + cuisine */}
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-extrabold text-white text-base leading-tight truncate"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        {r.name}
+                      </p>
+                      <p className="text-xs text-white/60 mt-0.5 truncate capitalize">
+                        {(r.cuisine ?? []).join(" · ")}
+                      </p>
+                    </div>
+
+                    {/* Order count badge */}
+                    <span className="shrink-0 bg-[#E55A26] text-white text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap group-hover:bg-[#C94D20] transition-colors">
+                      {r.recentOrderCount ?? 0} commandes aujourd&apos;hui
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{r.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 capitalize">
-                      {(r.cuisine ?? []).join(" · ")}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-xs bg-orange-50 text-[#E05A23] font-bold px-2 py-1 rounded-full">
-                    🔥 {r.recentOrderCount ?? 0} orders today
-                  </span>
                 </Link>
               ))}
             </div>
           )}
         </section>
 
-        {/* Popular Items */}
-        <section>
+        {/* ── Popular Items ── */}
+        <section className="mb-10">
           <div className="flex items-center gap-2 mb-4">
-            <Star className="w-5 h-5 text-yellow-400" />
-            <h2 className="text-lg font-bold text-gray-900">Popular Items</h2>
+            <span className="inline-flex items-center gap-1.5 bg-[#F0A500]/10 text-[#F0A500] text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full">
+              <Star className="w-3 h-3" />
+              Populaires
+            </span>
           </div>
+
           {loading ? (
             <div className="flex gap-3 overflow-x-auto pb-2">
-              {[1,2,3,4].map(i => (
-                <div key={i} className="shrink-0 w-36 h-40 bg-gray-200 rounded-2xl animate-pulse" />
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="shrink-0 w-36 h-44 bg-white/60 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : popular.length === 0 ? null : (
@@ -160,20 +208,27 @@ export default function CommunityPage() {
                 <Link
                   key={item.id}
                   href={`/restaurants/${item.restaurantId}`}
-                  className="shrink-0 w-36 bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer"
+                  className="shrink-0 w-40 bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(27,36,64,0.06)] cursor-pointer hover:shadow-md transition-shadow"
                 >
-                  <div className="h-24 bg-gray-100">
+                  <div className="h-28 bg-[#F5F0E8]">
                     {item.image && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     )}
                   </div>
-                  <div className="p-2">
-                    <p className="text-xs font-semibold text-gray-900 truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400">{item.price} MAD</p>
-                    <div className="flex items-center gap-0.5 mt-1">
-                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs text-gray-500">{item.averageRating?.toFixed(1) ?? "–"}</span>
+                  <div className="p-3">
+                    <p className="text-xs font-extrabold text-[#1B2440] truncate leading-snug" style={{ fontFamily: "var(--font-display)" }}>
+                      {item.name}
+                    </p>
+                    <p className="text-xs text-[#6B7A9E] mt-0.5">{item.restaurantName}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs font-bold text-[#E55A26]">{item.price} MAD</span>
+                      <div className="flex items-center gap-0.5">
+                        <Star className="w-3 h-3 fill-[#F0A500] text-[#F0A500]" />
+                        <span className="text-xs font-bold text-[#1B2440]">
+                          {item.averageRating?.toFixed(1) ?? "–"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -182,24 +237,28 @@ export default function CommunityPage() {
           )}
         </section>
 
-        {/* New This Month */}
+        {/* ── New This Month ── */}
         <section>
           <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5 text-purple-500" />
-            <h2 className="text-lg font-bold text-gray-900">New This Month</h2>
+            <span className="inline-flex items-center gap-1.5 bg-[#2DC08A]/10 text-[#2DC08A] text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full">
+              <Sparkles className="w-3 h-3" />
+              Nouveau ce mois-ci
+            </span>
           </div>
+
           {loading ? (
             <div className="grid grid-cols-2 gap-3">
-              {[1,2,3,4].map(i => (
-                <div key={i} className="h-40 bg-gray-200 rounded-2xl animate-pulse" />
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-44 bg-white/60 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : newArrivals.length === 0 ? null : (
             <div className="grid grid-cols-2 gap-3">
               {newArrivals.map((r) => (
                 <div key={r.id} className="relative">
-                  <span className="absolute top-2 left-2 z-10 text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full font-medium">
-                    New
+                  <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 bg-[#2DC08A] text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shadow-sm">
+                    <Sparkles className="w-2.5 h-2.5" />
+                    Nouveau
                   </span>
                   <RestaurantCard restaurant={r} />
                 </div>
@@ -207,6 +266,7 @@ export default function CommunityPage() {
             </div>
           )}
         </section>
+
       </div>
     </div>
   );

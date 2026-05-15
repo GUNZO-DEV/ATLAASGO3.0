@@ -7,7 +7,6 @@ import {
 } from "firebase/auth";
 import { doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import FloatingNavbar from "@/components/FloatingNavbar";
 import toast from "react-hot-toast";
 import { User, MapPin, Trash2 } from "lucide-react";
 
@@ -71,56 +70,77 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <FloatingNavbar />
-      <div className="max-w-lg mx-auto px-4 pt-24 pb-12 space-y-5">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+    <div className="min-h-screen bg-[#F5F0E8]">
+      <div className="max-w-[700px] mx-auto px-6 pt-8 pb-16 space-y-5">
+        <div className="mb-2">
+          <h1
+            className="text-2xl font-extrabold text-[#1B2440]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Paramètres
+          </h1>
+          <p className="text-sm text-[#6B7A9E] mt-1">Gérez votre profil et vos préférences</p>
+        </div>
 
         <form onSubmit={handleSave} className="space-y-5">
           {/* Profile */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <div className="bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
             <div className="flex items-center gap-2 mb-4">
-              <User className="w-4 h-4 text-[#E05A23]" />
-              <h2 className="font-semibold text-gray-900 text-sm">Profile</h2>
+              <span className="w-7 h-7 rounded-full bg-[#FEF0E7] flex items-center justify-center">
+                <User className="w-4 h-4 text-[#E55A26]" />
+              </span>
+              <h2
+                className="font-extrabold text-[#1B2440] text-sm"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Profil
+              </h2>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Display name</label>
+                <label className="block text-xs text-[#6B7A9E] mb-1">Nom affiché</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E05A23]"
+                  className="w-full px-3 py-2.5 bg-[#F5F0E8] border border-transparent rounded-xl text-sm text-[#1B2440] focus:border-[#E55A26]/30 focus:ring-0 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Email</label>
+                <label className="block text-xs text-[#6B7A9E] mb-1">Adresse email</label>
                 <input
                   type="text"
                   value={email}
                   disabled
-                  className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-400"
+                  className="w-full px-3 py-2.5 bg-[#F5F0E8] border border-transparent rounded-xl text-sm text-[#6B7A9E] opacity-60"
                 />
               </div>
               {phone && (
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                  <label className="block text-xs text-[#6B7A9E] mb-1">Téléphone</label>
                   <input
                     type="text"
                     value={phone}
                     disabled
-                    className="w-full px-3 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-400"
+                    className="w-full px-3 py-2.5 bg-[#F5F0E8] border border-transparent rounded-xl text-sm text-[#6B7A9E] opacity-60"
                   />
                 </div>
               )}
             </div>
           </div>
 
-          {/* Preferences */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
+          {/* Zone de livraison */}
+          <div className="bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
             <div className="flex items-center gap-2 mb-4">
-              <MapPin className="w-4 h-4 text-[#E05A23]" />
-              <h2 className="font-semibold text-gray-900 text-sm">Delivery zone</h2>
+              <span className="w-7 h-7 rounded-full bg-[#FEF0E7] flex items-center justify-center">
+                <MapPin className="w-4 h-4 text-[#E55A26]" />
+              </span>
+              <h2
+                className="font-extrabold text-[#1B2440] text-sm"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Zone de livraison
+              </h2>
             </div>
             <div className="flex gap-2">
               {["ifrane", "oujda"].map((z) => (
@@ -128,10 +148,10 @@ export default function SettingsPage() {
                   key={z}
                   type="button"
                   onClick={() => setZone(z)}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium capitalize transition-colors cursor-pointer border ${
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium capitalize transition-colors cursor-pointer ${
                     zone === z
-                      ? "border-[#E05A23] bg-orange-50 text-[#E05A23]"
-                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      ? "bg-[#E55A26] text-white"
+                      : "bg-[#F5F0E8] text-[#1B2440] hover:bg-[#FEF0E7]"
                   }`}
                 >
                   {z}
@@ -143,43 +163,48 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3.5 bg-[#E05A23] text-white rounded-2xl font-bold text-sm hover:bg-orange-600 transition-colors disabled:opacity-60 cursor-pointer"
+            className="w-full py-3.5 bg-[#E55A26] text-white rounded-2xl font-bold text-sm hover:bg-[#C94D20] transition-colors disabled:opacity-60 cursor-pointer"
           >
-            {saving ? "Saving..." : "Save changes"}
+            {saving ? "Enregistrement..." : "Sauvegarder"}
           </button>
         </form>
 
         {/* Danger zone */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-red-100">
+        <div className="bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)] border border-red-200/50">
           <div className="flex items-center gap-2 mb-3">
             <Trash2 className="w-4 h-4 text-red-500" />
-            <h2 className="font-semibold text-red-600 text-sm">Danger zone</h2>
+            <h2
+              className="font-extrabold text-red-600 text-sm"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Zone de danger
+            </h2>
           </div>
           {!showDeleteConfirm ? (
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="text-sm text-red-500 font-medium hover:underline cursor-pointer"
             >
-              Delete my account
+              Supprimer mon compte
             </button>
           ) : (
             <div>
-              <p className="text-sm text-gray-600 mb-3">
-                This will permanently delete your account and all data. This cannot be undone.
+              <p className="text-sm text-[#6B7A9E] mb-3">
+                Cette action supprimera définitivement votre compte et toutes vos données. Cette opération est irréversible.
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
+                  className="flex-1 py-2 bg-[#F5F0E8] rounded-xl text-sm text-[#1B2440] font-medium hover:bg-[#FEF0E7] cursor-pointer"
                 >
-                  Cancel
+                  Annuler
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
                   className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 disabled:opacity-60 cursor-pointer"
                 >
-                  {deleting ? "Deleting..." : "Delete account"}
+                  {deleting ? "Suppression..." : "Supprimer mon compte"}
                 </button>
               </div>
             </div>
