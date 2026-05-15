@@ -4,7 +4,18 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, ChevronRight, Star, RefreshCw } from "lucide-react";
+import {
+  ShoppingBag,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  Mic,
+  Home,
+  ClipboardList,
+  Heart,
+  Wallet,
+  User,
+} from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -43,6 +54,17 @@ const REST_SPRITE: Record<string, string> = {
   "Baladi Healthy":     "rest:baladi",
 };
 
+const CATEGORIES = [
+  { label: "Burgers",  icon: "🍔" },
+  { label: "Pizza",    icon: "🍕" },
+  { label: "Tajine",   icon: "🥘" },
+  { label: "Sushi",    icon: "🍣" },
+  { label: "Café",     icon: "☕" },
+  { label: "Desserts", icon: "🍰" },
+  { label: "Healthy",  icon: "🥗" },
+  { label: "Poulet",   icon: "🍗" },
+];
+
 function fmtDate(iso: string): string {
   try {
     return new Intl.DateTimeFormat("fr-MA", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
@@ -70,12 +92,20 @@ function Skeleton() {
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [userId, setUserId]         = useState<string | null>(null);
-  const [userName, setUserName]     = useState<string>("");
+  const [userId, setUserId]           = useState<string | null>(null);
+  const [userName, setUserName]       = useState<string>("");
   const [memberSince, setMemberSince] = useState<string>("");
-  const [orders, setOrders]         = useState<Order[]>([]);
-  const [checking, setChecking]     = useState(true);
+  const [orders, setOrders]           = useState<Order[]>([]);
+  const [checking, setChecking]       = useState(true);
   const [recommended, setRecommended] = useState<Restaurant[]>([]);
+
+  // New state for greeting widget
+  const [weather, setWeather]         = useState("18");
+  const [prayerTime, setPrayerTime]   = useState("20:45");
+
+  // New state for saved addresses
+  const [addresses, setAddresses]         = useState<{ id: string; label: string; address: string; isDefault: boolean }[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
 
   // 1. Auth guard
   useEffect(() => {
@@ -88,6 +118,12 @@ export default function DashboardPage() {
         setUserName(data?.name ?? user.email ?? "");
         if (data?.createdAt) {
           setMemberSince(new Intl.DateTimeFormat("fr-MA", { year: "numeric" }).format(new Date(data.createdAt)));
+        }
+        // Load saved addresses
+        if (Array.isArray(data?.savedAddresses) && data.savedAddresses.length > 0) {
+          setAddresses(data.savedAddresses);
+          const def = data.savedAddresses.find((a: { isDefault: boolean; id: string }) => a.isDefault);
+          setSelectedAddress(def?.id ?? data.savedAddresses[0]?.id ?? null);
         }
       } catch {
         setUserName(user.email ?? "");
@@ -125,83 +161,127 @@ export default function DashboardPage() {
     })();
   }, [userId]);
 
+  // Suppress unused-variable lint warnings for static state setters that are
+  // intentionally kept for future API integration.
+  void setWeather;
+  void setPrayerTime;
+
   if (checking) return <Skeleton />;
 
-  const activeOrders  = orders.filter((o) => isActive(o.status));
-  const pastOrders    = orders.filter((o) => !isActive(o.status));
-  const totalSpent    = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + (o.total ?? 0), 0);
+  const activeOrders = orders.filter((o) => isActive(o.status));
+  const pastOrders   = orders.filter((o) => !isActive(o.status));
+  const totalSpent   = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + (o.total ?? 0), 0);
 
   // Active order to highlight (most recent)
   const liveOrder = activeOrders[0] ?? null;
 
   return (
     <div className="min-h-screen bg-[#F5F0E8]">
-      <div className="max-w-[1100px] mx-auto px-6 pt-8 pb-16">
+      <div className="max-w-[1100px] mx-auto px-6 pt-8 pb-24">
 
-        {/* ── Page header ── */}
-        <div className="mb-6">
-          <h1
-            className="font-extrabold text-[32px] text-[#1B2440] leading-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Mes commandes
-          </h1>
-          <p className="text-sm text-[#6B7A9E] mt-1">
-            {orders.length} commande{orders.length !== 1 ? "s" : ""} au total
-            {memberSince ? ` · Membre depuis ${memberSince}` : ""}
-          </p>
-        </div>
-
-        {/* ── Stat chips ── */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {[
-            { label: "Commandes", value: orders.length.toString(), sub: "au total" },
-            { label: "Total dépensé", value: `${totalSpent.toLocaleString("fr-MA")} DH`, sub: "livraisons payées" },
-            { label: "Restos visités", value: new Set(orders.map((o) => o.restaurantId)).size.toString(), sub: "restaurants uniques" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#6B7A9E] mb-1">{s.label}</p>
+        {/* ── 1. Greeting header with weather + prayer time widget ── */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1
+              className="font-extrabold text-[32px] text-[#1B2440]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Bonjour, {userName.split(" ")[0]} 👋
+            </h1>
+            <p className="text-sm text-[#6B7A9E] mt-0.5">
+              Qu&apos;est-ce qui vous ferait plaisir ?
+            </p>
+          </div>
+          {/* Weather + prayer widget */}
+          <div className="bg-white rounded-2xl px-4 py-3 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex items-center gap-3">
+            <div className="text-center">
+              <p className="text-[11px] font-bold text-[#6B7A9E] uppercase tracking-wider">Ifrane</p>
               <p
-                className="text-[22px] font-extrabold text-[#1B2440]"
+                className="text-lg font-extrabold text-[#1B2440]"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {s.value}
+                {weather}°C
               </p>
-              <p className="text-xs text-[#6B7A9E] mt-0.5">{s.sub}</p>
             </div>
+            <div className="w-px h-8 bg-[#F5F0E8]" />
+            <div className="text-center">
+              <p className="text-[11px] font-bold text-[#6B7A9E] uppercase tracking-wider">Maghrib</p>
+              <p
+                className="text-lg font-extrabold text-[#1B2440]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {prayerTime}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 2. Saved addresses chip selector ── */}
+        {addresses.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+            {addresses.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setSelectedAddress(a.id)}
+                className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition cursor-pointer ${
+                  selectedAddress === a.id
+                    ? "bg-[#1B2440] text-white"
+                    : "bg-white text-[#1B2440] shadow-[0_2px_10px_rgba(27,36,64,0.06)]"
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── 3. Smart search bar ── */}
+        <div
+          onClick={() => router.push("/restaurants")}
+          className="bg-white rounded-2xl px-5 py-3.5 flex items-center gap-3 shadow-[0_2px_10px_rgba(27,36,64,0.06)] mb-6 cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <Search className="w-5 h-5 text-[#6B7A9E]" />
+          <span className="text-[#6B7A9E] text-sm">Rechercher un resto ou un plat…</span>
+          <Mic className="w-5 h-5 text-[#E55A26] ml-auto" />
+        </div>
+
+        {/* ── 4. Popular categories ── */}
+        <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+          {CATEGORIES.map((cat) => (
+            <Link
+              key={cat.label}
+              href={`/restaurants?category=${encodeURIComponent(cat.label)}`}
+              className="shrink-0 bg-white rounded-2xl px-4 py-3 flex flex-col items-center gap-1.5 shadow-[0_2px_10px_rgba(27,36,64,0.06)] hover:shadow-md transition-shadow min-w-[72px]"
+            >
+              <span className="text-2xl leading-none">{cat.icon}</span>
+              <span className="text-[11px] font-bold text-[#1B2440] whitespace-nowrap">{cat.label}</span>
+            </Link>
           ))}
         </div>
 
-        {/* ── Pour vous — recommended restaurants ── */}
-        {recommended.length > 0 && (
-          <>
-            <h2 className="text-[20px] font-extrabold text-[#1B2440] mb-3" style={{ fontFamily: "var(--font-display)" }}>
-              Pour vous
-            </h2>
-            <div className="flex gap-3 overflow-x-auto pb-2 mb-8 scrollbar-hide">
-              {recommended.map((r) => (
-                <Link key={r.id} href={`/restaurants/${r.id}`} className="shrink-0 w-[200px] bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-shadow group">
-                  <div className="h-[110px] overflow-hidden">
-                    <RestaurantSprite id={`rest:${r.id}`} height={110} radius={0} />
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-extrabold text-[#1B2440] text-sm truncate">{r.name}</h3>
-                    <p className="text-[11px] text-[#6B7A9E] truncate mt-0.5">{r.description}</p>
-                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[#6B7A9E]">
-                      <span className="flex items-center gap-0.5">
-                        <span className="text-[#F0A500]">★</span>
-                        <span className="font-bold text-[#1B2440]">{r.rating}</span>
-                      </span>
-                      <span>{r.estimatedDeliveryMins} min</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
+        {/* ── 5. Special offers banner ── */}
+        <div className="relative bg-[#E55A26] rounded-2xl p-6 mb-8 overflow-hidden">
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.12]"
+            style={{
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          />
+          <div className="relative">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">Offre spéciale</p>
+            <h3
+              className="text-2xl font-extrabold text-white mt-1"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              -20% sur votre 1ère commande
+            </h3>
+            <p className="text-sm text-white/80 mt-1">Code : BIENVENUE</p>
+          </div>
+        </div>
 
-        {/* ── Live order banner ── */}
+        {/* ── 6. Live order banner ── */}
         {liveOrder && (
           <Link
             href={`/orders/${liveOrder.id}`}
@@ -236,8 +316,8 @@ export default function DashboardPage() {
                 {/* Progress bars */}
                 <div className="flex gap-1.5 mt-4 max-w-xs">
                   {(["pending", "accepted", "picked_up"] as const).map((s, i) => {
-                    const stageIdx  = ["pending", "accepted", "picked_up"].indexOf(liveOrder.status);
-                    const filled    = i <= stageIdx;
+                    const stageIdx = ["pending", "accepted", "picked_up"].indexOf(liveOrder.status);
+                    const filled   = i <= stageIdx;
                     return (
                       <div key={s} className="flex-1 h-1.5 rounded-full overflow-hidden bg-white/20">
                         {filled && <div className="h-full bg-[#E55A26] rounded-full" />}
@@ -252,6 +332,55 @@ export default function DashboardPage() {
             </div>
           </Link>
         )}
+
+        {/* ── 7. Pour vous — recommended restaurants ── */}
+        {recommended.length > 0 && (
+          <>
+            <h2 className="text-[20px] font-extrabold text-[#1B2440] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+              Pour vous
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-2 mb-8 scrollbar-hide">
+              {recommended.map((r) => (
+                <Link key={r.id} href={`/restaurants/${r.id}`} className="shrink-0 w-[200px] bg-white rounded-2xl overflow-hidden hover:shadow-lg transition-shadow group">
+                  <div className="h-[110px] overflow-hidden">
+                    <RestaurantSprite id={`rest:${r.id}`} height={110} radius={0} />
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-extrabold text-[#1B2440] text-sm truncate">{r.name}</h3>
+                    <p className="text-[11px] text-[#6B7A9E] truncate mt-0.5">{r.description}</p>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[#6B7A9E]">
+                      <span className="flex items-center gap-0.5">
+                        <span className="text-[#F0A500]">★</span>
+                        <span className="font-bold text-[#1B2440]">{r.rating}</span>
+                      </span>
+                      <span>{r.estimatedDeliveryMins} min</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ── 8. Stat chips ── */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          {[
+            { label: "Commandes",     value: orders.length.toString(),                                           sub: "au total" },
+            { label: "Total dépensé", value: `${totalSpent.toLocaleString("fr-MA")} DH`,                        sub: "livraisons payées" },
+            { label: "Restos visités", value: new Set(orders.map((o) => o.restaurantId)).size.toString(),        sub: "restaurants uniques" },
+          ].map((s) => (
+            <div key={s.label} className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#6B7A9E] mb-1">{s.label}</p>
+              <p
+                className="text-[22px] font-extrabold text-[#1B2440]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {s.value}
+              </p>
+              <p className="text-xs text-[#6B7A9E] mt-0.5">{s.sub}</p>
+            </div>
+          ))}
+        </div>
 
         {/* ── Browse CTA when no orders ── */}
         {orders.length === 0 && (
@@ -276,7 +405,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Past orders grid ── */}
+        {/* ── 9. Past orders grid ── */}
         {pastOrders.length > 0 && (
           <>
             <h2
@@ -287,7 +416,7 @@ export default function DashboardPage() {
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {pastOrders.map((order) => {
-                const spriteId = REST_SPRITE[order.restaurantName ?? ""] ?? "rest:darnaji";
+                const spriteId    = REST_SPRITE[order.restaurantName ?? ""] ?? "rest:darnaji";
                 const itemsSummary = order.items?.map((i) => i.name).join(" · ") ?? "";
 
                 return (
@@ -350,7 +479,34 @@ export default function DashboardPage() {
             </Link>
           </div>
         )}
+
       </div>
+
+      {/* ── 10. Bottom navigation bar ── */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#F5F0E8] z-50 safe-area-pb">
+        <div className="max-w-[1100px] mx-auto flex justify-around py-2">
+          {[
+            { icon: Home,          label: "Accueil",   href: "/dashboard" },
+            { icon: ClipboardList, label: "Commandes", href: "/dashboard" },
+            { icon: Heart,         label: "Favoris",   href: "/favorites" },
+            { icon: Wallet,        label: "Wallet",    href: "/wallet" },
+            { icon: User,          label: "Profil",    href: "/profile/settings" },
+          ].map((item) => {
+            const Icon   = item.icon;
+            const active = item.href === "/dashboard" && item.label === "Accueil";
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 ${active ? "text-[#E55A26]" : "text-[#6B7A9E]"}`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] font-bold">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

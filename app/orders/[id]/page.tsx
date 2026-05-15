@@ -4,11 +4,19 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Phone, ChevronLeft, Star, MessageCircle, X } from "lucide-react";
+import {
+  Phone,
+  ChevronLeft,
+  Star,
+  MessageCircle,
+  X,
+  MapPin,
+  User,
+  Share2,
+} from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeToOrder, cancelOrder, expireStaleOrders } from "@/lib/orders";
-import Sprite from "@/components/atlas/Sprite";
 import type { Order, OrderStatus } from "@/types/order";
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
@@ -20,43 +28,25 @@ type Stage = {
   eta: string;
 };
 
-const STAGES: Record<Exclude<OrderStatus, "cancelled" | "expired">, Stage> = {
-  pending: {
-    index: 0,
-    title: () => "En attente de confirmation",
-    subtitle: "Nous cherchons un restaurant pour accepter votre commande.",
-    eta: "30–35 min",
-  },
-  accepted: {
-    index: 1,
-    title: (r) => `Préparation chez ${r ?? "le restaurant"}`,
-    subtitle: "Le restaurant prépare votre commande avec soin.",
-    eta: "20–25 min",
-  },
-  picked_up: {
-    index: 2,
-    title: () => "Coursier en route !",
-    subtitle: "Votre commande est entre les mains de votre coursier.",
-    eta: "10–15 min",
-  },
-  delivered: {
-    index: 3,
-    title: () => "Livré ! Bon appétit 🎉",
-    subtitle: "Votre commande est arrivée. Régalez-vous !",
-    eta: "Livré !",
-  },
+const STAGES: Record<string, Stage> = {
+  pending:   { index: 0, title: () => "Commande passée",                         subtitle: "Votre commande a été envoyée au restaurant.",  eta: "30–35 min" },
+  accepted:  { index: 1, title: (r) => `Acceptée par ${r ?? "le restaurant"}`,   subtitle: "Le restaurant a accepté votre commande.",      eta: "25–30 min" },
+  preparing: { index: 2, title: () => "En préparation",                           subtitle: "Le restaurant prépare votre commande.",         eta: "20–25 min" },
+  ready:     { index: 3, title: () => "Prête !",                                  subtitle: "Votre commande attend le coursier.",            eta: "15–20 min" },
+  picked_up: { index: 4, title: () => "Coursier en route !",                      subtitle: "Votre commande est en chemin.",                 eta: "10–15 min" },
+  delivered: { index: 5, title: () => "Livré ! Bon appétit 🎉",                   subtitle: "Votre commande est arrivée.",                   eta: "Livré !"   },
 };
 
-const STEP_LABELS = ["En attente", "Préparation", "Coursier en route", "Livré !"];
+const STEP_LABELS = ["Passée", "Acceptée", "Préparation", "Prête", "En route", "Livré"];
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center">
+    <div className="min-h-screen bg-[#F5F0E8] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-10 h-10 rounded-full border-[3px] border-brand border-t-transparent animate-atlas-spin" />
-        <p className="text-navy-soft text-sm font-medium">Chargement de votre commande…</p>
+        <div className="w-10 h-10 rounded-full border-[3px] border-[#E55A26] border-t-transparent animate-spin" />
+        <p className="text-[#6B7A9E] text-sm font-medium">Chargement de votre commande…</p>
       </div>
     </div>
   );
@@ -66,17 +56,17 @@ function LoadingSkeleton() {
 
 function CelebrationCard({ orderId, alreadyReviewed }: { orderId: string; alreadyReviewed: boolean }) {
   return (
-    <div className="bg-white rounded-2xl p-6 text-center animate-atlas-success-pop shadow-sm border border-mint/20">
-      <div className="text-5xl mb-3 animate-atlas-float inline-block">🎉</div>
-      <h2 className="text-navy font-extrabold text-2xl mb-1" style={{ fontFamily: "var(--font-display)" }}>
+    <div className="bg-white rounded-2xl p-6 text-center shadow-[0_2px_10px_rgba(27,36,64,0.06)] border border-[#2DC08A]/20">
+      <div className="text-5xl mb-3 inline-block">🎉</div>
+      <h2 className="text-[#1B2440] font-extrabold text-2xl mb-1" style={{ fontFamily: "var(--font-display)" }}>
         Bon appétit !
       </h2>
-      <p className="text-navy-soft text-sm mb-5">Votre commande a été livrée avec succès.</p>
+      <p className="text-[#6B7A9E] text-sm mb-5">Votre commande a été livrée avec succès.</p>
       <div className="flex flex-col gap-2 items-center">
         {!alreadyReviewed && (
           <Link
             href={`/orders/${orderId}/review`}
-            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-semibold text-sm px-6 py-2.5 rounded-full transition shadow-[0_2px_10px_rgba(229,90,38,0.3)] hover:shadow-[0_4px_16px_rgba(229,90,38,0.45)]"
+            className="inline-flex items-center gap-2 bg-[#E55A26] hover:bg-[#c94d20] text-white font-semibold text-sm px-6 py-2.5 rounded-full transition shadow-[0_2px_10px_rgba(229,90,38,0.3)] hover:shadow-[0_4px_16px_rgba(229,90,38,0.45)]"
           >
             <Star className="w-4 h-4 fill-white" />
             Noter cette commande
@@ -86,8 +76,8 @@ function CelebrationCard({ orderId, alreadyReviewed }: { orderId: string; alread
           href="/restaurants"
           className={`inline-flex items-center gap-2 text-sm font-semibold transition px-6 py-2.5 rounded-full ${
             alreadyReviewed
-              ? "bg-brand hover:bg-brand-dark text-white shadow-[0_2px_10px_rgba(229,90,38,0.3)] hover:shadow-[0_4px_16px_rgba(229,90,38,0.45)]"
-              : "border border-navy/15 text-navy hover:bg-navy/5"
+              ? "bg-[#E55A26] hover:bg-[#c94d20] text-white shadow-[0_2px_10px_rgba(229,90,38,0.3)] hover:shadow-[0_4px_16px_rgba(229,90,38,0.45)]"
+              : "border border-[#1B2440]/15 text-[#1B2440] hover:bg-[#1B2440]/5"
           }`}
         >
           Commander à nouveau
@@ -99,7 +89,7 @@ function CelebrationCard({ orderId, alreadyReviewed }: { orderId: string; alread
 
 // ─── Confetti dots ────────────────────────────────────────────────────────────
 
-const CONFETTI_COLORS = ["#E55A26", "#2EC089", "#F2B53A", "#D9486F", "#1B2440"];
+const CONFETTI_COLORS = ["#E55A26", "#2DC08A", "#F0A500", "#D9486F", "#1B2440"];
 
 function Confetti() {
   return (
@@ -107,7 +97,7 @@ function Confetti() {
       {Array.from({ length: 18 }).map((_, i) => (
         <div
           key={i}
-          className="absolute w-2 h-2 rounded-sm animate-atlas-confetti"
+          className="absolute w-2 h-2 rounded-sm animate-bounce"
           style={{
             left: `${Math.random() * 100}%`,
             top: `${Math.random() * 40}%`,
@@ -117,50 +107,6 @@ function Confetti() {
           }}
         />
       ))}
-    </div>
-  );
-}
-
-// ─── Progress stepper ─────────────────────────────────────────────────────────
-
-function ProgressStepper({ currentIndex }: { currentIndex: number }) {
-  return (
-    <div className="flex gap-1.5 mt-4">
-      {STEP_LABELS.map((label, i) => {
-        const filled = i < currentIndex;
-        const active = i === currentIndex;
-        return (
-          <div key={label} className="flex-1 flex flex-col gap-1">
-            <div
-              className={[
-                "h-1.5 rounded-full transition-all duration-500",
-                filled
-                  ? "bg-brand"
-                  : active
-                  ? "bg-[length:200%_100%] animate-atlas-shimmer"
-                  : "bg-[rgba(27,36,64,0.10)]",
-              ].join(" ")}
-              style={
-                active
-                  ? {
-                      background:
-                        "linear-gradient(90deg, #E55A26 0%, #FCEAD9 50%, #E55A26 100%)",
-                      backgroundSize: "200% 100%",
-                    }
-                  : undefined
-              }
-            />
-            <span
-              className={[
-                "text-[10px] font-medium leading-none truncate",
-                filled || active ? "text-brand" : "text-navy-soft/60",
-              ].join(" ")}
-            >
-              {label}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -311,9 +257,9 @@ export default function OrderTrackingPage({
   // ── Not found ──
   if (!order) {
     return (
-      <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-4 p-6">
-        <p className="text-navy-soft text-base">Commande introuvable.</p>
-        <Link href="/restaurants" className="text-brand text-sm font-semibold underline underline-offset-2">
+      <div className="min-h-screen bg-[#F5F0E8] flex flex-col items-center justify-center gap-4 p-6">
+        <p className="text-[#6B7A9E] text-base">Commande introuvable.</p>
+        <Link href="/restaurants" className="text-[#E55A26] text-sm font-semibold underline underline-offset-2">
           Découvrir les restaurants
         </Link>
       </div>
@@ -323,18 +269,18 @@ export default function OrderTrackingPage({
   // ── Cancelled / expired ──
   if (order.status === "cancelled" || order.status === "expired") {
     return (
-      <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-4 p-6">
-        <div className="bg-white rounded-2xl p-6 text-center shadow-sm max-w-sm w-full">
+      <div className="min-h-screen bg-[#F5F0E8] flex flex-col items-center justify-center gap-4 p-6">
+        <div className="bg-white rounded-2xl p-6 text-center shadow-[0_2px_10px_rgba(27,36,64,0.06)] max-w-sm w-full">
           <div className="text-4xl mb-3">😔</div>
-          <h2 className="text-navy font-extrabold text-xl mb-1">
+          <h2 className="text-[#1B2440] font-extrabold text-xl mb-1">
             Commande {order.status === "cancelled" ? "annulée" : "expirée"}
           </h2>
-          <p className="text-navy-soft text-sm mb-5">
+          <p className="text-[#6B7A9E] text-sm mb-5">
             Votre commande #{orderId?.slice(-6).toUpperCase()} n&apos;est plus active.
           </p>
           <Link
             href="/restaurants"
-            className="inline-flex items-center gap-2 bg-brand text-white font-semibold text-sm px-6 py-2.5 rounded-full"
+            className="inline-flex items-center gap-2 bg-[#E55A26] text-white font-semibold text-sm px-6 py-2.5 rounded-full"
           >
             Commander à nouveau
           </Link>
@@ -343,18 +289,18 @@ export default function OrderTrackingPage({
     );
   }
 
-  const stage = STAGES[order.status as Exclude<OrderStatus, "cancelled" | "expired">];
-  const currentIndex = stage.index;
+  const currentStage = STAGES[order.status as string];
+  const currentIdx = currentStage?.index ?? 0;
   const isDelivered = order.status === "delivered";
   const restaurantName = order.restaurantName ?? order.pickup ?? "Le restaurant";
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-[#F5F0E8]">
       {/* ─── Back bar ──────────────────────────────────────────── */}
-      <div className="max-w-[1400px] mx-auto px-8 pt-6 pb-0">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 pt-6 pb-0">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-navy-soft hover:text-navy text-sm font-medium transition"
+          className="inline-flex items-center gap-1.5 text-[#6B7A9E] hover:text-[#1B2440] text-sm font-medium transition"
         >
           <ChevronLeft className="w-4 h-4" />
           Tableau de bord
@@ -362,12 +308,11 @@ export default function OrderTrackingPage({
       </div>
 
       {/* ─── Main layout ───────────────────────────────────────── */}
-      <div className="max-w-[1400px] mx-auto p-8">
-        {/* Desktop: 3-col grid | Mobile: single column (status card only visible on mobile) */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_380px_1fr] gap-5">
+      <div className="max-w-[1400px] mx-auto p-4 sm:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-5">
 
           {/* ══════════════════════════════════════════════════════
-              Column 1 — Order Status
+              Column 1 — Order Status + Timeline (mobile-first)
           ══════════════════════════════════════════════════════ */}
           <div className="flex flex-col gap-4">
 
@@ -380,12 +325,12 @@ export default function OrderTrackingPage({
             )}
 
             {/* Status card */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm animate-atlas-fade-up">
+            <div className="bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
               {/* Live pulse indicator */}
               {!isDelivered && (
                 <div className="flex items-center gap-1.5 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-mint animate-pulse inline-block" />
-                  <span className="text-mint font-bold text-[10px] tracking-widest uppercase">
+                  <span className="w-2 h-2 rounded-full bg-[#2DC08A] animate-pulse inline-block" />
+                  <span className="text-[#2DC08A] font-bold text-[10px] tracking-widest uppercase">
                     Commande en cours
                   </span>
                 </div>
@@ -393,100 +338,193 @@ export default function OrderTrackingPage({
 
               {/* Stage title */}
               <h1
-                className="text-navy font-extrabold text-2xl leading-tight mb-1"
+                className="text-[#1B2440] font-extrabold text-2xl leading-tight mb-1"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {stage.title(restaurantName)}
+                {currentStage?.title(restaurantName) ?? "—"}
               </h1>
 
               {/* Stage subtitle */}
-              <p className="text-navy-soft text-[13px] mb-4 leading-relaxed">
-                {stage.subtitle}
+              <p className="text-[#6B7A9E] text-[13px] mb-4 leading-relaxed">
+                {currentStage?.subtitle}
               </p>
 
               {/* ETA */}
               {!isDelivered && (
                 <div className="mb-1">
-                  <p className="text-[10px] font-bold tracking-widest uppercase text-navy-soft mb-0.5">
+                  <p className="text-[10px] font-bold tracking-widest uppercase text-[#6B7A9E] mb-0.5">
                     Arrivée estimée
                   </p>
                   <p
-                    className="text-brand font-extrabold text-[36px] leading-none"
+                    className="text-[#E55A26] font-extrabold text-[36px] leading-none"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
-                    {stage.eta}
+                    {currentStage?.eta}
                   </p>
                 </div>
               )}
-
-              {/* Progress stepper */}
-              <ProgressStepper currentIndex={currentIndex} />
             </div>
 
-            {/* Driver card */}
-            <div className="bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-              <Sprite id="avatar:youssef" width={50} height={50} radius={25} />
-              <div className="flex-1 min-w-0">
-                <p className="text-navy font-bold text-sm leading-tight">Youssef El Fassi</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Star className="w-3.5 h-3.5 text-saffron fill-saffron" />
-                  <span className="text-navy-soft text-xs font-medium">4.9</span>
-                  <span className="text-navy-soft/50 text-xs">·</span>
-                  <span className="text-navy-soft text-xs">342 livraisons</span>
+            {/* ── Map placeholder ── */}
+            <div className="bg-gradient-to-b from-[#1B2440] to-[#0D1628] rounded-2xl h-[200px] mb-0 flex items-center justify-center relative overflow-hidden shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
+              <div
+                className="absolute inset-0 pointer-events-none opacity-[0.08]"
+                style={{
+                  backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)",
+                  backgroundSize: "20px 20px",
+                }}
+              />
+              <div className="relative text-center">
+                <MapPin className="w-8 h-8 text-[#E55A26] mx-auto mb-2" />
+                <p className="text-white/60 text-xs font-bold uppercase tracking-wider">Carte en temps réel</p>
+                <p className="text-white/40 text-[11px] mt-0.5">Google Maps bientôt disponible</p>
+              </div>
+              {/* ETA countdown */}
+              <div className="absolute top-4 right-4 bg-white/10 backdrop-blur rounded-xl px-3 py-2">
+                <p className="text-[10px] text-white/60 font-bold uppercase tracking-wider">ETA</p>
+                <p
+                  className="text-lg font-extrabold text-white"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {currentStage?.eta ?? "—"}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Rider card — shown when accepted or picked_up ── */}
+            {(order.status === "accepted" || order.status === "picked_up") && (
+              <div className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[#E55A26]/10 flex items-center justify-center shrink-0">
+                  <User className="w-6 h-6 text-[#E55A26]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-extrabold text-[#1B2440] text-sm">Youssef M.</p>
+                  <div className="flex items-center gap-2 text-[11px] text-[#6B7A9E] mt-0.5">
+                    <span className="flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-[#F0A500] text-[#F0A500]" /> 4.8
+                    </span>
+                    <span>·</span>
+                    <span>Scooter</span>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    aria-label="Appeler le coursier"
+                    className="w-10 h-10 rounded-xl bg-[#2DC08A]/10 flex items-center justify-center cursor-pointer"
+                  >
+                    <Phone className="w-4 h-4 text-[#2DC08A]" />
+                  </button>
+                  <Link
+                    href={`/orders/${orderId}/chat`}
+                    className="w-10 h-10 rounded-xl bg-[#E55A26]/10 flex items-center justify-center"
+                    aria-label="Chat avec le coursier"
+                  >
+                    <MessageCircle className="w-4 h-4 text-[#E55A26]" />
+                  </Link>
                 </div>
               </div>
-              <button
-                aria-label="Appeler le coursier"
-                className="w-[38px] h-[38px] rounded-full bg-navy flex items-center justify-center shrink-0 hover:bg-navy-2 transition"
-              >
-                <Phone className="w-4 h-4 text-white" />
-              </button>
+            )}
+
+            {/* ── 6-stage vertical timeline ── */}
+            <div className="bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#6B7A9E] mb-4">
+                Suivi de commande
+              </p>
+              <div className="space-y-0">
+                {STEP_LABELS.map((label, i) => {
+                  const reached = i <= currentIdx;
+                  const isCurrent = i === currentIdx;
+                  return (
+                    <div key={label} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className={[
+                            "w-3 h-3 rounded-full border-2",
+                            reached
+                              ? "bg-[#E55A26] border-[#E55A26]"
+                              : "bg-white border-[#6B7A9E]/30",
+                            isCurrent ? "ring-4 ring-[#E55A26]/20" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        />
+                        {i < STEP_LABELS.length - 1 && (
+                          <div
+                            className={`w-0.5 h-8 ${reached ? "bg-[#E55A26]" : "bg-[#6B7A9E]/20"}`}
+                          />
+                        )}
+                      </div>
+                      <div className="pb-6">
+                        <p
+                          className={`text-sm font-bold ${
+                            reached ? "text-[#1B2440]" : "text-[#6B7A9E]/60"
+                          }`}
+                        >
+                          {label}
+                        </p>
+                        {isCurrent && (
+                          <p className="text-xs text-[#6B7A9E] mt-0.5">{currentStage?.subtitle}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Order details card */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
+            {/* ── Share location button ── */}
+            {!isDelivered && (
+              <button
+                type="button"
+                className="bg-white rounded-2xl p-3.5 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex items-center justify-center gap-2.5 text-sm font-bold text-[#1B2440] hover:bg-[#FEF0E7] transition cursor-pointer"
+              >
+                <Share2 className="w-4 h-4 text-[#E55A26]" />
+                Partager le suivi de ma commande
+              </button>
+            )}
+
+            {/* ── Order items card ── */}
+            <div className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div>
-                  <p className="text-[10px] font-bold tracking-widest uppercase text-navy-soft">
+                  <p className="text-[10px] font-bold tracking-widest uppercase text-[#6B7A9E]">
                     Commande
                   </p>
-                  <p className="text-navy font-bold text-sm leading-tight">
+                  <p className="text-[#1B2440] font-bold text-sm leading-tight">
                     #{orderId?.slice(-6).toUpperCase()}
                   </p>
                 </div>
-                <p className="text-navy-soft text-xs text-right leading-tight">
-                  {restaurantName}
-                </p>
+                <p className="text-[#6B7A9E] text-xs text-right leading-tight">{restaurantName}</p>
               </div>
 
               {order.items && order.items.length > 0 && (
                 <div className="space-y-1.5">
                   {order.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-baseline gap-2">
-                      <span className="text-navy-soft text-sm leading-tight truncate">
-                        <span className="text-navy font-semibold mr-1">
+                      <span className="text-[#6B7A9E] text-sm leading-tight truncate">
+                        <span className="text-[#1B2440] font-semibold mr-1">
                           {item.quantity ?? 1}×
                         </span>
                         {item.name ?? item.description ?? "Article"}
                       </span>
                       {item.price != null && (
-                        <span className="text-navy text-sm font-medium shrink-0">
+                        <span className="text-[#1B2440] text-sm font-medium shrink-0">
                           {(item.price * (item.quantity ?? 1)).toFixed(0)} MAD
                         </span>
                       )}
                     </div>
                   ))}
 
-                  {/* Divider */}
+                  {/* Divider + totals */}
                   <div className="border-t border-[rgba(27,36,64,0.08)] pt-2 mt-1">
                     {order.fee != null && (
-                      <div className="flex justify-between text-[12px] text-navy-soft mb-1">
+                      <div className="flex justify-between text-[12px] text-[#6B7A9E] mb-1">
                         <span>Frais de livraison</span>
                         <span>{order.fee} MAD</span>
                       </div>
                     )}
                     {(order.total ?? order.subtotal) != null && (
-                      <div className="flex justify-between text-sm font-bold text-navy">
+                      <div className="flex justify-between text-sm font-bold text-[#1B2440]">
                         <span>Total payé</span>
                         <span>{order.total ?? order.subtotal} MAD</span>
                       </div>
@@ -496,13 +534,13 @@ export default function OrderTrackingPage({
               )}
             </div>
 
-            {/* Cancel order — only available while still pending */}
+            {/* ── Cancel order — only available while still pending ── */}
             {order.status === "pending" && uid === order.customerId && (
               <button
                 type="button"
                 onClick={handleCancel}
                 disabled={cancelling}
-                className="bg-white rounded-2xl p-3 shadow-sm flex items-center justify-center gap-2 text-sm font-bold text-rose-600 hover:bg-rose-50 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="bg-white rounded-2xl p-3 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex items-center justify-center gap-2 text-sm font-bold text-rose-600 hover:bg-rose-50 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <X className="w-4 h-4" />
                 {cancelling ? "Annulation…" : "Annuler la commande"}
@@ -511,18 +549,17 @@ export default function OrderTrackingPage({
           </div>
 
           {/* ══════════════════════════════════════════════════════
-              Column 2 — Chat Panel
-              Hidden on mobile (< lg) — not critical tracking info
+              Column 2 — Chat Panel (desktop only)
           ══════════════════════════════════════════════════════ */}
-          <div className="hidden lg:flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="hidden lg:flex flex-col bg-white rounded-2xl shadow-[0_2px_10px_rgba(27,36,64,0.06)] overflow-hidden">
             {/* Header */}
             <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-[rgba(27,36,64,0.08)]">
-              <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center">
-                <MessageCircle className="w-4 h-4 text-brand" />
+              <div className="w-8 h-8 rounded-full bg-[#E55A26]/10 flex items-center justify-center">
+                <MessageCircle className="w-4 h-4 text-[#E55A26]" />
               </div>
               <div>
-                <p className="text-navy font-bold text-sm leading-none">Support & Chat</p>
-                <p className="text-mint text-[11px] font-medium mt-0.5">En ligne</p>
+                <p className="text-[#1B2440] font-bold text-sm leading-none">Support & Chat</p>
+                <p className="text-[#2DC08A] text-[11px] font-medium mt-0.5">En ligne</p>
               </div>
             </div>
 
@@ -532,12 +569,12 @@ export default function OrderTrackingPage({
                 <div
                   key={idx}
                   className={[
-                    "flex gap-2 animate-atlas-fade-up",
+                    "flex gap-2",
                     msg.from === "user" ? "flex-row-reverse" : "",
                   ].join(" ")}
                 >
                   {msg.from === "support" && (
-                    <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center shrink-0 text-white text-[10px] font-bold">
+                    <div className="w-7 h-7 rounded-full bg-[#E55A26] flex items-center justify-center shrink-0 text-white text-[10px] font-bold">
                       A
                     </div>
                   )}
@@ -545,15 +582,15 @@ export default function OrderTrackingPage({
                     className={[
                       "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
                       msg.from === "support"
-                        ? "bg-[rgba(27,36,64,0.05)] text-navy rounded-tl-none"
-                        : "bg-brand text-white rounded-tr-none",
+                        ? "bg-[rgba(27,36,64,0.05)] text-[#1B2440] rounded-tl-none"
+                        : "bg-[#E55A26] text-white rounded-tr-none",
                     ].join(" ")}
                   >
                     <p>{msg.text}</p>
                     <p
                       className={[
                         "text-[10px] mt-1 text-right",
-                        msg.from === "support" ? "text-navy-soft/60" : "text-white/70",
+                        msg.from === "support" ? "text-[#6B7A9E]/60" : "text-white/70",
                       ].join(" ")}
                     >
                       {msg.time}
@@ -572,73 +609,24 @@ export default function OrderTrackingPage({
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder="Écrire un message…"
-                className="flex-1 text-sm bg-[rgba(27,36,64,0.04)] rounded-xl px-3 py-2 text-navy placeholder:text-navy-soft/50 outline-none focus:ring-1 focus:ring-brand/40 transition"
+                className="flex-1 text-sm bg-[rgba(27,36,64,0.04)] rounded-xl px-3 py-2 text-[#1B2440] placeholder:text-[#6B7A9E]/50 outline-none focus:ring-1 focus:ring-[#E55A26]/40 transition"
               />
               <button
                 onClick={sendMessage}
                 disabled={!chatInput.trim()}
-                className="w-8 h-8 rounded-full bg-brand disabled:opacity-40 flex items-center justify-center transition hover:bg-brand-dark"
+                className="w-8 h-8 rounded-full bg-[#E55A26] disabled:opacity-40 flex items-center justify-center transition hover:bg-[#c94d20]"
                 aria-label="Envoyer"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                  <path d="M12.5 1.5L1.5 7l4.5 1.5L12.5 1.5zm0 0L6 9" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M12.5 1.5L1.5 7l4.5 1.5L12.5 1.5zm0 0L6 9"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </button>
-            </div>
-          </div>
-
-          {/* ══════════════════════════════════════════════════════
-              Column 3 — Map
-              Hidden on mobile (< lg)
-          ══════════════════════════════════════════════════════ */}
-          <div className="hidden lg:block relative bg-white rounded-2xl overflow-hidden shadow-sm min-h-[520px]">
-            {/* Map background */}
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: "url(/images/src-map.png)",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-              aria-hidden
-            />
-
-            {/* Vignette overlay */}
-            <div
-              className="absolute inset-0 rounded-2xl"
-              style={{
-                background:
-                  "linear-gradient(to bottom, rgba(27,36,64,0.06) 0%, transparent 40%)",
-              }}
-              aria-hidden
-            />
-
-            {/* Info chip — top left */}
-            <div className="absolute top-4 left-4 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-mint animate-pulse" />
-              <div>
-                <p className="text-navy font-bold text-xs leading-none">{restaurantName}</p>
-                <p className="text-navy-soft text-[10px] mt-0.5 font-medium">
-                  ~{order.zone ?? "2.4 km"}
-                </p>
-              </div>
-            </div>
-
-            {/* Live indicator — bottom right */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-mint animate-pulse" />
-              <span className="text-navy text-[11px] font-semibold">Suivi en direct</span>
-            </div>
-
-            {/* Animated map pin */}
-            <div
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full animate-atlas-marker-drop"
-              aria-hidden
-            >
-              <div className="w-10 h-10 rounded-full bg-brand border-2 border-white shadow-lg flex items-center justify-center text-white text-lg">
-                🛵
-              </div>
-              <div className="w-3 h-3 bg-brand/30 rounded-full mx-auto -mt-1 blur-sm" />
             </div>
           </div>
 

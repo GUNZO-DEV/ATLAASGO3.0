@@ -10,7 +10,6 @@ import { subscribeToOrder, subscribeToPendingOrders } from "@/lib/orders";
 import type { DriverProfile } from "@/lib/drivers";
 import type { Order } from "@/types/order";
 import Sprite from "@/components/atlas/Sprite";
-import ZelligeBg from "@/components/atlas/ZelligeBg";
 import {
   Clock,
   History,
@@ -20,6 +19,12 @@ import {
   Navigation,
   CheckCircle2,
   Bike,
+  Zap,
+  Shield,
+  Star,
+  AlertTriangle,
+  MapPin,
+  Package,
   type LucideProps,
 } from "lucide-react";
 
@@ -29,6 +34,9 @@ const NAVY = "#1B2440";
 const ORANGE = "#E55A26";
 const MINT = "#2DC08A";
 const CREAM = "#F5F0E8";
+const MUTED = "#6B7A9E";
+const GOLD = "#F0A500";
+const LIGHT_ORANGE = "#FEF0E7";
 
 // ─── Mock data (shown when no Firestore driver profile) ────────────────────────
 
@@ -56,98 +64,25 @@ const MOCK_RUNS = [
   { id: "4", restaurant: "Atay Co.", city: "Bourgogne", mins: 28, earn: 45 },
 ];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Performance badges config ─────────────────────────────────────────────────
 
-/** Online/offline pill toggle */
-function OnlineToggle({
-  online,
-  onToggle,
-}: {
-  online: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      className="flex items-center gap-2 cursor-pointer select-none"
-      aria-label={online ? "Go offline" : "Go online"}
-    >
-      <span
-        className="text-[10px] font-bold tracking-widest uppercase"
-        style={{ color: online ? MINT : "#9CA3AF" }}
-      >
-        {online ? "ONLINE" : "OFFLINE"}
-      </span>
-      {/* Pill */}
-      <div
-        className="relative transition-colors duration-200"
-        style={{
-          width: 42,
-          height: 24,
-          borderRadius: 12,
-          background: online ? MINT : "#D1D5DB",
-        }}
-      >
-        <div
-          className="absolute top-[3px] transition-transform duration-200"
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: "50%",
-            background: "#fff",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
-            transform: online ? "translateX(21px)" : "translateX(3px)",
-          }}
-        />
-      </div>
-    </button>
-  );
-}
+const BADGES = [
+  { label: "Rapide", icon: Zap, value: "12 min", sub: "temps moyen", color: GOLD },
+  { label: "Fiable", icon: Shield, value: "98%", sub: "taux acceptation", color: MINT },
+  { label: "Étoiles", icon: Star, value: "4.9", sub: "note moyenne", color: ORANGE },
+  { label: "Courses", icon: Bike, value: "156", sub: "ce mois", color: NAVY },
+];
 
-/** Earnings stat chip */
-function StatChip({
-  label,
-  amount,
-  sub,
-  accent,
-}: {
-  label: string;
-  amount: string;
-  sub: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className="flex flex-col gap-0.5 rounded-xl px-2.5 py-2"
-      style={{
-        background: "rgba(255,255,255,0.12)",
-        border: accent ? `1px solid ${ORANGE}` : "1px solid rgba(255,255,255,0.08)",
-        minWidth: 0,
-        flex: 1,
-      }}
-    >
-      <span className="text-[10px] font-medium text-white/50 uppercase tracking-wider truncate">
-        {label}
-      </span>
-      <span className="text-sm font-bold text-white leading-tight">{amount}</span>
-      <span className="text-[10px] text-white/40 leading-tight">{sub}</span>
-    </div>
-  );
-}
+// ─── Countdown chip — green → yellow → red ────────────────────────────────────
 
-/** Countdown chip — green → yellow → red */
 function CountdownChip({ secs }: { secs: number }) {
-  const color =
-    secs > 12 ? "#2DC08A" : secs > 6 ? "#F59E0B" : "#EF4444";
+  const color = secs > 12 ? MINT : secs > 6 ? "#F59E0B" : "#EF4444";
   return (
     <div
       className="flex items-center gap-1.5 rounded-full px-3 py-1"
       style={{ background: `${color}22`, border: `1px solid ${color}55` }}
     >
-      <span
-        className="w-2 h-2 rounded-full animate-pulse"
-        style={{ background: color }}
-      />
+      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
       <span className="text-xs font-bold tabular-nums" style={{ color }}>
         {secs}s
       </span>
@@ -155,7 +90,8 @@ function CountdownChip({ secs }: { secs: number }) {
   );
 }
 
-/** Ride offer card (animated in) */
+// ─── Ride offer card ───────────────────────────────────────────────────────────
+
 function RideOfferCard({
   order,
   secs,
@@ -173,7 +109,6 @@ function RideOfferCard({
   const restaurantName = order.restaurantName ?? "Restaurant";
   const earn = order.fee ?? 12;
   const itemCount = order.items.length;
-  // Derive a short delivery address label from deliveryAddress
   const rawAddr = order.deliveryAddress ?? order.dropoff ?? "";
   const addrParts = rawAddr.split(",");
   const dropLabel =
@@ -184,19 +119,16 @@ function RideOfferCard({
 
   return (
     <div
-      className="rounded-2xl overflow-hidden shadow-lg animate-in slide-in-from-bottom-4 duration-300"
+      className="rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(27,36,64,0.06)] animate-in slide-in-from-bottom-4 duration-300"
       style={{ border: `2px solid ${ORANGE}`, background: "#fff" }}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-2.5"
-        style={{ background: `${ORANGE}0F` }}
+        style={{ background: LIGHT_ORANGE }}
       >
         <div className="flex items-center gap-2">
-          <span
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{ background: ORANGE }}
-          />
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: ORANGE }} />
           <span
             className="text-[11px] font-bold uppercase tracking-widest"
             style={{ color: ORANGE }}
@@ -215,8 +147,8 @@ function RideOfferCard({
             <p className="font-bold text-base truncate" style={{ color: NAVY }}>
               {restaurantName}
             </p>
-            <p className="text-sm" style={{ color: "#6B7280" }}>
-              {itemCount} article{itemCount !== 1 ? "s" : ""} · {order.total != null ? `${order.total} DH` : ""}
+            <p className="text-sm" style={{ color: MUTED }}>
+              {itemCount} article{itemCount !== 1 ? "s" : ""}{order.total != null ? ` · ${order.total} DH` : ""}
             </p>
           </div>
           <span className="text-xl font-extrabold" style={{ color: NAVY }}>
@@ -251,14 +183,14 @@ function RideOfferCard({
         <div className="flex gap-2">
           <button
             onClick={onDecline}
-            className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors"
-            style={{ background: "#F3F4F6", color: "#6B7280" }}
+            className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors cursor-pointer"
+            style={{ background: "#F3F4F6", color: MUTED }}
           >
             Refuser
           </button>
           <button
             onClick={onAccept}
-            className="flex-1 rounded-xl py-2.5 text-sm font-bold transition-opacity"
+            className="flex-1 rounded-xl py-2.5 text-sm font-bold transition-opacity cursor-pointer"
             style={{ background: ORANGE, color: "#fff" }}
           >
             Accepter
@@ -269,7 +201,8 @@ function RideOfferCard({
   );
 }
 
-/** Active delivery card */
+// ─── Active delivery card ──────────────────────────────────────────────────────
+
 function ActiveDeliveryCard({
   order,
   stage,
@@ -283,48 +216,23 @@ function ActiveDeliveryCard({
 }) {
   const title =
     stage === "heading_pickup"
-      ? "Se rendre chez Dar Naji"
+      ? `Récupérer chez ${order?.restaurantName ?? "Restaurant"}`
       : `Livrer chez ${order?.dropoff ?? "Ahmed H."}`;
-  const subtitle =
-    stage === "heading_pickup"
-      ? order?.pickup ?? "Médina, Marrakech"
-      : order?.dropoff ?? "Maârif, Casablanca";
+  const pickupAddr = order?.pickup ?? "Médina, Marrakech";
+  const dropoffAddr = order?.dropoff ?? "Maârif, Casablanca";
   const ctaLabel = stage === "heading_pickup" ? "Colis récupéré" : "Livré !";
   const onCta = stage === "heading_pickup" ? onPickedUp : onDelivered;
   const orderId = order?.id ?? "ATL-8742";
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-md" style={{ background: "#fff" }}>
-      {/* Map */}
-      <div className="relative" style={{ height: 200 }}>
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: "url(/images/src-map.png)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        {/* Distance chip */}
-        <div
-          className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 backdrop-blur-sm"
-          style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 1px 8px rgba(0,0,0,0.12)" }}
-        >
-          <span
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{ background: MINT }}
-          />
-          <span className="text-xs font-semibold" style={{ color: NAVY }}>
-            600 m · 3 min
-          </span>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="p-3.5 flex flex-col gap-2.5">
-        {/* Stage badge */}
+    <div
+      className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(27,36,64,0.06)]"
+      style={{ borderLeft: `4px solid ${ORANGE}` }}
+    >
+      {/* Stage badge */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full" style={{ background: ORANGE }} />
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: ORANGE }} />
           <span
             className="text-[10px] font-bold uppercase tracking-widest"
             style={{ color: ORANGE }}
@@ -332,76 +240,116 @@ function ActiveDeliveryCard({
             COURSE ACTIVE · #{orderId.replace("orders/", "").slice(0, 8).toUpperCase()}
           </span>
         </div>
+        <Package size={16} style={{ color: MUTED }} strokeWidth={2} />
+      </div>
 
-        {/* Title */}
-        <p className="text-lg font-extrabold leading-tight" style={{ color: NAVY, fontFamily: "'Bricolage Grotesque', sans-serif" }}>
-          {title}
-        </p>
+      {/* Title */}
+      <p
+        className="px-4 pb-1 text-lg font-extrabold leading-tight"
+        style={{ color: NAVY, fontFamily: "var(--font-display)" }}
+      >
+        {title}
+      </p>
 
-        {/* Subtitle */}
-        <p className="text-sm" style={{ color: "#6B7280" }}>{subtitle}</p>
-
-        {/* Address chip */}
+      {/* Map placeholder */}
+      <div
+        className="mx-4 my-3 rounded-xl overflow-hidden relative"
+        style={{ height: 120, background: "linear-gradient(135deg, #e8eaf0 0%, #d1d5de 100%)" }}
+      >
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "url(/images/src-map.png)", backgroundSize: "cover", backgroundPosition: "center" }} />
+        {/* Distance chip */}
         <div
-          className="flex items-center gap-2 rounded-xl px-3 py-2"
-          style={{ background: `${NAVY}08` }}
+          className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full px-3 py-1 backdrop-blur-sm"
+          style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 1px 8px rgba(0,0,0,0.12)" }}
         >
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: MINT }} />
+          <span className="text-xs font-semibold" style={{ color: NAVY }}>
+            600 m · 3 min
+          </span>
+        </div>
+        {/* Navigation CTA */}
+        <button
+          className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold cursor-pointer"
+          style={{ background: NAVY, color: "#fff" }}
+        >
+          <Navigation size={12} strokeWidth={2.2} />
+          Naviguer
+        </button>
+      </div>
+
+      {/* Pickup / dropoff addresses */}
+      <div className="px-4 pb-3 flex flex-col gap-2">
+        <div className="flex items-center gap-2">
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: stage === "heading_pickup" ? `${MINT}22` : `${ORANGE}22` }}
+            style={{ background: `${MINT}22` }}
           >
-            <Navigation
-              size={14}
-              style={{ color: stage === "heading_pickup" ? MINT : ORANGE }}
-              strokeWidth={2.2}
-            />
+            <MapPin size={13} style={{ color: MINT }} strokeWidth={2.2} />
           </div>
-          <span className="flex-1 text-xs font-medium truncate" style={{ color: NAVY }}>
-            {subtitle}
-          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: MUTED }}>
+              Ramassage
+            </p>
+            <p className="text-xs font-medium truncate" style={{ color: NAVY }}>
+              {pickupAddr}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: `${ORANGE}22` }}
+          >
+            <MapPin size={13} style={{ color: ORANGE }} strokeWidth={2.2} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: MUTED }}>
+              Livraison
+            </p>
+            <p className="text-xs font-medium truncate" style={{ color: NAVY }}>
+              {dropoffAddr}
+            </p>
+          </div>
           <button
-            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer"
             style={{ background: NAVY }}
             aria-label="Appeler"
           >
             <Phone size={15} color="#fff" strokeWidth={2} />
           </button>
         </div>
+      </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-2 pt-0.5">
-          <button
-            className="flex-1 rounded-xl py-2.5 text-sm font-semibold"
-            style={{ background: CREAM, color: NAVY }}
-          >
-            Naviguer
-          </button>
-          <button
-            onClick={onCta}
-            className="flex-1 rounded-xl py-2.5 text-sm font-bold"
-            style={{ background: ORANGE, color: "#fff" }}
-          >
-            {ctaLabel}
-          </button>
-        </div>
+      {/* Progress buttons */}
+      <div className="flex gap-2 px-4 pb-4">
+        <button
+          className="flex-1 rounded-xl py-2.5 text-sm font-semibold cursor-pointer"
+          style={{ background: CREAM, color: NAVY }}
+        >
+          Signaler
+        </button>
+        <button
+          onClick={onCta}
+          className="flex-1 rounded-xl py-2.5 text-sm font-bold cursor-pointer"
+          style={{ background: ORANGE, color: "#fff" }}
+        >
+          {ctaLabel}
+        </button>
       </div>
     </div>
   );
 }
 
-/** Today's runs list */
-function TodayRunsList({
-  runs,
-}: {
-  runs: typeof MOCK_RUNS;
-}) {
+// ─── Today's runs list ─────────────────────────────────────────────────────────
+
+function TodayRunsList({ runs }: { runs: typeof MOCK_RUNS }) {
   return (
-    <div className="rounded-2xl p-3.5" style={{ background: "#fff" }}>
+    <div className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-bold" style={{ color: NAVY }}>
+        <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: MUTED }}>
           Courses aujourd&apos;hui
-        </span>
-        <span className="text-xs font-medium" style={{ color: "#9CA3AF" }}>
+        </p>
+        <span className="text-xs font-medium" style={{ color: MUTED }}>
           {runs.length} courses
         </span>
       </div>
@@ -413,7 +361,7 @@ function TodayRunsList({
               <p className="text-sm font-semibold truncate" style={{ color: NAVY }}>
                 {run.restaurant}
               </p>
-              <p className="text-[11px]" style={{ color: "#9CA3AF" }}>
+              <p className="text-[11px]" style={{ color: MUTED }}>
                 {run.city} · {run.mins} min
               </p>
             </div>
@@ -427,7 +375,8 @@ function TodayRunsList({
   );
 }
 
-/** Offline empty state */
+// ─── Offline empty state ───────────────────────────────────────────────────────
+
 function OfflineState({ onGoOnline }: { onGoOnline: () => void }) {
   return (
     <div className="flex flex-col items-center gap-4 py-12 px-6 text-center">
@@ -438,16 +387,19 @@ function OfflineState({ onGoOnline }: { onGoOnline: () => void }) {
         <Bike size={36} style={{ color: NAVY }} strokeWidth={1.6} />
       </div>
       <div>
-        <p className="text-xl font-extrabold mb-1" style={{ color: NAVY, fontFamily: "'Bricolage Grotesque', sans-serif" }}>
+        <p
+          className="text-xl font-extrabold mb-1"
+          style={{ color: NAVY, fontFamily: "var(--font-display)" }}
+        >
           Hors-ligne
         </p>
-        <p className="text-sm leading-relaxed" style={{ color: "#6B7280" }}>
+        <p className="text-sm leading-relaxed" style={{ color: MUTED }}>
           Tu n&apos;es pas visible pour recevoir des courses. Active ton statut pour commencer à livrer.
         </p>
       </div>
       <button
         onClick={onGoOnline}
-        className="rounded-xl px-6 py-3 text-sm font-bold"
+        className="rounded-xl px-6 py-3 text-sm font-bold cursor-pointer"
         style={{ background: ORANGE, color: "#fff" }}
       >
         Passer en ligne
@@ -467,27 +419,18 @@ const TABS: { id: Tab; label: string; Icon: React.FC<LucideProps> }[] = [
   { id: "profil", label: "Profil", Icon: User },
 ];
 
-function BottomTabBar({
-  active,
-  onChange,
-}: {
-  active: Tab;
-  onChange: (t: Tab) => void;
-}) {
+function BottomTabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   const activeIdx = TABS.findIndex((t) => t.id === active);
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 border-t"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t"
       style={{
         background: "rgba(255,255,255,0.94)",
         backdropFilter: "blur(12px)",
         borderColor: "#E5E7EB",
-        maxWidth: 480,
-        margin: "0 auto",
       }}
     >
-      {/* Sliding orange indicator */}
       <div className="relative h-0.5" style={{ background: "#F3F4F6" }}>
         <div
           className="absolute top-0 h-0.5 transition-transform duration-200"
@@ -498,8 +441,7 @@ function BottomTabBar({
           }}
         />
       </div>
-
-      <div className="flex">
+      <div className="flex max-w-[700px] mx-auto">
         {TABS.map(({ id, label, Icon }) => {
           const isActive = active === id;
           return (
@@ -712,19 +654,10 @@ export default function DriverPage() {
 
   if (loading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: CREAM }}
-      >
+      <div className="min-h-screen flex items-center justify-center" style={{ background: CREAM }}>
         <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-full animate-pulse"
-            style={{ background: `${NAVY}22` }}
-          />
-          <div
-            className="w-24 h-3 rounded-full animate-pulse"
-            style={{ background: `${NAVY}18` }}
-          />
+          <div className="w-12 h-12 rounded-full animate-pulse" style={{ background: `${NAVY}22` }} />
+          <div className="w-24 h-3 rounded-full animate-pulse" style={{ background: `${NAVY}18` }} />
         </div>
       </div>
     );
@@ -732,131 +665,220 @@ export default function DriverPage() {
 
   const prof = profile ?? MOCK_PROFILE;
 
+  // Derived earnings for the today card
+  const earnings = {
+    today: prof.earningsToday,
+    deliveries: prof.runsToday,
+    tips: prof.tipsTotal,
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className="relative flex flex-col min-h-screen overflow-hidden"
-      style={{ background: CREAM, maxWidth: 480, margin: "0 auto" }}
-    >
-      {/* ── 1. Header ── */}
-      <header
-        className="flex items-center justify-between px-4 border-b shrink-0"
-        style={{
-          background: "#fff",
-          borderColor: "#E5E7EB",
-          padding: "14px 16px",
-          zIndex: 40,
-        }}
-      >
-        {/* Left: avatar + name + rating */}
-        <div className="flex items-center gap-3">
-          <Sprite id={prof.avatar ?? "avatar:youssef"} width={44} height={44} radius={22} />
-          <div>
-            <p className="text-sm font-bold leading-tight" style={{ color: NAVY }}>
-              {prof.name}
-            </p>
-            <p className="text-[11px] leading-tight" style={{ color: `${NAVY}80` }}>
-              {prof.rating.toFixed(2)} · {prof.totalDeliveries.toLocaleString("fr-MA")} livraisons
-            </p>
-          </div>
-        </div>
+    <div className="relative min-h-screen" style={{ background: CREAM }}>
+      {/* ── Scrollable content ── */}
+      <div className="max-w-[700px] mx-auto px-6 pt-8 pb-16">
 
-        {/* Right: online toggle */}
-        <OnlineToggle online={isOnline} onToggle={togglingOnline ? () => {} : handleToggle} />
-      </header>
-
-      {/* ── 2. Earnings Strip ── */}
-      <div
-        className="relative overflow-hidden shrink-0"
-        style={{ background: NAVY, padding: "14px 16px" }}
-      >
-        {/* Zellige overlay */}
-        <div className="absolute inset-0 opacity-[0.12]">
-          <ZelligeBg opacity={1} color="#fff" />
-        </div>
-
-        <div className="relative z-10 flex flex-col gap-3">
-          {/* Top row: label + amount + withdraw */}
-          <div className="flex items-center justify-between">
+        {/* ── 1. Online / Offline Hero Toggle ── */}
+        <div
+          className={`rounded-2xl p-6 mb-6 relative overflow-hidden transition-colors`}
+          style={{ background: isOnline ? MINT : NAVY }}
+        >
+          {/* Dot-grid overlay */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.12]"
+            style={{
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          />
+          <div className="relative flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-                GAINS
+              <p className="text-white/70 text-[11px] font-bold uppercase tracking-widest">
+                Statut
               </p>
               <p
-                className="text-[28px] font-extrabold text-white leading-none"
-                style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
+                className="text-white text-2xl font-extrabold"
+                style={{ fontFamily: "var(--font-display)" }}
               >
-                {prof.earningsToday} DH
+                {isOnline ? "En ligne" : "Hors ligne"}
+              </p>
+              <p className="text-white/60 text-xs mt-1">
+                {isOnline
+                  ? "Vous recevez des commandes"
+                  : "Activez pour recevoir des commandes"}
               </p>
             </div>
             <button
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold"
-              style={{ background: ORANGE, color: "#fff" }}
+              onClick={togglingOnline ? undefined : handleToggle}
+              disabled={togglingOnline}
+              className="w-16 h-9 rounded-full relative transition-colors cursor-pointer"
+              style={{
+                backgroundColor: isOnline ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.15)",
+              }}
             >
-              <Banknote size={16} strokeWidth={2} />
-              Retirer
+              <div
+                className={`absolute top-1 w-7 h-7 rounded-full bg-white shadow transition-all ${
+                  isOnline ? "left-8" : "left-1"
+                }`}
+              />
             </button>
           </div>
+        </div>
 
-          {/* 3 stat chips */}
-          <div className="flex gap-2">
-            <StatChip
-              label="Aujourd'hui"
-              amount={`${prof.earningsToday} DH`}
-              sub={`${prof.runsToday} courses`}
-            />
-            <StatChip
-              label="Semaine"
-              amount={`${prof.earningsWeek} DH`}
-              sub={`${prof.runsWeek} courses`}
-            />
-            <StatChip
-              label="Pourboires"
-              amount={`${prof.tipsTotal} DH`}
-              sub={`avg ${prof.runsToday > 0 ? Math.round(prof.tipsTotal / prof.runsToday) : 6} DH`}
-              accent
-            />
+        {/* ── 2. Today's Earnings Card ── */}
+        <div className="bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)] mb-6">
+          <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: MUTED }}>
+            Gains du jour
+          </p>
+          <p
+            className="text-4xl font-extrabold"
+            style={{ color: NAVY, fontFamily: "var(--font-display)" }}
+          >
+            {earnings.today}{" "}
+            <span className="text-xl" style={{ color: MUTED }}>
+              DH
+            </span>
+          </p>
+          <div className="flex gap-4 mt-3 text-sm">
+            <div>
+              <span style={{ color: MUTED }}>Livraisons:</span>{" "}
+              <span className="font-bold" style={{ color: NAVY }}>
+                {earnings.deliveries}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: MUTED }}>Pourboires:</span>{" "}
+              <span className="font-bold" style={{ color: MINT }}>
+                {earnings.tips} DH
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── 3. Scrollable main content ── */}
-      <main className="flex-1 overflow-y-auto pb-24" style={{ padding: "14px 16px" }}>
-        <div className="flex flex-col gap-3">
-          {isOnline ? (
-            <>
-              {/* Active delivery */}
-              {stage !== "none" && (
-                <ActiveDeliveryCard
-                  order={activeOrder}
-                  stage={stage as "heading_pickup" | "heading_dropoff"}
-                  onPickedUp={handlePickedUp}
-                  onDelivered={handleDelivered}
-                />
-              )}
+        {/* ── 3. Active Delivery Card ── */}
+        {stage !== "none" && (
+          <div className="mb-6">
+            <ActiveDeliveryCard
+              order={activeOrder}
+              stage={stage as "heading_pickup" | "heading_dropoff"}
+              onPickedUp={handlePickedUp}
+              onDelivered={handleDelivered}
+            />
+          </div>
+        )}
 
-              {/* Ride offer */}
-              {currentOffer && !activeOrder && (
+        {/* ── 4. Performance Badges Row ── */}
+        <div className="mb-6">
+          <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: MUTED }}>
+            Performance
+          </p>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+            {BADGES.map(({ label, icon: Icon, value, sub, color }) => (
+              <div
+                key={label}
+                className="bg-white rounded-2xl p-4 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex flex-col gap-2 shrink-0"
+                style={{ minWidth: 110 }}
+              >
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ background: `${color}18` }}
+                >
+                  <Icon size={18} style={{ color }} strokeWidth={2} />
+                </div>
+                <div>
+                  <p
+                    className="text-lg font-extrabold leading-none"
+                    style={{ color: NAVY, fontFamily: "var(--font-display)" }}
+                  >
+                    {value}
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: MUTED }}>
+                    {sub}
+                  </p>
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── 5. Pending Orders / Content based on online state ── */}
+        {isOnline ? (
+          <>
+            {/* Ride offer */}
+            {currentOffer && !activeOrder && (
+              <div className="mb-6">
                 <RideOfferCard
                   order={currentOffer}
                   secs={offerSecs}
                   onAccept={handleAcceptOffer}
                   onDecline={handleDeclineOffer}
                 />
-              )}
+              </div>
+            )}
 
-              {/* Today's runs */}
-              <TodayRunsList runs={MOCK_RUNS} />
-            </>
-          ) : (
-            <OfflineState onGoOnline={handleToggle} />
-          )}
-        </div>
-      </main>
+            {/* Pending orders list header */}
+            {pendingOrders.length > 1 && (
+              <div className="mb-4">
+                <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: MUTED }}>
+                  Commandes en attente ({pendingOrders.length - 1})
+                </p>
+                <div className="flex flex-col gap-3">
+                  {pendingOrders.slice(1).map((order) => {
+                    const restaurantName = order.restaurantName ?? "Restaurant";
+                    const earn = order.fee ?? 12;
+                    const rawAddr = order.deliveryAddress ?? order.dropoff ?? "";
+                    const dropLabel = (rawAddr.split(",").at(-1)?.trim() ?? rawAddr.slice(-24)) || "Livraison";
+                    return (
+                      <div
+                        key={order.id}
+                        className="bg-white rounded-2xl px-4 py-3 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex items-center gap-3"
+                      >
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: LIGHT_ORANGE }}
+                        >
+                          <Package size={16} style={{ color: ORANGE }} strokeWidth={2} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: NAVY }}>
+                            {restaurantName}
+                          </p>
+                          <p className="text-[11px] truncate" style={{ color: MUTED }}>
+                            {dropLabel}
+                          </p>
+                        </div>
+                        <span className="text-sm font-extrabold shrink-0" style={{ color: NAVY }}>
+                          {earn} DH
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-      {/* ── 4. Bottom Tab Bar ── */}
+            {/* Today's runs */}
+            <TodayRunsList runs={MOCK_RUNS} />
+          </>
+        ) : (
+          <OfflineState onGoOnline={handleToggle} />
+        )}
+      </div>
+
+      {/* ── Bottom Tab Bar ── */}
       <BottomTabBar active={tab} onChange={setTab} />
+
+      {/* ── SOS Emergency Button ── */}
+      <button
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-[0_4px_14px_rgba(239,68,68,0.4)] z-50 cursor-pointer"
+        aria-label="SOS Urgence"
+      >
+        <AlertTriangle className="w-6 h-6" />
+      </button>
     </div>
   );
 }

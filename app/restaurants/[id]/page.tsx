@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Star, Clock, Plus, Minus, X, ChevronLeft, Truck, ShoppingBag } from "lucide-react";
+import {
+  Star, Clock, Plus, Minus, X, ChevronLeft, Truck,
+  ShoppingBag, Heart,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import FloatingNavbar from "@/components/FloatingNavbar";
-import { Sprite, ZelligeBg } from "@/components/atlas";
-import { RestaurantSprite } from "@/components/atlas/RestaurantSprite";
+import { Sprite } from "@/components/atlas";
 import { useCart } from "@/contexts/CartContext";
 import toast from "react-hot-toast";
 
@@ -18,49 +20,69 @@ const RESTAURANTS: Record<string, {
   rating: number; reviews: number; eta: string; fee: string;
   badges: string[]; tileHue: number; img: string; description: string;
   dishes: string[];
+  estimatedDeliveryMins: number;
+  deliveryFee: number;
+  cuisine: string;
 }> = {
-  darnaji:     { id: "darnaji",     name: "Dar Naji",       tagline: "Cuisine marocaine traditionnelle", city: "Rabat · Médina",      rating: 4.8, reviews: 2340, eta: "20–30 min", fee: "12 DH", badges: ["Top-rated", "Halal"],   tileHue: 18,  img: "rest:darnaji",     description: "Découvrez la cuisine marocaine authentique préparée selon les recettes traditionnelles de nos grand-mères.", dishes: ["tagine-poulet", "couscous-royal", "pastilla", "harira", "briouates", "atay"] },
-  cafeclock:   { id: "cafeclock",   name: "Café Clock",     tagline: "Camel burger & comfort food",      city: "Fès · Médina",         rating: 4.7, reviews: 1820, eta: "25–35 min", fee: "15 DH", badges: ["Beldi"],              tileHue: 38,  img: "rest:cafeclock",   description: "Le légendaire Café Clock vous propose son incontournable camel burger et cuisine de fusion marocaine.", dishes: ["camel-burger", "msemen", "atay", "jus-orange"] },
-  snacktanjia: { id: "snacktanjia", name: "Snack Tanjia",   tagline: "Spécialités marrakchies",          city: "Marrakech · Jemâa",   rating: 4.9, reviews: 5210, eta: "15–25 min", fee: "9 DH",  badges: ["Bestseller"],         tileHue: 6,   img: "rest:snacktanjia", description: "La tanjia, spécialité emblématique de Marrakech, cuite lentement dans la cendre du hammam.", dishes: ["tanjia", "harira", "chebakia", "atay"] },
-  atayco:      { id: "atayco",      name: "Atay & Co",      tagline: "Thé à la menthe & sucreries",     city: "Casablanca · Maârif", rating: 4.6, reviews: 980,  eta: "10–15 min", fee: "7 DH",  badges: ["Free delivery"],      tileHue: 150, img: "rest:atayco",      description: "L'art du thé à la menthe marocain dans toute sa splendeur, accompagné de chebakia et pâtisseries beldi.", dishes: ["atay", "chebakia", "msemen", "jus-orange"] },
-  riadmogador: { id: "riadmogador", name: "Riad Mogador",   tagline: "Fine dining marocain",             city: "Essaouira · Port",     rating: 4.8, reviews: 1240, eta: "30–40 min", fee: "18 DH", badges: ["Premium"],            tileHue: 200, img: "rest:riadmogador", description: "Expérience gastronomique haut de gamme dans le cadre enchanteur d'Essaouira.", dishes: ["pastilla", "tagine-kefta", "briouates", "atay"] },
-  baladi:      { id: "baladi",      name: "Baladi Healthy", tagline: "Bowls & jus pressés",              city: "Casablanca · Anfa",   rating: 4.5, reviews: 612,  eta: "20–25 min", fee: "10 DH", badges: ["Healthy"],            tileHue: 130, img: "rest:baladi",      description: "Cuisine saine inspirée des saveurs du terroir marocain. Bowls nutritifs, jus fraîchement pressés.", dishes: ["bowl-baladi", "jus-orange", "harira", "msemen"] },
+  darnaji:     { id: "darnaji",     name: "Dar Naji",       tagline: "Cuisine marocaine traditionnelle", city: "Rabat · Médina",      rating: 4.8, reviews: 2340, eta: "20–30 min", fee: "12 DH", badges: ["Top-rated", "Halal"],   tileHue: 18,  img: "rest:darnaji",     description: "Découvrez la cuisine marocaine authentique.", dishes: ["tagine-poulet", "couscous-royal", "pastilla", "harira", "briouates", "atay"], estimatedDeliveryMins: 25, deliveryFee: 12, cuisine: "Marocaine" },
+  cafeclock:   { id: "cafeclock",   name: "Café Clock",     tagline: "Camel burger & comfort food",      city: "Fès · Médina",         rating: 4.7, reviews: 1820, eta: "25–35 min", fee: "15 DH", badges: ["Beldi"],              tileHue: 38,  img: "rest:cafeclock",   description: "Le légendaire Café Clock.", dishes: ["camel-burger", "msemen", "atay", "jus-orange"], estimatedDeliveryMins: 30, deliveryFee: 15, cuisine: "Fusion" },
+  snacktanjia: { id: "snacktanjia", name: "Snack Tanjia",   tagline: "Spécialités marrakchies",          city: "Marrakech · Jemâa",   rating: 4.9, reviews: 5210, eta: "15–25 min", fee: "9 DH",  badges: ["Bestseller"],         tileHue: 6,   img: "rest:snacktanjia", description: "La tanjia emblématique.", dishes: ["tanjia", "harira", "chebakia", "atay"], estimatedDeliveryMins: 20, deliveryFee: 9, cuisine: "Marocaine" },
+  atayco:      { id: "atayco",      name: "Atay & Co",      tagline: "Thé à la menthe & sucreries",     city: "Casablanca · Maârif", rating: 4.6, reviews: 980,  eta: "10–15 min", fee: "7 DH",  badges: ["Free delivery"],      tileHue: 150, img: "rest:atayco",      description: "L'art du thé marocain.", dishes: ["atay", "chebakia", "msemen", "jus-orange"], estimatedDeliveryMins: 12, deliveryFee: 7, cuisine: "Pâtisserie" },
+  riadmogador: { id: "riadmogador", name: "Riad Mogador",   tagline: "Fine dining marocain",             city: "Essaouira · Port",     rating: 4.8, reviews: 1240, eta: "30–40 min", fee: "18 DH", badges: ["Premium"],            tileHue: 200, img: "rest:riadmogador", description: "Gastronomie haut de gamme.", dishes: ["pastilla", "tagine-kefta", "briouates", "atay"], estimatedDeliveryMins: 35, deliveryFee: 18, cuisine: "Gastronomie" },
+  baladi:      { id: "baladi",      name: "Baladi Healthy", tagline: "Bowls & jus pressés",              city: "Casablanca · Anfa",   rating: 4.5, reviews: 612,  eta: "20–25 min", fee: "10 DH", badges: ["Healthy"],            tileHue: 130, img: "rest:baladi",      description: "Cuisine saine marocaine.", dishes: ["bowl-baladi", "jus-orange", "harira", "msemen"], estimatedDeliveryMins: 22, deliveryFee: 10, cuisine: "Healthy" },
 };
 
-const DISHES: Record<string, { name: string; sub: string; price: number; hue: number; img: string }> = {
-  "tagine-poulet":  { name: "Tagine Poulet Citron",    sub: "Olives Beldi · oignons confits",     price: 68,  hue: 38,  img: "dish:tagine-poulet" },
-  "couscous-royal": { name: "Couscous Royal",           sub: "Agneau, poulet, merguez",            price: 95,  hue: 24,  img: "dish:couscous-royal" },
-  "pastilla":       { name: "Pastilla au Poulet",       sub: "Amandes, cannelle, ouarka",          price: 75,  hue: 18,  img: "dish:pastilla" },
-  "harira":         { name: "Harira Traditionnelle",    sub: "Avec dattes & chebakia",             price: 28,  hue: 6,   img: "dish:harira" },
-  "camel-burger":   { name: "Camel Burger",             sub: "Avec frites maison",                 price: 110, hue: 38,  img: "dish:camel-burger" },
-  "msemen":         { name: "Msemen au Miel",           sub: "3 pièces · miel & beurre",           price: 22,  hue: 50,  img: "dish:msemen" },
-  "atay":           { name: "Atay à la Menthe",         sub: "Théière de 4 verres",                price: 18,  hue: 150, img: "dish:atay" },
-  "tanjia":         { name: "Tanjia Marrakchia",        sub: "Cuite au four traditionnel",         price: 88,  hue: 18,  img: "dish:tanjia" },
-  "tagine-kefta":   { name: "Tagine Kefta & Œuf",       sub: "Sauce tomate épicée",                price: 58,  hue: 6,   img: "dish:tagine-kefta" },
-  "briouates":      { name: "Briouates Crevettes",      sub: "6 pièces croustillantes",            price: 45,  hue: 38,  img: "dish:briouates" },
-  "chebakia":       { name: "Chebakia au Miel",         sub: "Pâtisserie marocaine · 250g",        price: 35,  hue: 340, img: "dish:chebakia" },
-  "bowl-baladi":    { name: "Bowl Baladi",              sub: "Quinoa, avocat, grenade",            price: 72,  hue: 130, img: "dish:bowl-baladi" },
-  "jus-orange":     { name: "Jus d'Orange Frais",       sub: "Pressé minute",                      price: 16,  hue: 50,  img: "dish:jus-orange" },
+const DISHES: Record<string, {
+  name: string; sub: string; price: number; hue: number; img: string; category: string;
+}> = {
+  "tagine-poulet":  { name: "Tagine Poulet Citron",    sub: "Olives Beldi · oignons confits",     price: 68,  hue: 38,  img: "dish:tagine-poulet",  category: "Tagines" },
+  "couscous-royal": { name: "Couscous Royal",           sub: "Agneau, poulet, merguez",            price: 95,  hue: 24,  img: "dish:couscous-royal", category: "Couscous" },
+  "pastilla":       { name: "Pastilla au Poulet",       sub: "Amandes, cannelle, ouarka",          price: 75,  hue: 18,  img: "dish:pastilla",       category: "Entrées" },
+  "harira":         { name: "Harira Traditionnelle",    sub: "Avec dattes & chebakia",             price: 28,  hue: 6,   img: "dish:harira",         category: "Soupes" },
+  "camel-burger":   { name: "Camel Burger",             sub: "Avec frites maison",                 price: 110, hue: 38,  img: "dish:camel-burger",   category: "Burgers" },
+  "msemen":         { name: "Msemen au Miel",           sub: "3 pièces · miel & beurre",           price: 22,  hue: 50,  img: "dish:msemen",         category: "Petits-déjeuners" },
+  "atay":           { name: "Atay à la Menthe",         sub: "Théière de 4 verres",                price: 18,  hue: 150, img: "dish:atay",           category: "Boissons" },
+  "tanjia":         { name: "Tanjia Marrakchia",        sub: "Cuite au four traditionnel",         price: 88,  hue: 18,  img: "dish:tanjia",         category: "Spécialités" },
+  "tagine-kefta":   { name: "Tagine Kefta & Œuf",       sub: "Sauce tomate épicée",                price: 58,  hue: 6,   img: "dish:tagine-kefta",   category: "Tagines" },
+  "briouates":      { name: "Briouates Crevettes",      sub: "6 pièces croustillantes",            price: 45,  hue: 38,  img: "dish:briouates",      category: "Entrées" },
+  "chebakia":       { name: "Chebakia au Miel",         sub: "Pâtisserie marocaine · 250g",        price: 35,  hue: 340, img: "dish:chebakia",       category: "Pâtisseries" },
+  "bowl-baladi":    { name: "Bowl Baladi",              sub: "Quinoa, avocat, grenade",            price: 72,  hue: 130, img: "dish:bowl-baladi",    category: "Bowls" },
+  "jus-orange":     { name: "Jus d'Orange Frais",       sub: "Pressé minute",                      price: 16,  hue: 50,  img: "dish:jus-orange",     category: "Boissons" },
 };
 
-// Local simple cart (no Firestore required for browsing)
+// ─── Local cart (no Firestore required for browsing) ─────────────────────────
+
 interface LocalCartItem { dishKey: string; qty: number }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function RestaurantPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
   const r = RESTAURANTS[id as string];
 
+  // ── Local cart state ──────────────────────────────────────────────────────
   const [cartItems, setCartItems] = useState<LocalCartItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [addedKey, setAddedKey]     = useState<string | null>(null);
+  const [addedKey, setAddedKey]    = useState<string | null>(null);
 
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [isFavorited, setIsFavorited]     = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>("");
+  const [activeCuisine, setActiveCuisine]   = useState<string>("Tous");
+
+  // ── Refs for scroll-spy ───────────────────────────────────────────────────
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // ── CartContext (used at checkout) ────────────────────────────────────────
   const { addItem } = useCart();
 
+  // ── Redirect if restaurant not found ─────────────────────────────────────
   useEffect(() => {
     if (!r) router.replace("/restaurants");
   }, [r, router]);
 
+  // ── Cart helpers ──────────────────────────────────────────────────────────
   const addToCart = useCallback((dishKey: string) => {
     setCartItems((prev) => {
       const idx = prev.findIndex((i) => i.dishKey === dishKey);
@@ -74,19 +96,18 @@ export default function RestaurantPage() {
   }, []);
 
   const updateQty = useCallback((dishKey: string, delta: number) => {
-    setCartItems((prev) => {
-      const updated = prev.map((i) => i.dishKey === dishKey ? { ...i, qty: i.qty + delta } : i).filter((i) => i.qty > 0);
-      return updated;
-    });
+    setCartItems((prev) =>
+      prev.map((i) => i.dishKey === dishKey ? { ...i, qty: i.qty + delta } : i).filter((i) => i.qty > 0)
+    );
   }, []);
 
-  const subtotal   = cartItems.reduce((s, i) => s + (DISHES[i.dishKey]?.price ?? 0) * i.qty, 0);
-  const itemCount  = cartItems.reduce((s, i) => s + i.qty, 0);
+  const subtotal    = cartItems.reduce((s, i) => s + (DISHES[i.dishKey]?.price ?? 0) * i.qty, 0);
+  const itemCount   = cartItems.reduce((s, i) => s + i.qty, 0);
   const deliveryFee = parseInt(r?.fee ?? "12") || 12;
   const total       = subtotal + deliveryFee;
 
+  // ── Checkout — push to Firestore CartContext then navigate ────────────────
   const handleCheckout = async () => {
-    // Push items to Firestore CartContext then navigate to checkout
     if (!r || cartItems.length === 0) return;
     try {
       for (const item of cartItems) {
@@ -97,195 +118,413 @@ export default function RestaurantPage() {
         }
       }
     } catch {
-      // Not signed in — still navigate, checkout will handle auth
+      // Not signed in — checkout page will handle auth
     }
     router.push("/checkout");
   };
 
+  // ── Favorite toggle ───────────────────────────────────────────────────────
+  const handleFavoriteToggle = () => {
+    setIsFavorited((prev) => !prev);
+    toast.success(isFavorited ? "Retiré des favoris" : "Ajouté aux favoris", { duration: 1200 });
+  };
+
+  // ── Category scroll ───────────────────────────────────────────────────────
+  const scrollToCategory = (id: string) => {
+    setActiveCategory(id);
+    categoryRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   if (!r) return null;
 
-  const menuSections = [
-    { title: "Populaires", dishes: r.dishes.slice(0, 4) },
-    { title: "Tous les plats", dishes: r.dishes },
-  ].filter((s, i, arr) => i === 0 || arr[0].dishes.length !== r.dishes.length);
+  // ── Build category sections from this restaurant's dishes ─────────────────
+  const categoryOrder = ["Populaires", "Tagines", "Couscous", "Spécialités", "Entrées", "Soupes", "Bowls", "Petits-déjeuners", "Pâtisseries", "Boissons", "Burgers"];
+
+  // Unique categories present in this restaurant
+  const popularDishKeys = r.dishes.slice(0, 4);
+  const sections: { id: string; name: string; dishKeys: string[] }[] = [];
+
+  // Always add "Populaires" first if there are dishes
+  if (r.dishes.length > 0) {
+    sections.push({ id: "Populaires", name: "Populaires", dishKeys: popularDishKeys });
+  }
+
+  // Then group remaining dishes by category
+  const byCategory: Record<string, string[]> = {};
+  for (const dishKey of r.dishes) {
+    const cat = DISHES[dishKey]?.category ?? "Autres";
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(dishKey);
+  }
+  for (const cat of categoryOrder) {
+    if (byCategory[cat] && byCategory[cat].length > 0) {
+      sections.push({ id: cat, name: cat, dishKeys: byCategory[cat] });
+    }
+  }
+  // Any leftover categories not in categoryOrder
+  for (const [cat, keys] of Object.entries(byCategory)) {
+    if (!categoryOrder.includes(cat) && keys.length > 0) {
+      sections.push({ id: cat, name: cat, dishKeys: keys });
+    }
+  }
+
+  // Initialize activeCategory on first render
+  const firstCategoryId = sections[0]?.id ?? "";
+
+  // ── Cuisine filter chips (unique cuisines across all restaurants for discovery) ──
+  const cuisineOptions = ["Tous", ...Array.from(new Set(Object.values(RESTAURANTS).map((rest) => rest.cuisine)))];
+
+  // ── Filtered dishes (within this restaurant) ─────────────────────────────
+  // When a cuisine filter is active, hide dishes whose restaurant doesn't match
+  // (for a single-restaurant page this means showing all or none — so we keep all dishes
+  //  and filter sections by whether the restaurant cuisine matches)
+  const restaurantMatchesCuisine = activeCuisine === "Tous" || r.cuisine === activeCuisine;
+  const visibleSections = restaurantMatchesCuisine ? sections : [];
 
   return (
-    <div style={{ background: "#F6EEDC", minHeight: "100vh" }}>
+    <div className="min-h-screen bg-[#F5F0E8]">
       <FloatingNavbar />
 
-      {/* Hero banner */}
-      <RestaurantSprite id={r.img} height={280} />
+      <div className="max-w-[1100px] mx-auto px-6 pt-8 pb-24">
 
-      {/* Info card */}
-      <div style={{ maxWidth: 1200, margin: "-50px auto 0", padding: "0 32px", position: "relative", zIndex: 2 }}>
-        <div style={{ background: "#fff", borderRadius: 22, padding: 28, display: "flex", gap: 24, alignItems: "flex-start", boxShadow: "0 12px 28px rgba(27,36,64,0.08)" }}>
-          <Link href="/restaurants" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: "#F6EEDC", flexShrink: 0, marginTop: 4 }}>
-            <ChevronLeft size={18} color="#1B2440" />
-          </Link>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 38, color: "#1B2440", letterSpacing: "-0.02em" }}>{r.name}</div>
-            <div style={{ fontSize: 15, color: "#5A6584", marginTop: 4 }}>{r.tagline}</div>
-            <div style={{ fontSize: 13, color: "#5A6584", marginTop: 2 }}>{r.city}</div>
-            <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
+        {/* ── Back link ── */}
+        <Link
+          href="/restaurants"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6B7A9E] mb-4 hover:text-[#1B2440] transition"
+        >
+          <ChevronLeft className="w-4 h-4" /> Restaurants
+        </Link>
+
+        {/* ── Hero image with restaurant info overlay ── */}
+        <div className="relative h-[220px] bg-[#1B2440] rounded-2xl overflow-hidden mb-6">
+          {/* Dot-grid texture */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.12]"
+            style={{
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          />
+          {/* Gradient overlay + info */}
+          <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-[#1B2440] to-transparent">
+            <h1
+              className="text-2xl font-extrabold text-white"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {r.name}
+            </h1>
+            <div className="flex items-center gap-3 mt-1.5 text-sm text-white/70 flex-wrap">
+              <span className="flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 fill-[#F0A500] text-[#F0A500]" />
+                {r.rating}
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {r.estimatedDeliveryMins} min
+              </span>
+              <span>·</span>
+              <span>{r.deliveryFee} DH livraison</span>
+              <span>·</span>
+              <span className="text-white/50">{r.city}</span>
+            </div>
+            {/* Badges */}
+            <div className="flex gap-1.5 mt-2 flex-wrap">
               {r.badges.map((b) => (
-                <span key={b} style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", background: "#FFF0EA", color: "#C8481A", padding: "5px 10px", borderRadius: 999 }}>{b}</span>
+                <span
+                  key={b}
+                  className="text-[10px] font-bold uppercase tracking-wider bg-[#E55A26]/80 text-white px-2.5 py-0.5 rounded-full"
+                >
+                  {b}
+                </span>
               ))}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 22, alignItems: "center", flexShrink: 0 }}>
-            {[
-              { icon: "⭐", val: r.rating.toString(), label: `${r.reviews.toLocaleString("fr")} avis` },
-              { icon: "🕐", val: r.eta,              label: "Livraison" },
-              { icon: "🛵", val: r.fee,              label: "Frais" },
-            ].map((s) => (
-              <div key={s.label} style={{ textAlign: "center", minWidth: 76 }}>
-                <div style={{ fontSize: 20 }}>{s.icon}</div>
-                <div style={{ fontWeight: 800, color: "#1B2440", marginTop: 2, fontSize: 15 }}>{s.val}</div>
-                <div style={{ fontSize: 11, color: "#5A6584" }}>{s.label}</div>
-              </div>
+
+          {/* Favorite button */}
+          <button
+            onClick={handleFavoriteToggle}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center cursor-pointer hover:bg-white transition"
+          >
+            <Heart
+              className={`w-5 h-5 transition ${
+                isFavorited ? "fill-[#E55A26] text-[#E55A26]" : "text-[#1B2440]"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* ── Cuisine filter chips ── */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4 pb-1">
+          {cuisineOptions.map((cuisine) => (
+            <button
+              key={cuisine}
+              onClick={() => setActiveCuisine(cuisine)}
+              className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                activeCuisine === cuisine
+                  ? "bg-[#E55A26] text-white"
+                  : "bg-white text-[#6B7A9E] shadow-[0_2px_10px_rgba(27,36,64,0.06)] hover:text-[#1B2440]"
+              }`}
+            >
+              {cuisine}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Sticky category nav ── */}
+        <div className="sticky top-0 z-30 bg-[#F5F0E8] py-3 -mx-6 px-6 mb-4">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {sections.map((sec) => (
+              <button
+                key={sec.id}
+                onClick={() => scrollToCategory(sec.id)}
+                className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition cursor-pointer ${
+                  (activeCategory || firstCategoryId) === sec.id
+                    ? "bg-[#1B2440] text-white"
+                    : "bg-white text-[#1B2440] shadow-[0_2px_10px_rgba(27,36,64,0.06)] hover:shadow-md"
+                }`}
+              >
+                {sec.name}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Menu grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 28, marginTop: 28, paddingBottom: 60 }}>
-          {/* Sticky sidebar nav */}
-          <aside style={{ position: "sticky", top: 90, alignSelf: "flex-start" }}>
-            <div style={{ background: "#fff", borderRadius: 18, padding: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#5A6584", padding: "6px 8px 10px" }}>Menu</div>
-              {["Populaires", "Tagines", "Couscous", "Entrées", "Pâtisseries", "Boissons"].map((s, i) => (
-                <a key={s} href={`#sec-${i}`} style={{ display: "block", padding: "8px 10px", borderRadius: 10, fontSize: 13, fontWeight: 600, color: i === 0 ? "#1B2440" : "#5A6584", background: i === 0 ? "#FBF6E7" : "transparent", textDecoration: "none", transition: "background 150ms ease" }}
-                  onMouseEnter={(e) => { if (i !== 0) (e.currentTarget as HTMLElement).style.background = "#F6EEDC"; }}
-                  onMouseLeave={(e) => { if (i !== 0) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >{s}</a>
-              ))}
-            </div>
+        {/* ── Two-column layout: menu + desktop sidebar cart ── */}
+        <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6">
 
-            {/* Cart summary in sidebar */}
-            {itemCount > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                style={{ marginTop: 14, background: "#1B2440", borderRadius: 18, padding: 16, color: "#fff", cursor: "pointer" }}
-                onClick={() => setDrawerOpen(true)}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#E55A26", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800 }}>{itemCount}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14 }}>Voir le panier</div>
-                    <div style={{ fontSize: 12, opacity: 0.75 }}>{subtotal} DH</div>
-                  </div>
-                  <ShoppingBag size={18} color="#E55A26" />
-                </div>
-              </motion.div>
-            )}
-          </aside>
-
-          {/* Dishes */}
+          {/* ── Menu sections ── */}
           <div>
-            <div id="sec-0" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, color: "#1B2440", marginBottom: 14 }}>Populaires</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-              {r.dishes.map((dishKey) => {
-                const dish = DISHES[dishKey];
-                if (!dish) return null;
-                const inCart = cartItems.find((i) => i.dishKey === dishKey);
-                const justAdded = addedKey === dishKey;
+            {visibleSections.length === 0 && (
+              <div className="bg-white rounded-2xl p-8 text-center text-[#6B7A9E] shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
+                Aucun plat disponible pour cette catégorie.
+              </div>
+            )}
 
-                return (
-                  <motion.div
-                    key={dishKey}
-                    whileHover={{ y: -2, boxShadow: "0 14px 24px rgba(27,36,64,0.08)" }}
-                    style={{ background: "#fff", borderRadius: 18, padding: 14, display: "flex", gap: 14, alignItems: "center", cursor: "pointer", boxShadow: "0 2px 6px rgba(27,36,64,0.04)", transition: "box-shadow 160ms ease" }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#1B2440" }}>{dish.name}</div>
-                      <div style={{ fontSize: 12, color: "#5A6584", marginTop: 4 }}>{dish.sub}</div>
-                      <div style={{ marginTop: 10, fontWeight: 800, color: "#1B2440", fontSize: 15 }}>{dish.price} DH</div>
-                    </div>
-                    <div style={{ position: "relative", flexShrink: 0 }}>
-                      <Sprite id={dish.img} width={100} height={100} radius={14} />
-                      <AnimatePresence>
-                        {inCart ? (
-                          <motion.div
-                            key="counter"
-                            initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }}
-                            style={{ position: "absolute", bottom: -8, right: -8, display: "flex", alignItems: "center", background: "#fff", borderRadius: 999, border: "1.5px solid #E55A26", overflow: "hidden" }}
-                          >
-                            <button onClick={() => updateQty(dishKey, -1)} style={{ width: 28, height: 28, border: "none", background: "transparent", color: "#E55A26", fontWeight: 800, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <Minus size={12} strokeWidth={2.5} color="#E55A26" />
-                            </button>
-                            <span style={{ width: 20, textAlign: "center", fontWeight: 800, color: "#1B2440", fontSize: 13 }}>{inCart.qty}</span>
-                            <button onClick={() => addToCart(dishKey)} style={{ width: 28, height: 28, border: "none", background: "#E55A26", color: "#fff", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <Plus size={12} strokeWidth={2.5} color="#fff" />
-                            </button>
-                          </motion.div>
-                        ) : (
-                          <motion.button
-                            key="add"
-                            initial={{ scale: 0.8 }} animate={{ scale: justAdded ? 1.15 : 1 }} exit={{ scale: 0.8 }}
-                            onClick={() => addToCart(dishKey)}
-                            style={{ position: "absolute", bottom: -8, right: -8, width: 34, height: 34, background: "#E55A26", borderRadius: 999, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 12px rgba(229,90,38,0.40)" }}
-                          >
-                            <Plus size={18} strokeWidth={2.4} color="#fff" />
-                          </motion.button>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+            {visibleSections.map((sec) => (
+              <div
+                key={sec.id}
+                id={`sec-${sec.id}`}
+                ref={(el) => { categoryRefs.current[sec.id] = el; }}
+                className="mb-8 scroll-mt-20"
+              >
+                <h2
+                  className="text-lg font-extrabold text-[#1B2440] mb-3"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {sec.name}
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {sec.dishKeys.map((dishKey) => {
+                    const dish = DISHES[dishKey];
+                    if (!dish) return null;
+                    const inCart  = cartItems.find((i) => i.dishKey === dishKey);
+                    const justAdded = addedKey === dishKey;
+
+                    return (
+                      <div
+                        key={dishKey}
+                        className="bg-white rounded-2xl p-3 shadow-[0_2px_10px_rgba(27,36,64,0.06)] flex gap-3 hover:shadow-md transition-shadow cursor-pointer"
+                      >
+                        {/* Dish image */}
+                        <div className="w-20 h-20 rounded-xl bg-[#F5F0E8] shrink-0 overflow-hidden">
+                          <Sprite id={dish.img} width={80} height={80} radius={12} />
+                        </div>
+
+                        {/* Dish info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-[#1B2440] text-sm truncate">{dish.name}</p>
+                          <p className="text-[11px] text-[#6B7A9E] mt-0.5 line-clamp-2">{dish.sub}</p>
+
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="font-extrabold text-[#E55A26] text-sm">{dish.price} DH</p>
+
+                            {/* Add / qty controls */}
+                            <AnimatePresence mode="wait">
+                              {inCart ? (
+                                <motion.div
+                                  key="counter"
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  exit={{ scale: 0.8, opacity: 0 }}
+                                  className="flex items-center bg-[#F5F0E8] rounded-xl overflow-hidden"
+                                >
+                                  <button
+                                    onClick={() => updateQty(dishKey, -1)}
+                                    className="w-7 h-7 flex items-center justify-center cursor-pointer"
+                                  >
+                                    {inCart.qty === 1
+                                      ? <X className="w-3 h-3 text-[#E55A26]" />
+                                      : <Minus className="w-3 h-3 text-[#E55A26]" />
+                                    }
+                                  </button>
+                                  <span className="w-5 text-center text-xs font-extrabold text-[#1B2440]">
+                                    {inCart.qty}
+                                  </span>
+                                  <button
+                                    onClick={() => addToCart(dishKey)}
+                                    className="w-7 h-7 flex items-center justify-center cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3 text-[#E55A26]" />
+                                  </button>
+                                </motion.div>
+                              ) : (
+                                <motion.button
+                                  key="add"
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: justAdded ? 1.15 : 1, opacity: 1 }}
+                                  exit={{ scale: 0.8, opacity: 0 }}
+                                  onClick={() => addToCart(dishKey)}
+                                  className="w-8 h-8 rounded-xl bg-[#E55A26] flex items-center justify-center cursor-pointer hover:bg-[#C94D20] transition"
+                                >
+                                  <Plus className="w-4 h-4 text-white" />
+                                </motion.button>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
+
+          {/* ── Desktop sidebar cart ── */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-4 bg-white rounded-2xl p-5 shadow-[0_2px_10px_rgba(27,36,64,0.06)]">
+              <p className="font-extrabold text-[#1B2440] text-sm mb-3">
+                Votre panier ({itemCount})
+              </p>
+
+              {cartItems.length === 0 ? (
+                <p className="text-[#6B7A9E] text-xs text-center py-4">
+                  Votre panier est vide
+                </p>
+              ) : (
+                <>
+                  {cartItems.map(({ dishKey, qty }) => {
+                    const dish = DISHES[dishKey];
+                    if (!dish) return null;
+                    return (
+                      <div
+                        key={dishKey}
+                        className="flex items-center justify-between py-2 border-b border-[#F5F0E8] last:border-0"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-[#1B2440] font-medium truncate">{dish.name}</p>
+                          <p className="text-xs text-[#6B7A9E]">x{qty}</p>
+                        </div>
+                        <p className="text-sm font-bold text-[#1B2440] ml-2 shrink-0">
+                          {dish.price * qty} DH
+                        </p>
+                      </div>
+                    );
+                  })}
+
+                  {/* Delivery row */}
+                  <div className="flex items-center justify-between py-2 text-xs text-[#6B7A9E]">
+                    <span className="flex items-center gap-1">
+                      <Truck className="w-3 h-3" /> Livraison
+                    </span>
+                    <span>{deliveryFee} DH</span>
+                  </div>
+
+                  <div className="border-t border-[#F5F0E8] pt-3 mt-1 flex items-center justify-between">
+                    <p className="text-sm font-bold text-[#1B2440]">Total</p>
+                    <p
+                      className="text-lg font-extrabold text-[#E55A26]"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      {total} DH
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleCheckout}
+                    className="block w-full py-3 bg-[#E55A26] hover:bg-[#C94D20] text-white rounded-xl font-bold text-sm text-center transition mt-3 cursor-pointer"
+                  >
+                    Commander
+                  </button>
+                </>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
 
-      {/* Cart Drawer */}
+      {/* ── Cart slide-in drawer (mobile / tablet) ── */}
       <AnimatePresence>
         {drawerOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={() => setDrawerOpen(false)}
-              style={{ position: "fixed", inset: 0, background: "rgba(27,36,64,0.4)", backdropFilter: "blur(2px)", zIndex: 60 }}
+              className="fixed inset-0 bg-[#1B2440]/40 backdrop-blur-sm z-60"
             />
             <motion.div
-              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 440, background: "#F6EEDC", display: "flex", flexDirection: "column", zIndex: 61, boxShadow: "-20px 0 60px rgba(0,0,0,0.18)" }}
+              className="fixed top-0 right-0 bottom-0 w-[440px] max-w-full bg-[#F5F0E8] flex flex-col z-[61] shadow-[-20px_0_60px_rgba(0,0,0,0.18)]"
             >
               {/* Drawer header */}
-              <div style={{ padding: "20px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(27,36,64,0.08)", background: "#fff" }}>
+              <div className="p-5 flex justify-between items-center border-b border-[#1B2440]/[0.08] bg-white">
                 <div>
-                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, color: "#1B2440" }}>Ton panier</div>
-                  <div style={{ fontSize: 12, color: "#5A6584" }}>Chez {r.name} · {r.eta}</div>
+                  <div
+                    className="font-extrabold text-[#1B2440] text-xl"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    Ton panier
+                  </div>
+                  <div className="text-xs text-[#6B7A9E]">Chez {r.name} · {r.eta}</div>
                 </div>
-                <button onClick={() => setDrawerOpen(false)} style={{ width: 36, height: 36, borderRadius: 999, background: "#F6EEDC", border: "none", cursor: "pointer", fontSize: 18, color: "#1B2440", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <X size={18} />
+                <button
+                  onClick={() => setDrawerOpen(false)}
+                  className="w-9 h-9 rounded-full bg-[#F5F0E8] border-none flex items-center justify-center cursor-pointer hover:bg-[#EDE8DC] transition"
+                >
+                  <X className="w-4 h-4 text-[#1B2440]" />
                 </button>
               </div>
 
-              {/* Items */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "14px 24px" }}>
+              {/* Drawer items */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-2.5">
                 {cartItems.length === 0 && (
-                  <div style={{ background: "#fff", padding: 24, borderRadius: 16, textAlign: "center", color: "#5A6584" }}>Panier vide.</div>
+                  <div className="bg-white rounded-2xl p-6 text-center text-[#6B7A9E] text-sm">
+                    Panier vide.
+                  </div>
                 )}
                 {cartItems.map(({ dishKey, qty }) => {
                   const dish = DISHES[dishKey];
                   if (!dish) return null;
                   return (
-                    <div key={dishKey} style={{ background: "#fff", borderRadius: 14, padding: 12, display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
+                    <div
+                      key={dishKey}
+                      className="bg-white rounded-2xl p-3 flex gap-3 items-center"
+                    >
                       <Sprite id={dish.img} width={56} height={56} radius={12} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, color: "#1B2440", fontSize: 14 }}>{dish.name}</div>
-                        <div style={{ fontSize: 12, color: "#5A6584" }}>{dish.price} DH</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-[#1B2440] text-sm truncate">{dish.name}</p>
+                        <p className="text-xs text-[#6B7A9E]">{dish.price} DH</p>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", background: "#F6EEDC", borderRadius: 999 }}>
-                        <button onClick={() => updateQty(dishKey, -1)} style={{ width: 30, height: 30, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {qty === 1 ? <X size={12} /> : <Minus size={12} />}
+                      <div className="flex items-center bg-[#F5F0E8] rounded-full">
+                        <button
+                          onClick={() => updateQty(dishKey, -1)}
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer"
+                        >
+                          {qty === 1 ? <X className="w-3 h-3 text-[#1B2440]" /> : <Minus className="w-3 h-3 text-[#1B2440]" />}
                         </button>
-                        <div style={{ width: 22, textAlign: "center", fontWeight: 800, color: "#1B2440", fontSize: 14 }}>{qty}</div>
-                        <button onClick={() => addToCart(dishKey)} style={{ width: 30, height: 30, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <Plus size={12} />
+                        <span className="w-5 text-center font-extrabold text-[#1B2440] text-sm">{qty}</span>
+                        <button
+                          onClick={() => addToCart(dishKey)}
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3 text-[#1B2440]" />
                         </button>
                       </div>
                     </div>
@@ -293,18 +532,18 @@ export default function RestaurantPage() {
                 })}
 
                 {cartItems.length > 0 && (
-                  <div style={{ background: "#fff", borderRadius: 14, padding: 14, marginTop: 14 }}>
+                  <div className="bg-white rounded-2xl p-4 mt-2 space-y-1.5">
                     {[
-                      ["Sous-total", `${subtotal} DH`],
-                      ["Livraison", `${deliveryFee} DH`],
-                      ["Code BSSLAMA10", "−10 DH"],
-                    ].map(([k, v]) => (
-                      <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, color: k.includes("Code") ? "#2EC089" : "#5A6584" }}>
-                        <span>{k}</span>
-                        <span style={{ color: k.includes("Code") ? "#2EC089" : "#1B2440" }}>{v}</span>
+                      { label: "Sous-total", value: `${subtotal} DH`, accent: false },
+                      { label: "Livraison",  value: `${deliveryFee} DH`, accent: false },
+                      { label: "Code BSSLAMA10", value: "−10 DH", accent: true },
+                    ].map(({ label, value, accent }) => (
+                      <div key={label} className="flex justify-between text-sm">
+                        <span className={accent ? "text-[#2DC08A]" : "text-[#6B7A9E]"}>{label}</span>
+                        <span className={accent ? "text-[#2DC08A] font-bold" : "text-[#1B2440]"}>{value}</span>
                       </div>
                     ))}
-                    <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, marginTop: 8, borderTop: "1px solid rgba(27,36,64,0.08)", fontWeight: 800, fontSize: 16, color: "#1B2440" }}>
+                    <div className="flex justify-between font-extrabold text-[#1B2440] text-base pt-2 border-t border-[#F5F0E8]">
                       <span>Total</span>
                       <span>{total - 10} DH</span>
                     </div>
@@ -312,19 +551,19 @@ export default function RestaurantPage() {
                 )}
               </div>
 
-              {/* Checkout button */}
+              {/* Drawer checkout button */}
               {cartItems.length > 0 && (
-                <div style={{ padding: 20, background: "#fff", borderTop: "1px solid rgba(27,36,64,0.08)" }}>
+                <div className="p-5 bg-white border-t border-[#1B2440]/[0.08]">
                   <button
                     onClick={handleCheckout}
-                    style={{ width: "100%", background: "#E55A26", color: "#fff", border: "none", borderRadius: 999, padding: "16px 24px", fontFamily: "inherit", fontWeight: 800, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 8px 20px rgba(229,90,38,0.35)" }}
+                    className="w-full bg-[#E55A26] hover:bg-[#C94D20] text-white rounded-full py-4 font-extrabold text-base flex items-center justify-between px-5 transition cursor-pointer shadow-[0_8px_20px_rgba(229,90,38,0.35)]"
                   >
-                    <span style={{ background: "rgba(255,255,255,0.2)", borderRadius: 999, padding: "2px 10px", fontSize: 13 }}>{itemCount}</span>
+                    <span className="bg-white/20 rounded-full px-3 py-0.5 text-sm">{itemCount}</span>
                     <span>Commander maintenant</span>
                     <span>{total - 10} DH</span>
                   </button>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5A6584" }}>
-                    <Truck size={12} /> Livraison estimée · {r.eta}
+                  <div className="flex items-center justify-center gap-1.5 mt-2.5 text-xs text-[#6B7A9E]">
+                    <Truck className="w-3 h-3" /> Livraison estimée · {r.eta}
                   </div>
                 </div>
               )}
@@ -333,15 +572,37 @@ export default function RestaurantPage() {
         )}
       </AnimatePresence>
 
-      {/* Mobile sticky bar */}
+      {/* ── Mobile floating cart trigger (when drawer is closed) ── */}
+      {itemCount > 0 && !drawerOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-20 right-4 z-50 lg:hidden"
+        >
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2 bg-[#1B2440] text-white rounded-full px-4 py-2.5 shadow-xl cursor-pointer"
+          >
+            <span className="w-6 h-6 rounded-full bg-[#E55A26] flex items-center justify-center text-xs font-extrabold">
+              {itemCount}
+            </span>
+            <span className="text-sm font-bold">Panier</span>
+            <span className="text-sm font-extrabold text-[#E55A26]">{subtotal} DH</span>
+          </button>
+        </motion.div>
+      )}
+
+      {/* ── Mobile bottom sheet CTA ── */}
       {itemCount > 0 && (
-        <div className="lg:hidden" style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 16px", background: "#fff", borderTop: "1px solid rgba(27,36,64,0.08)", zIndex: 50 }}>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#F5F0E8] p-4 z-40 lg:hidden">
           <button
             onClick={handleCheckout}
-            style={{ width: "100%", background: "#E55A26", color: "#fff", border: "none", borderRadius: 999, padding: "14px 20px", fontFamily: "inherit", fontWeight: 800, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+            className="flex w-full items-center justify-between bg-[#E55A26] hover:bg-[#C94D20] text-white rounded-2xl px-5 py-3.5 font-bold text-sm transition cursor-pointer"
           >
-            <span style={{ background: "rgba(255,255,255,0.25)", borderRadius: 999, padding: "2px 10px", fontSize: 12 }}>{itemCount}</span>
-            <span>Commander</span>
+            <span className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4" />
+              Voir le panier ({itemCount})
+            </span>
             <span>{total} DH</span>
           </button>
         </div>
