@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "npx next dev",
     "build": "npx next build",
+    "deploy": "npm run build && cp public/_worker.js out/_worker.js && npx wrangler pages deploy out --project-name=atlaasgo --commit-dirty=true",
     "start": "npx next start",
     "lint": "npx eslint",
     "test": "vitest run",
@@ -46,6 +47,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "wrangler": "^4.92.0"
   }
 }

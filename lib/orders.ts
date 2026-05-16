@@ -49,12 +49,27 @@ export async function createOrder(input: CreateOrderInput): Promise<string> {
   const { collection, addDoc } = await import("firebase/firestore");
   const { db } = await import("@/lib/firebase");
   const now = new Date().toISOString();
-  const ref = await addDoc(collection(db, "orders"), {
+
+  // Strip undefined values — Firestore rejects them with
+  // "Unsupported field value: undefined".
+  const raw = {
     ...input,
     status: "pending" as OrderStatus,
     statusHistory: [{ status: "pending", timestamp: now, actorId: input.customerId }],
     timestamp: now,
-  });
+  };
+  const data = Object.fromEntries(
+    Object.entries(raw).filter(([, v]) => v !== undefined)
+  );
+
+  // Also strip undefined from nested item objects
+  if (Array.isArray(data.items)) {
+    data.items = (data.items as Record<string, unknown>[]).map((item) =>
+      Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined))
+    );
+  }
+
+  const ref = await addDoc(collection(db, "orders"), data);
   return ref.id;
 }
 
