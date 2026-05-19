@@ -156,6 +156,26 @@ export function useApplications() {
                 { onConflict: 'user_id' },
               );
           }
+
+          // Bootstrap restaurant if merchant
+          if (kind === 'restaurant') {
+            const slug = (app.business_name as string)
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/(^-|-$)/g, '')
+              .slice(0, 48)
+              + '-' + Date.now().toString(36);
+            await supabase.from('restaurants').insert({
+              slug,
+              name: app.business_name,
+              cuisine: app.cuisine ?? 'General',
+              cuisine_tags: app.cuisine ? [app.cuisine] : [],
+              description: null,
+              emoji: '🍽️',
+              owner_id: app.applicant_id,
+              status: 'draft',
+            });
+          }
         }
       }
 

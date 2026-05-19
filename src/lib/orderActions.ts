@@ -45,7 +45,8 @@ export async function markPreparing(orderId: string): Promise<ActionResult> {
   return ok();
 }
 
-/** Admin: assign a rider to an order. Creates the assignment row and bumps status. */
+/** Admin: assign a rider to an order. Creates the assignment row.
+ *  Status stays at `preparing` until the rider accepts. */
 export async function assignRider(
   orderId: string,
   riderId: string,
@@ -60,14 +61,11 @@ export async function assignRider(
     .from('order_assignments')
     .insert({ order_id: orderId, rider_id: riderId, is_active: true });
   if (insErr) return err(insErr);
-  await supabase
-    .from('orders')
-    .update({ status: 'enRoute' as OrderStatus })
-    .eq('id', orderId);
+  // Don't change order status — rider must accept first
   return ok();
 }
 
-/** Rider: accept an active assignment. */
+/** Rider: accept an active assignment → order moves to enRoute. */
 export async function acceptAssignment(orderId: string, riderId: string): Promise<ActionResult> {
   const { error } = await supabase
     .from('order_assignments')
@@ -76,6 +74,12 @@ export async function acceptAssignment(orderId: string, riderId: string): Promis
     .eq('rider_id', riderId)
     .eq('is_active', true);
   if (error) return err(error);
+  // Now move order to enRoute
+  const { error: oErr } = await supabase
+    .from('orders')
+    .update({ status: 'enRoute' as OrderStatus })
+    .eq('id', orderId);
+  if (oErr) return err(oErr);
   return ok();
 }
 

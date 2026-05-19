@@ -1,20 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useCart } from '../lib/cart';
 import { useI18n } from '../lib/i18n';
 import { useAuth } from '../lib/auth';
 import { useCreateOrder } from '../lib/orders';
 import { useAddresses } from '../lib/customer';
+import { IS_STRIPE_CONFIGURED } from '../lib/stripe';
+import { supabase } from '../lib/supabase';
 import type { AddressRow, Coords } from '../lib/database.types';
 import { FadeUp } from '../components/visual/ScrollReveal';
+
+type PayMethod = 'card' | 'cash';
 
 const MIN_LANDMARK = 3;
 
 const SUGGESTIONS = [
+  'AUI Dorm 16',
+  'AUI Main Gate',
+  'AUI Student Center',
   'Near the Grand Mosque',
-  'Behind the Telecom Shop',
-  'Across from Café Hassan',
   'Next to the AUI gate',
   'Near the Michlifen pharmacy',
 ];
@@ -34,6 +39,7 @@ export default function CartPage() {
   const { addresses } = useAddresses();
   const nav = useNavigate();
 
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'saved' | 'new'>('new');
   const [selectedAddress, setSelectedAddress] = useState<AddressRow | null>(null);
   const [landmark, setLandmark] = useState('');
@@ -41,6 +47,8 @@ export default function CartPage() {
   const [coords, setCoords] = useState<Coords | null>(null);
   const [locStatus, setLocStatus] = useState<'idle' | 'requesting' | 'denied' | 'error'>('idle');
   const [locError, setLocError] = useState<string | null>(null);
+  const [payMethod, setPayMethod] = useState<PayMethod>(IS_STRIPE_CONFIGURED ? 'card' : 'cash');
+  const wasCancelled = searchParams.get('cancelled') === '1';
 
   // Auto-select default saved address if user has any
   useEffect(() => {
@@ -90,6 +98,7 @@ export default function CartPage() {
       return;
     }
     if (!effectiveCoords || !landmarkOk) return;
+
     const orderId = await create({
       items,
       landmark: effectiveLandmark.trim(),
@@ -100,7 +109,18 @@ export default function CartPage() {
       serviceFeeDh: serviceFee,
       totalDh: total,
     });
-    if (orderId) {
+    if (!orderId) return;
+
+    if (payMethod === 'card' && IS_STRIPE_CONFIGURED) {
+      // Redirect to our premium checkout page
+      clear();
+      nav(`/checkout/${orderId}`);
+    } else {
+      // Cash on delivery
+      await supabase
+        .from('orders')
+        .update({ payment_method: 'cash' })
+        .eq('id', orderId);
       clear();
       nav(`/track/${orderId}`);
     }
@@ -366,20 +386,32 @@ export default function CartPage() {
 
             <div className="cart-summary">
               <h3>Order summary</h3>
+
+              {wasCancelled && (
+                <div
+                  style={{
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.2)',
+                    borderRadius: 12,
+                    padding: '10px 12px',
+                    fontSize: 12,
+                    color: '#EF4444',
+                    marginBottom: 14,
+                    lineHeight: 1.45,
+                    fontWeight: 600,
+                  }}
+                >
+                  Payment was cancelled. You can try again or pay with cash.
+                </div>
+              )}
+
               <div className="sum-row">
                 <span>{t('cart.subtotal')}</span>
                 <span>{subtotal} dh</span>
               </div>
               <div className="sum-row">
                 <span>{t('cart.delivery')}</span>
-                <span
-                  style={{
-                    color: deliveryFee === 0 ? 'var(--primary)' : 'inherit',
-                    fontWeight: deliveryFee === 0 ? 700 : 400,
-                  }}
-                >
-                  {deliveryFee === 0 ? t('common.free') : `${deliveryFee} dh`}
-                </span>
+                <span>{deliveryFee} dh</span>
               </div>
               <div className="sum-row">
                 <span>{t('cart.service')}</span>
@@ -388,6 +420,70 @@ export default function CartPage() {
               <div className="sum-row total">
                 <span>{t('cart.total')}</span>
                 <span>{total} dh</span>
+              </div>
+
+              {/* ── Payment method selector ── */}
+              <div style={{ margin: '18px 0 8px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-soft)', marginBottom: 8 }}>
+                  Pay with
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {IS_STRIPE_CONFIGURED && (
+                    <button
+                      type="button"
+                      onClick={() => setPayMethod('card')}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '12px 14px',
+                        borderRadius: 14,
+                        border: `2px solid ${payMethod === 'card' ? 'var(--primary)' : 'var(--line)'}`,
+                        background: payMethod === 'card' ? 'rgba(255,87,34,0.06)' : 'var(--surface)',
+                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                        transition: 'all .2s',
+                      }}
+                    >
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: 'linear-gradient(135deg, #635BFF, #0A2540)',
+                        display: 'grid', placeItems: 'center', color: 'white', flexShrink: 0,
+                      }}>
+                        <I.Wallet size={16} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>Card / Apple Pay</div>
+                        <div style={{ fontSize: 11, color: 'var(--fg-soft)' }}>Visa, Mastercard, Apple Pay</div>
+                      </div>
+                      {payMethod === 'card' && <I.Check size={16} style={{ color: 'var(--primary)' }} />}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPayMethod('cash')}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 14px',
+                      borderRadius: 14,
+                      border: `2px solid ${payMethod === 'cash' ? 'var(--primary)' : 'var(--line)'}`,
+                      background: payMethod === 'cash' ? 'rgba(255,87,34,0.06)' : 'var(--surface)',
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                      transition: 'all .2s',
+                    }}
+                  >
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: 'linear-gradient(135deg, #34D399, #059669)',
+                      display: 'grid', placeItems: 'center', color: 'white', flexShrink: 0,
+                      fontSize: 18,
+                    }}>
+                      💵
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>Cash on delivery</div>
+                      <div style={{ fontSize: 11, color: 'var(--fg-soft)' }}>Pay the rider when it arrives</div>
+                    </div>
+                    {payMethod === 'cash' && <I.Check size={16} style={{ color: 'var(--primary)' }} />}
+                  </button>
+                </div>
               </div>
 
               {!user && (
@@ -425,7 +521,9 @@ export default function CartPage() {
                       ? 'Capture GPS first'
                       : !landmarkOk
                         ? 'Add a landmark'
-                        : `${t('cart.checkout')} · ${total} dh`}{' '}
+                        : payMethod === 'card'
+                          ? `Pay ${total} dh`
+                          : `Order · ${total} dh (cash)`}{' '}
                 <I.Arrow />
               </button>
               <p
@@ -437,9 +535,7 @@ export default function CartPage() {
                   lineHeight: 1.4,
                 }}
               >
-                Free delivery on orders over 120 dh.
-                <br />
-                Pay with Apple Pay, card, wallet, or cash.
+                Campus delivery 20 dh · Restaurant delivery 35 dh.
               </p>
             </div>
           </div>

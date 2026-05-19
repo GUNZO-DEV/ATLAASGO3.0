@@ -6,6 +6,25 @@ import { useAddresses } from '../lib/customer';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import type { Coords } from '../lib/database.types';
 
+const AUI_DORMS = Array.from({ length: 60 }, (_, i) => ({
+  label: `Dorm ${i + 1}`,
+  building: `${i + 1}`,
+  line1: 'AUI Campus, Ifrane',
+}));
+
+const AUI_OTHER = [
+  { label: 'SSE', building: 'SSE', line1: 'School of Science & Engineering, AUI' },
+  { label: 'SBA', building: 'SBA', line1: 'School of Business Administration, AUI' },
+  { label: 'SHSS', building: 'SHSS', line1: 'School of Humanities & Social Sciences, AUI' },
+  { label: 'Library', building: 'Library', line1: 'Mohammed VI Library, AUI' },
+  { label: 'Student Center', building: 'Student Center', line1: 'AUI Campus, Ifrane' },
+  { label: 'Dining Hall', building: 'Dining Hall', line1: 'AUI Campus, Ifrane' },
+  { label: 'Sports Complex', building: 'Sports Complex', line1: 'AUI Campus, Ifrane' },
+  { label: 'Main Gate', building: 'Main Gate', line1: 'AUI Main Entrance, Ifrane' },
+];
+
+const AUI_BUILDINGS = [...AUI_DORMS, ...AUI_OTHER];
+
 export default function AddressesPage() {
   const { user, loading: authLoading } = useAuth();
   const { addresses, save, remove, setDefault, loading } = useAddresses();
@@ -202,10 +221,60 @@ export default function AddressesPage() {
                 <input
                   type="checkbox"
                   checked={isCampus}
-                  onChange={(e) => setIsCampus(e.target.checked)}
+                  onChange={(e) => {
+                    setIsCampus(e.target.checked);
+                    if (e.target.checked && !line1) setLine1('AUI Campus, Ifrane');
+                  }}
                 />
                 AUI campus delivery
               </label>
+
+              {isCampus && (
+                <div style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      color: 'var(--fg-soft)',
+                      marginBottom: 8,
+                    }}
+                  >
+                    Quick pick a building
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {AUI_BUILDINGS.map((b) => (
+                      <button
+                        key={b.building}
+                        type="button"
+                        onClick={() => {
+                          setBuilding(b.building);
+                          setLine1(b.line1);
+                          setLabel(b.label);
+                        }}
+                        style={{
+                          padding: '7px 12px',
+                          border: building === b.building
+                            ? '1.5px solid var(--primary)'
+                            : '1px solid var(--line)',
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: building === b.building ? 700 : 500,
+                          background: building === b.building
+                            ? 'rgba(255, 87, 34, 0.08)'
+                            : 'var(--surface)',
+                          color: building === b.building ? 'var(--primary)' : 'var(--fg-soft)',
+                          cursor: 'pointer',
+                          transition: 'all .15s',
+                        }}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div
                 style={{

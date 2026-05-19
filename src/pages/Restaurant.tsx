@@ -152,7 +152,7 @@ export default function RestaurantPage() {
                           name: item.name,
                           desc: item.description ?? undefined,
                           priceDh: item.price_dh,
-                        });
+                        }, 1, !!restaurant.is_campus_partner);
                       }}
                     >
                       + {t('common.add')}

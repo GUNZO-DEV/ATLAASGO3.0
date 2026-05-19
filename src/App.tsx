@@ -21,6 +21,7 @@ import Admin from './pages/Admin';
 import ApplyRider from './pages/ApplyRider';
 import ApplyPartner from './pages/ApplyPartner';
 import Campus from './pages/Campus';
+import Checkout from './pages/Checkout';
 import NotFound from './pages/NotFound';
 
 export default function App() {
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/merchant/apply" element={<ApplyPartner />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/campus" element={<Campus />} />
+          <Route path="/checkout/:id" element={<Checkout />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

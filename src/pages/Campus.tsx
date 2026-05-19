@@ -89,9 +89,9 @@ export default function CampusPage() {
       coords,
       deliveryNotes: notes.trim() || undefined,
       subtotalDh: FIXED_PRICE_DH,
-      deliveryFeeDh: 0,
+      deliveryFeeDh: 20,
       serviceFeeDh: 0,
-      totalDh: FIXED_PRICE_DH,
+      totalDh: FIXED_PRICE_DH + 20,
     });
     if (orderId) {
       setSubmitted(true);

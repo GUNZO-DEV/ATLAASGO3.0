@@ -20,18 +20,24 @@ import { supabase } from '../lib/supabase';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import RiderOrderCard from '../components/RiderOrderCard';
 
-type Tab = 'available' | 'active' | 'history' | 'earnings';
+type Tab = 'pending' | 'active' | 'available' | 'history' | 'earnings';
 
 function RiderShell() {
-  const [tab, setTab] = useState<Tab>('active');
+  const [tab, setTab] = useState<Tab>('pending');
   const { profile, setStatus } = useRiderProfile();
   const { assignments } = useRiderAssignments();
   const { orders: available } = useAvailableOrders();
   const { today, week, tripsToday } = useRiderEarnings();
   const { user } = useAuth();
 
+  // Pending = assigned but rider hasn't accepted yet
+  const pendingAssignments = useMemo(
+    () => assignments.filter((a) => a.is_active && !a.accepted_at),
+    [assignments],
+  );
+  // Active = accepted and in progress
   const activeAssignments = useMemo(
-    () => assignments.filter((a) => a.is_active),
+    () => assignments.filter((a) => a.is_active && !!a.accepted_at),
     [assignments],
   );
   const historyAssignments = useMemo(
@@ -126,12 +132,15 @@ function RiderShell() {
         </div>
 
         <div className="dash-tabs">
-          {(['active', 'available', 'history', 'earnings'] as Tab[]).map((t) => (
+          {(['pending', 'active', 'available', 'history', 'earnings'] as Tab[]).map((t) => (
             <button
               key={t}
               className={tab === t ? 'active' : ''}
               onClick={() => setTab(t)}
             >
+              {t === 'pending' && pendingAssignments.length > 0 && (
+                <span className="dash-tab-badge primary">{pendingAssignments.length}</span>
+              )}
               {t === 'available' && available.length > 0 && (
                 <span className="dash-tab-badge">{available.length}</span>
               )}
@@ -143,13 +152,35 @@ function RiderShell() {
           ))}
         </div>
 
+        {tab === 'pending' && (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {pendingAssignments.length === 0 && (
+              <div className="empty-state">
+                <I.Lightning size={36} />
+                <h3>No pending requests</h3>
+                <p>When admin assigns you an order, it shows up here for you to accept or decline.</p>
+              </div>
+            )}
+            {pendingAssignments.map(
+              (a) =>
+                a.order && user && (
+                  <PendingOrderCard
+                    key={a.id}
+                    order={a.order}
+                    riderId={user.id}
+                  />
+                ),
+            )}
+          </div>
+        )}
+
         {tab === 'active' && (
           <div style={{ display: 'grid', gap: 12 }}>
             {activeAssignments.length === 0 && (
               <div className="empty-state">
                 <I.Bike size={36} />
                 <h3>No active trips</h3>
-                <p>Switch the Available tab to claim one from the pool.</p>
+                <p>Accept a pending request or claim one from the Available tab.</p>
               </div>
             )}
             {activeAssignments.map(
@@ -351,6 +382,119 @@ function RiderActiveCard({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function PendingOrderCard({
+  order,
+  riderId,
+}: {
+  order: import('../lib/database.types').OrderRow;
+  riderId: string;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [reason, setReason] = useState('');
+
+  async function handleAccept() {
+    setSubmitting(true);
+    const res = await acceptAssignment(order.id, riderId);
+    if (!res.ok) alert(res.error);
+    setSubmitting(false);
+  }
+
+  async function handleDecline() {
+    if (!reason.trim()) return;
+    setSubmitting(true);
+    const res = await rejectAssignment(order.id, riderId, reason.trim());
+    if (!res.ok) alert(res.error);
+    setSubmitting(false);
+    setDeclining(false);
+  }
+
+  return (
+    <div className="trip-card pending-pulse">
+      <div className="trip-card-head">
+        <div>
+          <div className="trip-card-id">
+            #{order.id.slice(0, 8).toUpperCase()} · assigned to you
+          </div>
+          <div className="trip-card-landmark">
+            <I.Pin size={14} /> {order.driver_payload?.headerLandmark ?? order.landmark}
+          </div>
+        </div>
+        <div className="trip-card-pay">+ 18 dh</div>
+      </div>
+      <div className="trip-card-meta">
+        <span>
+          <I.Bag size={12} /> {order.items?.length ?? 0} items
+        </span>
+        <span>·</span>
+        <span>
+          <I.Receipt size={12} /> {order.total_dh} dh order
+        </span>
+        {order.coords && (
+          <>
+            <span>·</span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+              {order.coords.lat.toFixed(4)}, {order.coords.lng.toFixed(4)}
+            </span>
+          </>
+        )}
+      </div>
+
+      {!declining ? (
+        <div className="trip-actions">
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={handleAccept}
+            disabled={submitting}
+          >
+            {submitting ? 'Accepting…' : 'Accept trip'} <I.Check size={14} />
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={() => setDeclining(true)}
+            disabled={submitting}
+          >
+            Decline
+          </button>
+        </div>
+      ) : (
+        <div className="trip-actions" style={{ flexDirection: 'column', gap: 10 }}>
+          <input
+            className="input"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason (too far, busy, etc.)"
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              border: '1px solid var(--line)',
+              borderRadius: 12,
+              fontSize: 14,
+              background: 'var(--surface)',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-lg"
+              style={{ background: '#EF4444', color: 'white', flex: 1 }}
+              onClick={handleDecline}
+              disabled={submitting || !reason.trim()}
+            >
+              {submitting ? 'Declining…' : 'Confirm decline'}
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => { setDeclining(false); setReason(''); }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

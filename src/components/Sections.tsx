@@ -318,84 +318,75 @@ export function Tripersona() {
   );
 }
 
-function PwaPhone() {
+function EdgePhone() {
   return (
-    <div
-      style={{
-        width: 200,
-        height: 320,
-        borderRadius: 30,
-        background: 'linear-gradient(160deg, #2A211C, #0E0A07)',
-        padding: 6,
-        transform: 'rotate(8deg) translateY(-10px)',
-        boxShadow: '0 40px 80px rgba(0,0,0,0.35), 0 14px 32px rgba(0,0,0,0.25)',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          borderRadius: 24,
-          background: 'white',
-          padding: '40px 16px 16px',
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 60,
-            height: 16,
-            background: '#0E0A07',
-            borderRadius: 10,
-          }}
-        />
-        <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 16, color: '#1A1410', letterSpacing: '-0.02em' }}>
-          Ready to order?
+    <div className="edge-phone">
+      <div className="edge-phone-inner">
+        {/* Notch */}
+        <div className="edge-phone-notch" />
+        {/* Status bar */}
+        <div className="edge-phone-status">
+          <span>9:41</span>
+          <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 9 }}>5G</span>
+            <span style={{ width: 14, height: 8, borderRadius: 2, border: '1px solid rgba(0,0,0,0.3)', position: 'relative' }}>
+              <span style={{ position: 'absolute', inset: 1, background: '#34C759', borderRadius: 1 }} />
+            </span>
+          </span>
         </div>
-        <div
-          style={{
-            marginTop: 16,
-            padding: 10,
-            background: '#FBF7F2',
-            borderRadius: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            color: '#7A6F66',
-            fontSize: 9,
-          }}
-        >
-          <I.Search size={11} /> Search Ifrane…
+        {/* App header */}
+        <div className="edge-phone-header">
+          <I.Logo size={14} />
+          <span style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 14, letterSpacing: '-0.02em' }}>AtlaasGo</span>
         </div>
-        <div
-          style={{
-            marginTop: 12,
-            padding: 12,
-            background: 'linear-gradient(135deg, #FF5722, #C2185B)',
-            borderRadius: 12,
-            color: 'white',
-          }}
-        >
-          <div style={{ fontSize: 8, opacity: 0.85, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {/* Search */}
+        <div className="edge-phone-search">
+          <I.Search size={10} /> Search Ifrane restaurants…
+        </div>
+        {/* Promo card */}
+        <div className="edge-phone-promo">
+          <div style={{ fontSize: 7, opacity: 0.85, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             Prime Offer
           </div>
-          <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 13, marginTop: 4, lineHeight: 1.1 }}>
-            50% off your
-            <br />
-            first 5 orders
+          <div style={{ fontFamily: 'Montserrat', fontWeight: 800, fontSize: 12, marginTop: 3, lineHeight: 1.1 }}>
+            50% off your<br />first 5 orders
+          </div>
+          <div style={{ fontSize: 8, marginTop: 6, opacity: 0.8, display: 'flex', alignItems: 'center', gap: 3 }}>
+            <I.Arrow size={8} /> Claim now
           </div>
         </div>
-        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-          <div style={{ flex: 1, height: 50, borderRadius: 10, background: 'linear-gradient(135deg, #FFB74D, #FF8A65)' }} />
-          <div style={{ flex: 1, height: 50, borderRadius: 10, background: 'linear-gradient(135deg, #6B5B47, #2A211C)' }} />
+        {/* Restaurant cards */}
+        <div className="edge-phone-cards">
+          <div className="edge-phone-resto" style={{ background: 'linear-gradient(135deg, #FFB74D, #FF8A65)' }}>
+            <span style={{ fontSize: 20 }}>🥘</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 9 }}>Tagine House</div>
+              <div style={{ fontSize: 7, opacity: 0.7 }}>22 min · Free delivery</div>
+            </div>
+          </div>
+          <div className="edge-phone-resto" style={{ background: 'linear-gradient(135deg, #6B5B47, #2A211C)', color: '#FBF7F2' }}>
+            <span style={{ fontSize: 20 }}>🍕</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 9 }}>Crepeto</div>
+              <div style={{ fontSize: 7, opacity: 0.7 }}>18 min · 5 dh</div>
+            </div>
+          </div>
         </div>
-        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-          <div style={{ flex: 1, height: 50, borderRadius: 10, background: 'linear-gradient(135deg, #34D399, #059669)' }} />
-          <div style={{ flex: 1, height: 50, borderRadius: 10, background: 'linear-gradient(135deg, #C2185B, #FF5722)' }} />
+        {/* Tracking notification */}
+        <div className="edge-phone-notif">
+          <div className="edge-phone-notif-dot" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 8 }}>Youssef is arriving</div>
+            <div style={{ fontSize: 7, opacity: 0.6 }}>Order #A8F2 · 2 min away</div>
+          </div>
+          <I.Bike size={12} style={{ color: '#FF5722' }} />
+        </div>
+        {/* Bottom nav */}
+        <div className="edge-phone-nav">
+          <div className="edge-phone-nav-item active"><I.Home size={12} /><span>Home</span></div>
+          <div className="edge-phone-nav-item"><I.Search size={12} /><span>Browse</span></div>
+          <div className="edge-phone-nav-item"><I.Bag size={12} /><span>Orders</span></div>
+          <div className="edge-phone-nav-item"><I.User size={12} /><span>Account</span></div>
         </div>
       </div>
     </div>
@@ -404,13 +395,33 @@ function PwaPhone() {
 
 export function PWABanner() {
   const { t } = useI18n();
+  const [installing, setInstalling] = useState(false);
+  const [showIosGuide, setShowIosGuide] = useState(false);
+
+  const isIos = typeof navigator !== 'undefined' && /iP(hone|ad|od)/i.test(navigator.userAgent);
+  const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+  const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone);
+
+  async function handleInstall() {
+    if (isStandalone) return;
+    setInstalling(true);
+    try {
+      const { triggerInstall } = await import('../lib/pwa');
+      const result = await triggerInstall();
+      if (result === 'unsupported' && isIos) {
+        setShowIosGuide(true);
+      }
+    } finally {
+      setInstalling(false);
+    }
+  }
+
   return (
     <section className="edge-hero" id="download" aria-labelledby="edge-hero-title">
       {/* Full-bleed gradient backplate */}
       <div className="edge-hero-bg" aria-hidden />
-      {/* Soft glow */}
       <div className="edge-hero-glow" aria-hidden />
-      {/* Atlas mountain silhouette in the back — ties the bottom hero to the top */}
+      {/* Atlas mountain silhouette */}
       <svg
         className="edge-hero-mountains"
         viewBox="0 0 1440 240"
@@ -461,22 +472,68 @@ export function PWABanner() {
             <span className="edge-hero-title-accent">{t('pwa.title.l2')}</span>
           </h2>
           <p className="edge-hero-lead">{t('pwa.lead')}</p>
+
+          {/* Install buttons — wired to real PWA prompt */}
           <div className="edge-hero-buttons">
-            <a className="edge-hero-btn" href="#ios">
-              <I.Apple size={28} />
-              <div>
-                <span className="edge-hero-btn-sub">Add to iOS</span>
-                <span className="edge-hero-btn-big">Home Screen</span>
+            {isStandalone ? (
+              <div className="edge-hero-btn" style={{ opacity: 0.7 }}>
+                <I.Check size={28} />
+                <div>
+                  <span className="edge-hero-btn-sub">Already installed</span>
+                  <span className="edge-hero-btn-big">You're all set</span>
+                </div>
               </div>
-            </a>
-            <a className="edge-hero-btn" href="#android">
-              <I.Android size={28} />
-              <div>
-                <span className="edge-hero-btn-sub">Install for</span>
-                <span className="edge-hero-btn-big">Android</span>
-              </div>
-            </a>
+            ) : (
+              <>
+                <button
+                  className="edge-hero-btn"
+                  onClick={handleInstall}
+                  disabled={installing}
+                >
+                  <I.Apple size={28} />
+                  <div>
+                    <span className="edge-hero-btn-sub">{isIos ? 'Tap Share → Add to' : 'Add to iOS'}</span>
+                    <span className="edge-hero-btn-big">Home Screen</span>
+                  </div>
+                </button>
+                <button
+                  className="edge-hero-btn"
+                  onClick={handleInstall}
+                  disabled={installing}
+                >
+                  <I.Android size={28} />
+                  <div>
+                    <span className="edge-hero-btn-sub">{installing ? 'Installing…' : 'Install for'}</span>
+                    <span className="edge-hero-btn-big">Android</span>
+                  </div>
+                </button>
+              </>
+            )}
           </div>
+
+          {/* iOS install guide overlay */}
+          {showIosGuide && (
+            <div className="edge-ios-guide" onClick={() => setShowIosGuide(false)}>
+              <div className="edge-ios-guide-card" onClick={(e) => e.stopPropagation()}>
+                <button className="edge-ios-close" onClick={() => setShowIosGuide(false)} aria-label="Close">
+                  <I.Close size={16} />
+                </button>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📲</div>
+                <h3 style={{ margin: '0 0 8px', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 18 }}>
+                  Install on iPhone
+                </h3>
+                <ol className="edge-ios-steps">
+                  <li>Tap the <strong>Share</strong> button <span style={{ fontSize: 16 }}>⬆️</span> in Safari</li>
+                  <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
+                  <li>Tap <strong>Add</strong> in the top-right corner</li>
+                </ol>
+                <p style={{ fontSize: 12, opacity: 0.7, margin: '12px 0 0' }}>
+                  AtlaasGo will appear as an app on your home screen with offline support and push notifications.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="edge-hero-meta">
             <span><I.Lightning size={12} /> 2-tap install · no App Store</span>
             <span className="dot" />
@@ -484,9 +541,29 @@ export function PWABanner() {
             <span className="dot" />
             <span><I.Bike size={12} /> Live push tracking</span>
           </div>
+
+          {/* Three-persona quick-links */}
+          <div className="edge-hero-personas">
+            <Link to="/auth" className="edge-persona-pill">
+              <span className="edge-persona-emoji">🍽</span>
+              <span>Order food</span>
+              <I.Arrow size={10} />
+            </Link>
+            <Link to="/rider/apply" className="edge-persona-pill">
+              <span className="edge-persona-emoji">🏍</span>
+              <span>Drive & earn</span>
+              <I.Arrow size={10} />
+            </Link>
+            <Link to="/merchant/apply" className="edge-persona-pill">
+              <span className="edge-persona-emoji">🏪</span>
+              <span>List your restaurant</span>
+              <I.Arrow size={10} />
+            </Link>
+          </div>
         </div>
+
         <div className="edge-hero-mock">
-          <PwaPhone />
+          <EdgePhone />
         </div>
       </div>
     </section>
