@@ -1,0 +1,40 @@
+rules_version = '2';
+
+/**
+ * Dev rules — permissive enough for local emulator iteration, but the
+ * landmark contract is enforced server-side so it can't silently regress.
+ *
+ * IMPORTANT: do NOT add a wildcard `match /{document=**}` catch-all.
+ * Firestore evaluates the UNION of matching rules — a wildcard `allow write`
+ * would let any write succeed regardless of the per-collection rule, which is
+ * what hid this bug initially.
+ *
+ * Production lock-down checklist:
+ *   - require `request.auth != null` on every match
+ *   - constrain orders writes to `request.auth.uid == resource.data.customerId`
+ *   - move category/partner writes to admin-only (server SDK)
+ *   - tighten landmark length, coord ranges, status enum
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    match /partners/{partnerId} {
+      allow read, write: if true;
+    }
+
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if request.resource.data.landmark is string
+                    && request.resource.data.landmark.size() >= 3
+                    && request.resource.data.coords.lat is number
+                    && request.resource.data.coords.lng is number
+                    && request.resource.data.driverPayload.headerLandmark is string
+                    && request.resource.data.driverPayload.headerLandmark.size() >= 3;
+      allow update: if true;
+      allow delete: if true;
+    }
+  }
+}

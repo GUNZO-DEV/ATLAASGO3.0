@@ -1,0 +1,15 @@
+# Cloudflare Pages config for AtlaasGo web.
+# Used by `wrangler pages deploy` and `wrangler pages dev`.
+# Dashboard project settings override this file where they overlap.
+
+name = "atlaasgo"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-05-17"
+
+# Production environment
+[env.production]
+name = "atlaasgo"
+
+# Preview environment (Pages auto-creates one per non-main branch)
+[env.preview]
+name = "atlaasgo"

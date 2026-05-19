@@ -1,0 +1,22 @@
+{
+  "name": "atlaasgo-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "emulators": "firebase emulators:start --only firestore --project demo-atlaasgo",
+    "seed": "tsx seed.ts",
+    "advance": "tsx advance-demo.ts",
+    "rules:check": "tsx rules-test.ts",
+    "reset": "firebase emulators:exec --only firestore --project demo-atlaasgo 'npm run seed'"
+  },
+  "dependencies": {
+    "firebase": "^12.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "firebase-tools": "^14.18.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

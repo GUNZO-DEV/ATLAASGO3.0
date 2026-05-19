@@ -1,0 +1,49 @@
+{
+  "name": "atlaasgo",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "verify:schema": "node scripts/parse-schema.mjs && node scripts/check-insert.mjs",
+    "pages:deploy": "npm run build && wrangler pages deploy dist --project-name=atlaasgo",
+    "pages:dev": "npm run build && wrangler pages dev dist",
+    "emulators": "npm --prefix backend run emulators",
+    "seed": "npm --prefix backend run seed",
+    "advance": "npm --prefix backend run advance",
+    "rules:check": "npm --prefix backend run rules:check",
+    "reset": "npm --prefix backend run reset",
+    "mobile": "npm --prefix mobile start",
+    "mobile:ios": "npm --prefix mobile run ios",
+    "mobile:android": "npm --prefix mobile run android"
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@stripe/stripe-js": "^9.5.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "@types/leaflet": "^1.9.21",
+    "gsap": "^3.15.0",
+    "leaflet": "^1.9.4",
+    "lenis": "^1.3.23",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.27.0",
+    "three": "^0.184.0",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "libpg-query": "^17.7.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

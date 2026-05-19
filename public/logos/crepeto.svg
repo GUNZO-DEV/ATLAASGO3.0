@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <circle cx="100" cy="100" r="100" fill="#E53935"/>
+  <circle cx="100" cy="100" r="88" fill="#C62828"/>
+  <!-- Fire flame -->
+  <path d="M100 45 C92 55 80 62 85 78 C78 70 74 82 82 90 C76 88 74 98 82 104 C86 107 94 108 100 104 C106 108 114 107 118 104 C126 98 124 88 118 90 C126 82 122 70 115 78 C120 62 108 55 100 45Z" fill="#FFA000"/>
+  <path d="M100 55 C95 63 87 68 90 80 C85 74 83 83 89 89 C85 88 83 95 89 99 C93 102 100 103 100 99 C100 103 107 102 111 99 C117 95 115 88 111 89 C117 83 115 74 110 80 C113 68 105 63 100 55Z" fill="#FFCC02"/>
+  <path d="M100 65 C97 71 93 74 95 82 C92 77 91 83 95 87 C93 86 92 91 96 93 C98 95 100 95 100 93 C100 95 102 95 104 93 C108 91 107 86 105 87 C109 83 108 77 105 82 C107 74 103 71 100 65Z" fill="white" opacity="0.3"/>
+  <!-- CREPETO text -->
+  <text x="100" y="140" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="22" fill="white" letter-spacing="2">CREPETO</text>
+  <!-- Banner -->
+  <path d="M30 150 L170 150 L165 165 L35 165 Z" fill="#FFA000"/>
+  <text x="100" y="162" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="11" fill="#C62828" letter-spacing="1">WOOD FIRE</text>
+</svg>

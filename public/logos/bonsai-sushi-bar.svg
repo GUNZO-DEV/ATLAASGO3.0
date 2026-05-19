@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="28" fill="#F5F0E8"/>
+  <!-- Bonsai tree trunk -->
+  <path d="M100 160 L100 110 M100 130 L80 110 M100 120 L120 100" stroke="#4A2C0A" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <!-- Bonsai tree canopy -->
+  <ellipse cx="100" cy="88" rx="28" ry="22" fill="#2D6A2D"/>
+  <ellipse cx="76" cy="100" rx="18" ry="14" fill="#388E3C"/>
+  <ellipse cx="124" cy="96" rx="18" ry="14" fill="#2D6A2D"/>
+  <ellipse cx="100" cy="80" rx="20" ry="16" fill="#43A047"/>
+  <!-- Pot -->
+  <path d="M82 160 L88 148 L112 148 L118 160 Z" fill="#C62828"/>
+  <rect x="80" y="158" width="40" height="6" rx="3" fill="#B71C1C"/>
+  <!-- BONSAI text -->
+  <text x="100" y="185" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-weight="700" font-size="18" fill="#C62828" letter-spacing="2">Bonsai</text>
+  <text x="100" y="198" text-anchor="middle" font-family="Arial, sans-serif" font-weight="600" font-size="8" fill="#4A2C0A" letter-spacing="2">SUSHI BAR</text>
+</svg>
