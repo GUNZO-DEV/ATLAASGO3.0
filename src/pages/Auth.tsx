@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useI18n } from '../lib/i18n';
 import { useAuth } from '../lib/auth';
+import { useRoles } from '../lib/roles';
 import { supabase } from '../lib/supabase';
 
 type Mode = 'signin' | 'signup' | 'magic';
@@ -14,9 +15,18 @@ const ROLE_DESC: Record<Role, { title: string; sub: string; emoji: string }> = {
   rider:    { title: 'I want to drive', sub: 'Earn flexibly with deliveries', emoji: '🏍' },
 };
 
+/** Pick the best landing page for the user's highest role. */
+function dashboardForRoles(roles: Set<string>): string {
+  if (roles.has('admin') || roles.has('super_admin')) return '/admin';
+  if (roles.has('merchant')) return '/merchant';
+  if (roles.has('rider')) return '/rider';
+  return '/order';
+}
+
 export default function AuthPage() {
   const { t } = useI18n();
   const { user, signIn, signUp, signInWithOtp } = useAuth();
+  const { roles, loading: rolesLoading } = useRoles();
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [mode, setMode] = useState<Mode>('signin');
@@ -28,11 +38,51 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [magicSent, setMagicSent] = useState(false);
 
+  // If already logged in, redirect to the right dashboard
   useEffect(() => {
-    if (user) nav('/orders', { replace: true });
-  }, [user, nav]);
+    if (!user || rolesLoading) return;
+    const next = params.get('next');
+    nav(next || dashboardForRoles(roles), { replace: true });
+  }, [user, rolesLoading, roles, nav, params]);
 
   const justConfirmed = params.get('confirmed') === '1';
+
+  // If user just confirmed email and had a merchant/rider signup intent, redirect to apply
+  useEffect(() => {
+    if (!justConfirmed || !user) return;
+    const pendingRole = sessionStorage.getItem('atlaasgo_signup_role');
+    if (pendingRole === 'merchant') {
+      sessionStorage.removeItem('atlaasgo_signup_role');
+      nav('/merchant/apply', { replace: true });
+    } else if (pendingRole === 'rider') {
+      sessionStorage.removeItem('atlaasgo_signup_role');
+      nav('/rider/apply', { replace: true });
+    }
+  }, [justConfirmed, user, nav]);
+
+  /** After sign-in, fetch fresh roles and redirect. */
+  async function redirectAfterLogin(userId: string) {
+    // Check if they have a pending signup role (merchant/rider application)
+    const pendingRole = sessionStorage.getItem('atlaasgo_signup_role');
+    if (pendingRole === 'merchant') {
+      sessionStorage.removeItem('atlaasgo_signup_role');
+      nav('/merchant/apply', { replace: true });
+      return;
+    }
+    if (pendingRole === 'rider') {
+      sessionStorage.removeItem('atlaasgo_signup_role');
+      nav('/rider/apply', { replace: true });
+      return;
+    }
+
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    const freshRoles = new Set((data ?? []).map((r: { role: string }) => r.role));
+    const next = params.get('next');
+    nav(next || dashboardForRoles(freshRoles), { replace: true });
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,14 +92,31 @@ export default function AuthPage() {
     try {
       if (mode === 'signin') {
         const { error } = await signIn(email, password);
-        if (error) setError(error);
-        else nav('/orders');
+        if (error) {
+          setError(error);
+        } else {
+          // Fetch the user to get ID, then redirect by role
+          const { data: { user: u } } = await supabase.auth.getUser();
+          if (u) await redirectAfterLogin(u.id);
+        }
       } else if (mode === 'signup') {
         const { error } = await signUp(email, password, name || undefined);
-        if (error) setError(error);
-        else {
-          if (role !== 'customer') {
-            nav(role === 'rider' ? '/rider/apply' : '/merchant/apply');
+        if (error) {
+          setError(error);
+        } else {
+          if (role === 'merchant') {
+            setError(
+              'Account created! Check your inbox to confirm your email — then fill out the partner form.',
+            );
+            setMode('signin');
+            // Store intent so we redirect to apply after confirmation
+            sessionStorage.setItem('atlaasgo_signup_role', 'merchant');
+          } else if (role === 'rider') {
+            setError(
+              'Account created! Check your inbox to confirm your email — then fill out the rider form.',
+            );
+            setMode('signin');
+            sessionStorage.setItem('atlaasgo_signup_role', 'rider');
           } else {
             setError(
               'Account created. Check your inbox to confirm your email — then come back and sign in.',
@@ -70,9 +137,10 @@ export default function AuthPage() {
   async function signInWithGoogle() {
     setBusy(true);
     setError(null);
+    // Google OAuth redirect — after return, the useEffect above handles routing
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/orders` },
+      options: { redirectTo: `${window.location.origin}/auth` },
     });
     if (error) {
       setError(error.message);

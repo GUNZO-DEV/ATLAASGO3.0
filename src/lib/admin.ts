@@ -107,6 +107,8 @@ export function useApplications() {
       notes?: string,
     ) => {
       const table = kind === 'rider' ? 'rider_applications' : 'restaurant_applications';
+
+      // Update application status
       await supabase
         .from(table)
         .update({
@@ -115,6 +117,48 @@ export function useApplications() {
           reviewer_notes: notes ?? null,
         })
         .eq('id', id);
+
+      // On approval → auto-grant the role + bootstrap rider/merchant profile
+      if (next === 'approved') {
+        // Fetch the application to get applicant_id
+        const { data: app } = await supabase
+          .from(table)
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (app?.applicant_id) {
+          const role = kind === 'rider' ? 'rider' : 'merchant';
+
+          // Grant the role
+          await supabase
+            .from('user_roles')
+            .upsert(
+              { user_id: app.applicant_id, role },
+              { onConflict: 'user_id,role' },
+            );
+
+          // Bootstrap rider profile if rider
+          if (kind === 'rider') {
+            await supabase
+              .from('riders')
+              .upsert(
+                {
+                  user_id: app.applicant_id,
+                  vehicle: app.vehicle ?? null,
+                  plate: app.plate ?? null,
+                  status: 'offline',
+                  rating: 5.0,
+                  total_trips: 0,
+                  total_earnings_dh: 0,
+                  documents_verified: true,
+                },
+                { onConflict: 'user_id' },
+              );
+          }
+        }
+      }
+
       await refresh();
     },
     [refresh],
