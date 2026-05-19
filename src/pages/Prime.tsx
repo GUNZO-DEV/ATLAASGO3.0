@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -53,20 +53,84 @@ const TIERS: Array<{
 export default function PrimePage() {
   const { user } = useAuth();
   const nav = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [active, setActive] = useState<PrimeTier | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [buying, setBuying] = useState<PrimeTier | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [justActivated, setJustActivated] = useState<PrimeTier | null>(null);
+  const [cancelled, setCancelled] = useState(false);
 
+  // Load current subscription
   useEffect(() => {
     if (!user) return;
     supabase
       .from('prime_subscriptions')
-      .select('tier,is_active')
+      .select('tier,is_active,expires_at')
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .maybeSingle()
       .then(({ data }) => {
-        const row = data as { tier?: PrimeTier } | null;
+        const row = data as { tier?: PrimeTier; expires_at?: string } | null;
         setActive(row?.tier ?? null);
+        setExpiresAt(row?.expires_at ?? null);
       });
-  }, [user]);
+  }, [user, justActivated]);
+
+  // Handle Stripe success redirect
+  useEffect(() => {
+    const sessionId = params.get('session_id');
+    const successTier = params.get('tier');
+    const success = params.get('success');
+
+    if (success === '1' && sessionId && !activating && !justActivated) {
+      setActivating(true);
+      (async () => {
+        const { data, error } = await supabase.functions.invoke('activate-prime', {
+          body: { sessionId },
+        });
+        if (!error && data?.ok) {
+          setJustActivated(data.tier as PrimeTier);
+          setActive(data.tier as PrimeTier);
+        }
+        setActivating(false);
+        // Clean URL
+        setParams({}, { replace: true });
+      })();
+    }
+
+    if (params.get('cancelled') === '1') {
+      setCancelled(true);
+      setParams({}, { replace: true });
+    }
+  }, [params, activating, justActivated, setParams]);
+
+  async function subscribe(tier: PrimeTier) {
+    if (!user) {
+      nav('/auth?next=/prime');
+      return;
+    }
+    setBuying(tier);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-prime-checkout', {
+        body: {
+          tier,
+          userId: user.id,
+          customerEmail: user.email,
+          siteUrl: window.location.origin,
+        },
+      });
+      if (error || !data?.url) {
+        alert('Could not start checkout. Try again.');
+        setBuying(null);
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      alert('Network error. Check your connection.');
+      setBuying(null);
+    }
+  }
 
   return (
     <section className="page">
@@ -81,10 +145,47 @@ export default function PrimePage() {
           </p>
         </FadeUp>
 
+        {/* Activation banner */}
+        {activating && (
+          <div className="prime-banner activating">
+            <div className="prime-banner-spinner" />
+            Activating your subscription...
+          </div>
+        )}
+        {justActivated && (
+          <div className="prime-banner success">
+            <I.Check size={16} />
+            <div>
+              <strong>Welcome to Prime {justActivated.replace('_', ' ')}!</strong>
+              <span>Your perks are active now. Enjoy free delivery on your next order.</span>
+            </div>
+          </div>
+        )}
+        {cancelled && (
+          <div className="prime-banner cancelled">
+            <I.Shield size={14} /> Payment cancelled. Pick a plan when you're ready.
+          </div>
+        )}
+
+        {/* Active subscription info */}
+        {active && !justActivated && (
+          <div className="prime-banner active-sub">
+            <I.Star size={16} />
+            <div>
+              <strong>Prime {active.replace('_', ' ')} is active</strong>
+              {expiresAt && (
+                <span>
+                  Renews {new Date(expiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="prime-grid">
           {TIERS.map((t, i) => (
             <FadeUp y={14} delay={i * 0.05} key={t.tier}>
-              <div className={`prime-tier ${t.highlight ? 'highlight' : ''}`}>
+              <div className={`prime-tier ${t.highlight ? 'highlight' : ''} ${active === t.tier ? 'current' : ''}`}>
                 {t.highlight && <span className="prime-tier-flag">Most popular</span>}
                 {active === t.tier && <span className="prime-tier-active">Active</span>}
                 <div className="prime-tier-name">{t.name}</div>
@@ -102,17 +203,24 @@ export default function PrimePage() {
                 </ul>
                 <button
                   className={`btn ${t.highlight ? 'btn-primary' : 'btn-outline'} btn-lg`}
-                  onClick={() => {
-                    if (!user) nav('/auth?next=/prime');
-                    else alert('Stripe subscription wiring pending — add Stripe keys to enable.');
-                  }}
-                  disabled={active === t.tier}
+                  onClick={() => subscribe(t.tier)}
+                  disabled={active === t.tier || buying !== null}
                 >
-                  {active === t.tier ? 'Active' : `Get ${t.name}`} <I.Arrow />
+                  {active === t.tier ? (
+                    'Active'
+                  ) : buying === t.tier ? (
+                    <>Redirecting to Stripe...</>
+                  ) : (
+                    <>Get {t.name} <I.Arrow /></>
+                  )}
                 </button>
               </div>
             </FadeUp>
           ))}
+        </div>
+
+        <div className="prime-footer-note">
+          <I.Shield size={12} /> Payments secured by Stripe. Cancel anytime from your account.
         </div>
       </div>
     </section>

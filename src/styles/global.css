@@ -2274,6 +2274,59 @@ footer.foot::before {
 }
 .prime-tier-list li { display: flex; align-items: center; gap: 8px; }
 .prime-tier.highlight .btn-primary { background: white; color: var(--primary); }
+.prime-tier.current { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* Prime banners */
+.prime-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: var(--r);
+  margin: 20px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.prime-banner div { display: flex; flex-direction: column; gap: 2px; }
+.prime-banner span { font-size: 12px; font-weight: 400; opacity: 0.85; }
+.prime-banner.success {
+  background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.06));
+  color: #059669;
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.prime-banner.activating {
+  background: rgba(255,87,34,0.08);
+  color: var(--primary);
+  border: 1px solid rgba(255,87,34,0.15);
+}
+.prime-banner.cancelled {
+  background: rgba(239,68,68,0.08);
+  color: #B91C1C;
+  border: 1px solid rgba(239,68,68,0.15);
+}
+.prime-banner.active-sub {
+  background: linear-gradient(135deg, rgba(255,87,34,0.10), rgba(255,138,101,0.06));
+  color: var(--primary);
+  border: 1px solid rgba(255,87,34,0.15);
+}
+.prime-banner-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,87,34,0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.prime-footer-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 32px;
+  font-size: 12px;
+  color: var(--fg-soft);
+  opacity: 0.8;
+}
 
 /* ─────────────── ACCOUNT PAGE ─────────────── */
 .account-grid {
