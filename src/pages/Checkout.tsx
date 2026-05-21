@@ -6,6 +6,7 @@ import * as I from '../icons/Icon';
 import { useOrder } from '../lib/orders';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import { MotionButton } from '../components/visual/Motion';
 
 const stripePromise = loadStripe(
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '',
@@ -109,7 +110,7 @@ function CheckoutForm({
         </div>
       )}
 
-      <button
+      <MotionButton
         type="submit"
         className="btn btn-primary btn-lg btn-block checkout-pay-btn"
         disabled={!stripe || !ready || busy}
@@ -123,7 +124,7 @@ function CheckoutForm({
             <I.Shield size={14} /> Pay {total} dh
           </>
         )}
-      </button>
+      </MotionButton>
 
       <div className="checkout-secure">
         <I.Shield size={12} />
@@ -203,9 +204,9 @@ export default function Checkout() {
             <I.Shield size={32} />
             <h2>Payment Error</h2>
             <p>{fetchError || 'Order not found.'}</p>
-            <button className="btn btn-primary" onClick={() => nav('/cart')}>
+            <MotionButton className="btn btn-primary" onClick={() => nav('/cart')}>
               Back to cart <I.Arrow />
-            </button>
+            </MotionButton>
           </div>
         </div>
       </section>

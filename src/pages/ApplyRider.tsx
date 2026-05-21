@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 
 export default function ApplyRider() {
   const { user } = useAuth();
@@ -43,9 +44,9 @@ export default function ApplyRider() {
               Our team will review your details and reach out within 48 hours. Track status in your
               account → Applications.
             </p>
-            <button className="btn btn-primary" onClick={() => nav('/')}>
+            <MotionButton className="btn btn-primary" onClick={() => nav('/')}>
               Back home <I.Arrow />
-            </button>
+            </MotionButton>
           </div>
         </div>
       </section>
@@ -118,14 +119,14 @@ export default function ApplyRider() {
             {error && (
               <div style={{ color: '#EF4444', fontSize: 12, marginTop: 8 }}>{error}</div>
             )}
-            <button
+            <MotionButton
               onClick={submit}
               disabled={busy || !fullName.trim() || !phone.trim()}
               className="btn btn-primary btn-lg btn-block"
               style={{ marginTop: 12 }}
             >
               {busy ? 'Submitting…' : 'Submit application'} <I.Arrow />
-            </button>
+            </MotionButton>
           </div>
         </FadeUp>
       </div>

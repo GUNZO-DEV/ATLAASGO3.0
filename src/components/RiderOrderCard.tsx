@@ -7,6 +7,7 @@ import {
   markDelivered,
 } from '../lib/orderActions';
 import OrderChat from './OrderChat';
+import { MotionButton } from './visual/Motion';
 import type { OrderRow } from '../lib/database.types';
 
 export default function RiderOrderCard({
@@ -118,50 +119,46 @@ export default function RiderOrderCard({
 
           <div className="rider-order-actions" style={{ marginTop: 12, display: 'grid', gap: 8 }}>
             {!accepted ? (
-              <>
-                <button
-                  className="btn btn-primary btn-lg"
-                  onClick={() => acceptAssignment(order.id, riderId)}
-                  disabled={submitting}
-                >
-                  Accept order <I.Check size={14} />
-                </button>
-              </>
+              <MotionButton
+                className="btn btn-success btn-lg"
+                onClick={() => acceptAssignment(order.id, riderId)}
+                disabled={submitting}
+              >
+                Accept order <I.Check size={14} />
+              </MotionButton>
             ) : !pickedUp ? (
-              <>
-                <button
-                  className="btn btn-primary btn-lg"
-                  onClick={handlePickup}
-                  disabled={submitting}
-                >
-                  {submitting ? 'Updating…' : 'I picked it up'} <I.Arrow />
-                </button>
-              </>
+              <MotionButton
+                className="btn btn-primary btn-lg"
+                onClick={handlePickup}
+                disabled={submitting}
+              >
+                {submitting ? 'Updating…' : 'I picked it up'} <I.Arrow />
+              </MotionButton>
             ) : order.status === 'outForDelivery' ? (
               <>
-                <button
+                <MotionButton
                   className="btn btn-primary btn-lg"
                   onClick={handleArriving}
                   disabled={submitting}
                 >
                   {submitting ? 'Updating…' : 'Arriving now'} <I.Pin size={14} />
-                </button>
-                <button
-                  className="btn btn-outline"
+                </MotionButton>
+                <MotionButton
+                  className="btn btn-success"
                   onClick={handleDelivered}
                   disabled={submitting}
                 >
                   Delivery complete <I.Check size={14} />
-                </button>
+                </MotionButton>
               </>
             ) : order.status === 'arriving' ? (
-              <button
-                className="btn btn-primary btn-lg"
+              <MotionButton
+                className="btn btn-success btn-lg"
                 onClick={handleDelivered}
                 disabled={submitting}
               >
                 {submitting ? 'Confirming…' : 'Confirm delivery'} <I.Check size={14} />
-              </button>
+              </MotionButton>
             ) : null}
           </div>
         </div>

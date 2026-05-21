@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as I from '../icons/Icon';
 import { useOrderReview } from '../lib/customer';
 import { FadeUp } from './visual/ScrollReveal';
+import { MotionButton } from './visual/Motion';
 
 function Stars({
   value,
@@ -116,13 +117,13 @@ export default function ReviewForm({
 
         {error && <div style={{ color: '#EF4444', fontSize: 12 }}>{error}</div>}
 
-        <button
+        <MotionButton
           className="btn btn-primary btn-lg btn-block"
           onClick={onSubmit}
           disabled={restaurantRating === 0 || submitting}
         >
           {submitting ? 'Submitting…' : 'Submit review'} <I.Arrow />
-        </button>
+        </MotionButton>
       </div>
     </FadeUp>
   );

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as I from '../icons/Icon';
 import { markPreparing } from '../lib/orderActions';
 import OrderChat from './OrderChat';
+import { MotionButton } from './visual/Motion';
 import type { OrderRow } from '../lib/database.types';
 
 export default function MerchantOrderCard({ order }: { order: OrderRow }) {
@@ -71,14 +72,14 @@ export default function MerchantOrderCard({ order }: { order: OrderRow }) {
           </div>
 
           {order.status === 'ordered' && (
-            <button
-              className="btn btn-primary btn-lg"
+            <MotionButton
+              className="btn btn-success btn-lg btn-block"
               onClick={handleMarkReady}
               disabled={marking}
-              style={{ marginTop: 12, width: '100%' }}
+              style={{ marginTop: 12 }}
             >
-              {marking ? 'Updating…' : '✓ Mark ready for pickup'}
-            </button>
+              {marking ? 'Updating…' : 'Mark ready for pickup'} <I.Check size={14} />
+            </MotionButton>
           )}
         </div>
       )}

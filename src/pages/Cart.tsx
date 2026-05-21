@@ -10,6 +10,7 @@ import { IS_STRIPE_CONFIGURED } from '../lib/stripe';
 import { supabase } from '../lib/supabase';
 import type { AddressRow, Coords } from '../lib/database.types';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton, MotionCard, MotionFade, AnimatePresence, motion } from '../components/visual/Motion';
 
 type PayMethod = 'card' | 'cash';
 
@@ -507,7 +508,7 @@ export default function CartPage() {
                 <div style={{ color: '#EF4444', fontSize: 12, marginTop: 12 }}>{error}</div>
               )}
 
-              <button
+              <MotionButton
                 className="btn btn-primary btn-lg btn-block"
                 style={{ marginTop: 18, opacity: canSubmit ? 1 : 0.6 }}
                 onClick={checkout}
@@ -525,7 +526,7 @@ export default function CartPage() {
                           ? `Pay ${total} dh`
                           : `Order · ${total} dh (cash)`}{' '}
                 <I.Arrow />
-              </button>
+              </MotionButton>
               <p
                 style={{
                   fontSize: 12,
@@ -535,7 +536,7 @@ export default function CartPage() {
                   lineHeight: 1.4,
                 }}
               >
-                Campus delivery 20 dh · Restaurant delivery 35 dh.
+                Main gate → dorms 20 dh · Restaurant → main gate 35 dh.
               </p>
             </div>
           </div>

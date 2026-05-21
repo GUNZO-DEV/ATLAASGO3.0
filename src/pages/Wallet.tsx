@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 import type { WalletTxKind } from '../lib/database.types';
 
 type TxRow = {
@@ -81,13 +82,13 @@ export default function WalletPage() {
               </div>
             </div>
             <div className="wallet-card-actions">
-              <button
+              <MotionButton
                 className="btn btn-primary btn-lg"
                 onClick={() => alert('Stripe wiring pending — add VITE_STRIPE_PUBLISHABLE_KEY to enable top-up.')}
               >
                 <I.Plus size={14} /> Top up
-              </button>
-              <button className="btn btn-outline btn-lg">Send credit</button>
+              </MotionButton>
+              <MotionButton className="btn btn-outline btn-lg">Send credit</MotionButton>
             </div>
           </div>
         </FadeUp>

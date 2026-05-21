@@ -18,6 +18,7 @@ import {
 } from '../lib/orderActions';
 import { supabase } from '../lib/supabase';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton, MotionCard, MotionStagger, MotionStaggerItem, MotionPop, AnimatePresence } from '../components/visual/Motion';
 import RiderOrderCard from '../components/RiderOrderCard';
 
 type Tab = 'pending' | 'active' | 'available' | 'history' | 'earnings';
@@ -356,30 +357,30 @@ function RiderActiveCard({
       <div className="trip-actions">
         {!accepted ? (
           <>
-            <button className="btn btn-primary btn-lg" onClick={onAccept}>
+            <MotionButton className="btn btn-success btn-lg" onClick={onAccept}>
               Accept trip <I.Check size={14} />
-            </button>
-            <button className="btn btn-outline" onClick={onReject}>
+            </MotionButton>
+            <MotionButton className="btn btn-outline" onClick={onReject}>
               Decline
-            </button>
+            </MotionButton>
           </>
         ) : !pickedUp ? (
-          <button className="btn btn-primary btn-lg" onClick={onPickup}>
+          <MotionButton className="btn btn-primary btn-lg" onClick={onPickup}>
             I picked it up <I.Arrow />
-          </button>
+          </MotionButton>
         ) : order.status === 'outForDelivery' ? (
           <>
-            <button className="btn btn-primary btn-lg" onClick={onArriving}>
+            <MotionButton className="btn btn-primary btn-lg" onClick={onArriving}>
               Arriving now
-            </button>
-            <button className="btn btn-outline" onClick={onDelivered}>
+            </MotionButton>
+            <MotionButton className="btn btn-success" onClick={onDelivered}>
               Mark delivered
-            </button>
+            </MotionButton>
           </>
         ) : (
-          <button className="btn btn-primary btn-lg" onClick={onDelivered}>
+          <MotionButton className="btn btn-success btn-lg" onClick={onDelivered}>
             Delivered <I.Check size={14} />
-          </button>
+          </MotionButton>
         )}
       </div>
     </div>
@@ -446,20 +447,20 @@ function PendingOrderCard({
 
       {!declining ? (
         <div className="trip-actions">
-          <button
+          <MotionButton
             className="btn btn-primary btn-lg"
             onClick={handleAccept}
             disabled={submitting}
           >
             {submitting ? 'Accepting…' : 'Accept trip'} <I.Check size={14} />
-          </button>
-          <button
+          </MotionButton>
+          <MotionButton
             className="btn btn-outline"
             onClick={() => setDeclining(true)}
             disabled={submitting}
           >
             Decline
-          </button>
+          </MotionButton>
         </div>
       ) : (
         <div className="trip-actions" style={{ flexDirection: 'column', gap: 10 }}>
@@ -478,20 +479,20 @@ function PendingOrderCard({
             }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="btn btn-lg"
-              style={{ background: '#EF4444', color: 'white', flex: 1 }}
+            <MotionButton
+              className="btn btn-danger btn-lg"
+              style={{ flex: 1 }}
               onClick={handleDecline}
               disabled={submitting || !reason.trim()}
             >
               {submitting ? 'Declining…' : 'Confirm decline'}
-            </button>
-            <button
+            </MotionButton>
+            <MotionButton
               className="btn btn-ghost"
               onClick={() => { setDeclining(false); setReason(''); }}
             >
               Cancel
-            </button>
+            </MotionButton>
           </div>
         </div>
       )}
@@ -527,9 +528,9 @@ function PoolOrderCard({
         </span>
       </div>
       <div className="trip-actions">
-        <button className="btn btn-primary btn-lg" onClick={onClaim}>
+        <MotionButton className="btn btn-primary btn-lg" onClick={onClaim}>
           Claim this trip <I.Arrow />
-        </button>
+        </MotionButton>
         <Link to={`/track/${order.id}`} className="btn btn-outline">
           Preview details
         </Link>

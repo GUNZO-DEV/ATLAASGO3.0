@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton, MotionCard, MotionPop } from '../components/visual/Motion';
 import type { PrimeTier } from '../lib/database.types';
 
 const TIERS: Array<{
@@ -147,75 +148,81 @@ export default function PrimePage() {
 
         {/* Activation banner */}
         {activating && (
-          <div className="prime-banner activating">
-            <div className="prime-banner-spinner" />
-            Activating your subscription...
-          </div>
+          <MotionPop>
+            <div className="prime-banner activating">
+              <div className="prime-banner-spinner" />
+              Activating your subscription...
+            </div>
+          </MotionPop>
         )}
         {justActivated && (
-          <div className="prime-banner success">
-            <I.Check size={16} />
-            <div>
-              <strong>Welcome to Prime {justActivated.replace('_', ' ')}!</strong>
-              <span>Your perks are active now. Enjoy free delivery on your next order.</span>
+          <MotionPop>
+            <div className="prime-banner success">
+              <I.Check size={16} />
+              <div>
+                <strong>Welcome to Prime {justActivated.replace('_', ' ')}!</strong>
+                <span>Your perks are active now. Enjoy free delivery on your next order.</span>
+              </div>
             </div>
-          </div>
+          </MotionPop>
         )}
         {cancelled && (
-          <div className="prime-banner cancelled">
-            <I.Shield size={14} /> Payment cancelled. Pick a plan when you're ready.
-          </div>
+          <MotionPop>
+            <div className="prime-banner cancelled">
+              <I.Shield size={14} /> Payment cancelled. Pick a plan when you're ready.
+            </div>
+          </MotionPop>
         )}
 
         {/* Active subscription info */}
         {active && !justActivated && (
-          <div className="prime-banner active-sub">
-            <I.Star size={16} />
-            <div>
-              <strong>Prime {active.replace('_', ' ')} is active</strong>
-              {expiresAt && (
-                <span>
-                  Renews {new Date(expiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </span>
-              )}
+          <MotionPop>
+            <div className="prime-banner active-sub">
+              <I.Star size={16} />
+              <div>
+                <strong>Prime {active.replace('_', ' ')} is active</strong>
+                {expiresAt && (
+                  <span>
+                    Renews {new Date(expiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          </MotionPop>
         )}
 
         <div className="prime-grid">
           {TIERS.map((t, i) => (
-            <FadeUp y={14} delay={i * 0.05} key={t.tier}>
-              <div className={`prime-tier ${t.highlight ? 'highlight' : ''} ${active === t.tier ? 'current' : ''}`}>
-                {t.highlight && <span className="prime-tier-flag">Most popular</span>}
-                {active === t.tier && <span className="prime-tier-active">Active</span>}
-                <div className="prime-tier-name">{t.name}</div>
-                <div className="prime-tier-price">
-                  {t.priceDh}
-                  <span className="prime-tier-currency">dh</span>
-                  <span className="prime-tier-cadence">{t.cadence}</span>
-                </div>
-                <ul className="prime-tier-list">
-                  {t.perks.map((p) => (
-                    <li key={p}>
-                      <I.Check size={14} /> {p}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  className={`btn ${t.highlight ? 'btn-primary' : 'btn-outline'} btn-lg`}
-                  onClick={() => subscribe(t.tier)}
-                  disabled={active === t.tier || buying !== null}
-                >
-                  {active === t.tier ? (
-                    'Active'
-                  ) : buying === t.tier ? (
-                    <>Redirecting to Stripe...</>
-                  ) : (
-                    <>Get {t.name} <I.Arrow /></>
-                  )}
-                </button>
+            <MotionCard key={t.tier} className={`prime-tier ${t.highlight ? 'highlight' : ''} ${active === t.tier ? 'current' : ''}`} delay={i * 0.1}>
+              {t.highlight && <span className="prime-tier-flag">Most popular</span>}
+              {active === t.tier && <span className="prime-tier-active">Active</span>}
+              <div className="prime-tier-name">{t.name}</div>
+              <div className="prime-tier-price">
+                {t.priceDh}
+                <span className="prime-tier-currency">dh</span>
+                <span className="prime-tier-cadence">{t.cadence}</span>
               </div>
-            </FadeUp>
+              <ul className="prime-tier-list">
+                {t.perks.map((p) => (
+                  <li key={p}>
+                    <I.Check size={14} /> {p}
+                  </li>
+                ))}
+              </ul>
+              <MotionButton
+                className={`btn ${t.highlight ? 'btn-primary' : 'btn-outline'} btn-lg`}
+                onClick={() => subscribe(t.tier)}
+                disabled={active === t.tier || buying !== null}
+              >
+                {active === t.tier ? (
+                  'Active'
+                ) : buying === t.tier ? (
+                  <>Redirecting to Stripe...</>
+                ) : (
+                  <>Get {t.name} <I.Arrow /></>
+                )}
+              </MotionButton>
+            </MotionCard>
           ))}
         </div>
 

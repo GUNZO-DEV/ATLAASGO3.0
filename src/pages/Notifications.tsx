@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { useNotifications } from '../lib/customer';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 import type { NotificationKind } from '../lib/database.types';
 
 const KIND_ICON: Record<NotificationKind, JSX.Element> = {
@@ -68,9 +69,9 @@ export default function NotificationsPage() {
             </FadeUp>
           </div>
           {unreadCount > 0 && (
-            <button className="btn btn-outline" onClick={markAllRead}>
+            <MotionButton className="btn btn-outline btn-sm" onClick={markAllRead}>
               Mark all read
-            </button>
+            </MotionButton>
           )}
         </div>
 

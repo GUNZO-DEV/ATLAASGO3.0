@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 
 export default function ApplyPartner() {
   const { user } = useAuth();
@@ -39,9 +40,9 @@ export default function ApplyPartner() {
             <I.Check size={36} />
             <h3>Welcome — application received</h3>
             <p>Our partnerships team will reach out by phone within 24 hours.</p>
-            <button className="btn btn-primary" onClick={() => nav('/')}>
+            <MotionButton className="btn btn-primary" onClick={() => nav('/')}>
               Back home <I.Arrow />
-            </button>
+            </MotionButton>
           </div>
         </div>
       </section>
@@ -99,14 +100,14 @@ export default function ApplyPartner() {
               />
             </div>
             {error && <div style={{ color: '#EF4444', fontSize: 12 }}>{error}</div>}
-            <button
+            <MotionButton
               onClick={submit}
               disabled={busy || !name.trim() || (!email.trim() && !user?.email)}
               className="btn btn-primary btn-lg btn-block"
               style={{ marginTop: 12 }}
             >
               {busy ? 'Submitting…' : 'Submit application'} <I.Arrow />
-            </button>
+            </MotionButton>
           </div>
         </FadeUp>
       </div>

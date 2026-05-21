@@ -8,6 +8,7 @@ import type { OrderStatus } from '../lib/database.types';
 import OrderChat from '../components/OrderChat';
 import ReviewForm from '../components/ReviewForm';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 
 // Leaflet ships ~80 KB so we lazy-load it; the rest of the Track page renders
 // instantly while the map hydrates.
@@ -112,9 +113,8 @@ export default function Track() {
                 <div className="track-landmark-label">Driver heads to</div>
                 <div className="track-landmark-value">{headerLandmark}</div>
               </div>
-              <button
-                className="btn btn-outline"
-                style={{ padding: '8px 14px', fontSize: 12 }}
+              <MotionButton
+                className="btn btn-outline btn-sm"
                 onClick={() => {
                   if (!navigator.geolocation) return;
                   navigator.geolocation.getCurrentPosition((pos) => {
@@ -124,7 +124,7 @@ export default function Track() {
                 }}
               >
                 <I.Pin size={12} /> Share location
-              </button>
+              </MotionButton>
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 
 export default function AccountPage() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -89,9 +90,9 @@ export default function AccountPage() {
                   placeholder="+212 6 12 34 56 78"
                 />
               </div>
-              <button onClick={save} disabled={saving} className="btn btn-primary">
+              <MotionButton onClick={save} disabled={saving} className="btn btn-primary">
                 {saving ? 'Saving…' : 'Save changes'}
-              </button>
+              </MotionButton>
               {status && (
                 <div
                   style={{
@@ -118,7 +119,7 @@ export default function AccountPage() {
                   </Link>
                 ))}
               </div>
-              <button
+              <MotionButton
                 onClick={async () => {
                   await signOut();
                   nav('/');
@@ -127,7 +128,7 @@ export default function AccountPage() {
                 style={{ marginTop: 16 }}
               >
                 Sign out
-              </button>
+              </MotionButton>
             </div>
           </FadeUp>
         </div>

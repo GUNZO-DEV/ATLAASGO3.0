@@ -5,6 +5,7 @@ import { useI18n } from '../lib/i18n';
 import { useAuth } from '../lib/auth';
 import { useRoles } from '../lib/roles';
 import { supabase } from '../lib/supabase';
+import { MotionButton } from '../components/visual/Motion';
 
 type Mode = 'signin' | 'signup' | 'magic';
 type Role = 'customer' | 'merchant' | 'rider';
@@ -281,7 +282,7 @@ export default function AuthPage() {
                 />
               </div>
             )}
-            <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy}>
+            <MotionButton type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy}>
               {busy
                 ? 'Working…'
                 : mode === 'signin'
@@ -290,7 +291,7 @@ export default function AuthPage() {
                     ? `Create ${role} account`
                     : 'Send magic link'}{' '}
               <I.Arrow />
-            </button>
+            </MotionButton>
           </form>
 
           <div className="auth-foot">

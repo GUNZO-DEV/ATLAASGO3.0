@@ -5,6 +5,7 @@ import { useCart } from '../lib/cart';
 import { useI18n } from '../lib/i18n';
 import { useFavorites } from '../lib/customer';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 
 const HEADER_GRADS: Record<number, string> = {
   0: 'linear-gradient(135deg, var(--amber), var(--primary))',
@@ -166,9 +167,9 @@ export default function RestaurantPage() {
 
         {cartCount > 0 && (
           <div className="resto-floating-cart">
-            <button className="btn btn-primary btn-lg" onClick={() => nav('/cart')}>
+            <MotionButton className="btn btn-primary btn-lg" onClick={() => nav('/cart')}>
               View cart ({cartCount}) <I.Arrow />
-            </button>
+            </MotionButton>
           </div>
         )}
       </div>

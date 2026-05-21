@@ -4,6 +4,7 @@ import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { useAddresses } from '../lib/customer';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 import type { Coords } from '../lib/database.types';
 
 const AUI_DORMS = Array.from({ length: 60 }, (_, i) => ({
@@ -100,9 +101,9 @@ export default function AddressesPage() {
             <I.Pin size={36} />
             <h3>No addresses yet</h3>
             <p>Add your first delivery spot in under 20 seconds.</p>
-            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setAdding(true)}>
+            <MotionButton className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setAdding(true)}>
               <I.Plus size={14} /> Add address
-            </button>
+            </MotionButton>
           </div>
         )}
 
@@ -153,9 +154,9 @@ export default function AddressesPage() {
             ))}
 
             {!adding && (
-              <button className="btn btn-outline" onClick={() => setAdding(true)}>
+              <MotionButton className="btn btn-outline" onClick={() => setAdding(true)}>
                 <I.Plus size={14} /> Add another address
-              </button>
+              </MotionButton>
             )}
           </div>
         )}
@@ -317,22 +318,22 @@ export default function AddressesPage() {
                       : 'Tap to capture'}
                   </div>
                 </div>
-                <button onClick={captureCoords} className="btn btn-primary">
+                <MotionButton onClick={captureCoords} className="btn btn-primary btn-sm">
                   {coords ? 'Update' : 'Capture'}
-                </button>
+                </MotionButton>
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-                <button
+                <MotionButton
                   onClick={onSave}
                   disabled={busy || !label.trim() || !line1.trim() || !coords}
                   className="btn btn-primary btn-lg"
                 >
                   {busy ? 'Saving…' : 'Save address'} <I.Arrow />
-                </button>
-                <button onClick={() => setAdding(false)} className="btn btn-ghost">
+                </MotionButton>
+                <MotionButton onClick={() => setAdding(false)} className="btn btn-ghost">
                   Cancel
-                </button>
+                </MotionButton>
               </div>
             </div>
           </FadeUp>

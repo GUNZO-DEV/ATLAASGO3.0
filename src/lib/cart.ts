@@ -13,7 +13,7 @@ export type CartItem = {
 
 /** Fixed delivery fees (DH) */
 const CAMPUS_FEE = 20;     // Main gate → dorms
-const RESTAURANT_FEE = 35; // Restaurant → dorms
+const RESTAURANT_FEE = 35; // Restaurant → main gate
 
 type State = {
   items: CartItem[];
