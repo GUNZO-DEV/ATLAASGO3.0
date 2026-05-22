@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="28" fill="#FEFAE8"/>
+  <!-- Burger bun top -->
+  <ellipse cx="100" cy="72" rx="58" ry="30" fill="#F5A623"/>
+  <ellipse cx="100" cy="68" rx="55" ry="26" fill="#F7B733"/>
+  <!-- Sesame seeds -->
+  <ellipse cx="85" cy="62" rx="5" ry="3" fill="#E8960A" transform="rotate(-20 85 62)"/>
+  <ellipse cx="100" cy="58" rx="5" ry="3" fill="#E8960A"/>
+  <ellipse cx="115" cy="62" rx="5" ry="3" fill="#E8960A" transform="rotate(20 115 62)"/>
+  <!-- Lettuce -->
+  <path d="M42 96 Q60 88 80 94 Q100 100 120 92 Q140 88 158 96" stroke="#4CAF50" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <!-- Cheese -->
+  <rect x="45" y="100" width="110" height="12" rx="4" fill="#FFC107"/>
+  <!-- Patty -->
+  <rect x="48" y="112" width="104" height="22" rx="10" fill="#5D2E0C"/>
+  <!-- Bun bottom -->
+  <ellipse cx="100" cy="142" rx="58" ry="18" fill="#F7B733"/>
+  <!-- Text -->
+  <text x="100" y="176" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-weight="900" font-size="15" fill="#E8960A" letter-spacing="0">homemade</text>
+  <text x="100" y="192" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="11" fill="#5D2E0C" letter-spacing="2">BURGERS</text>
+</svg>
