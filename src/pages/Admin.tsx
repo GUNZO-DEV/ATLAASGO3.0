@@ -9,11 +9,13 @@ import {
   useAdminUsers,
   useAvailableRiders,
   type AdminOrderFilter,
+  type UserWithRoles,
 } from '../lib/admin';
 import { assignRider } from '../lib/orderActions';
 import { supabase } from '../lib/supabase';
-import type { OrderRow } from '../lib/database.types';
+import type { OrderRow, AppRole } from '../lib/database.types';
 import { FadeUp } from '../components/visual/ScrollReveal';
+import { MotionButton } from '../components/visual/Motion';
 
 type Tab = 'orders' | 'applications' | 'promotions' | 'users';
 
@@ -44,7 +46,7 @@ function AdminShell() {
     decide,
   } = useApplications();
   const { promotions, toggle } = usePromotions();
-  const { users, loading: usersLoading } = useAdminUsers();
+  const { users, loading: usersLoading, createUser, grantRole, revokeRole } = useAdminUsers();
 
   const stats = useMemo(() => {
     const live = orders.filter((o) =>
@@ -208,37 +210,400 @@ function AdminShell() {
         )}
 
         {tab === 'users' && (
-          <div className="dash-panel">
-            <h3>Users · roles</h3>
-            {usersLoading && <p style={{ color: 'var(--fg-soft)' }}>Loading…</p>}
-            {!usersLoading &&
-              users.map((u) => (
-                <div className="order-row" key={u.id}>
-                  <span className="order-id">{u.id.slice(0, 8)}</span>
-                  <span>
-                    <strong>{u.display_name ?? '—'}</strong>{' '}
-                    <span style={{ color: 'var(--fg-soft)', fontSize: 12 }}>{u.phone ?? ''}</span>
-                  </span>
-                  <span>
-                    {u.roles.length === 0 ? (
-                      <span style={{ color: 'var(--fg-soft)', fontSize: 12 }}>customer</span>
-                    ) : (
-                      u.roles.map((r) => (
-                        <span key={r} className="badge badge-soft" style={{ marginInlineEnd: 6 }}>
-                          {r}
-                        </span>
-                      ))
-                    )}
-                  </span>
-                  <span style={{ fontSize: 11, color: 'var(--fg-soft)' }}>
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              ))}
+          <div style={{ display: 'grid', gap: 20 }}>
+            <CreateUserForm onCreate={createUser} />
+            <div className="dash-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0 }}>Users · roles</h3>
+                <span style={{ fontSize: 12, color: 'var(--fg-soft)' }}>
+                  {users.length} users
+                </span>
+              </div>
+              {usersLoading && <p style={{ color: 'var(--fg-soft)' }}>Loading…</p>}
+              {!usersLoading && users.length === 0 && (
+                <p style={{ color: 'var(--fg-soft)', fontSize: 13 }}>No users found.</p>
+              )}
+              <div style={{ display: 'grid', gap: 8 }}>
+                {users.map((u) => (
+                  <UserRow key={u.id} user={u} onGrant={grantRole} onRevoke={revokeRole} />
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+/* ── Create user form ─────────────────────────────────────────────── */
+const ALL_ROLES: AppRole[] = ['customer', 'merchant', 'rider', 'admin', 'super_admin'];
+
+function CreateUserForm({
+  onCreate,
+}: {
+  onCreate: (p: {
+    email: string;
+    password: string;
+    display_name?: string;
+    phone?: string;
+    role?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState<string>('customer');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function handleSubmit() {
+    setBusy(true);
+    setError(null);
+    setSuccess(false);
+    const res = await onCreate({
+      email: email.trim(),
+      password,
+      display_name: displayName.trim() || undefined,
+      phone: phone.trim() || undefined,
+      role: role !== 'customer' ? role : undefined,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error ?? 'Failed to create user');
+    } else {
+      setSuccess(true);
+      setEmail('');
+      setPassword('');
+      setDisplayName('');
+      setPhone('');
+      setRole('customer');
+      setTimeout(() => setSuccess(false), 3000);
+    }
+  }
+
+  if (!open) {
+    return (
+      <MotionButton className="btn btn-primary" onClick={() => setOpen(true)}>
+        <I.Plus size={14} /> Create new user
+      </MotionButton>
+    );
+  }
+
+  return (
+    <FadeUp y={12}>
+      <div className="dash-panel">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <I.User size={16} /> Create new user
+            </span>
+          </h3>
+          <button className="btn btn-ghost" onClick={() => setOpen(false)} style={{ fontSize: 12 }}>
+            Cancel
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gap: 12, maxWidth: 500 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="field">
+              <label>Email *</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="user@example.com"
+                required
+              />
+            </div>
+            <div className="field">
+              <label>Password *</label>
+              <input
+                type="text"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                required
+              />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="field">
+              <label>Display name</label>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Youssef B."
+              />
+            </div>
+            <div className="field">
+              <label>Phone</label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+212 6 ..."
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label>Role</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ALL_ROLES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  style={{
+                    padding: '7px 14px',
+                    border: role === r ? '1.5px solid var(--primary)' : '1px solid var(--line)',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: role === r ? 700 : 500,
+                    background: role === r ? 'rgba(255,87,34,0.08)' : 'var(--surface)',
+                    color: role === r ? 'var(--primary)' : 'var(--fg-soft)',
+                    cursor: 'pointer',
+                    transition: 'all .15s',
+                  }}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ color: '#EF4444', fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 10 }}>
+              {error}
+            </div>
+          )}
+          {success && (
+            <div style={{ color: '#059669', fontSize: 12, padding: '8px 12px', background: 'rgba(16,185,129,0.08)', borderRadius: 10 }}>
+              User created successfully
+            </div>
+          )}
+
+          <MotionButton
+            onClick={handleSubmit}
+            disabled={busy || !email.trim() || password.length < 6}
+            className="btn btn-primary"
+            style={{ justifySelf: 'start' }}
+          >
+            {busy ? 'Creating…' : 'Create user'} <I.Arrow />
+          </MotionButton>
+        </div>
+      </div>
+    </FadeUp>
+  );
+}
+
+/* ── User row with role management ─────────────────────────────── */
+const ROLE_COLORS: Record<string, string> = {
+  customer: '#7A6F66',
+  merchant: '#059669',
+  rider: '#FF5722',
+  admin: '#7C3AED',
+  super_admin: '#DC2626',
+};
+
+function UserRow({
+  user,
+  onGrant,
+  onRevoke,
+}: {
+  user: UserWithRoles;
+  onGrant: (userId: string, role: string) => Promise<{ ok: boolean; error?: string }>;
+  onRevoke: (userId: string, role: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleGrant(role: string) {
+    setBusy(true);
+    setError(null);
+    const res = await onGrant(user.id, role);
+    setBusy(false);
+    if (!res.ok) setError(res.error ?? 'Failed');
+  }
+
+  async function handleRevoke(role: string) {
+    setBusy(true);
+    setError(null);
+    const res = await onRevoke(user.id, role);
+    setBusy(false);
+    if (!res.ok) setError(res.error ?? 'Failed');
+  }
+
+  const grantable = ALL_ROLES.filter((r) => !user.roles.includes(r));
+
+  return (
+    <div
+      style={{
+        background: expanded ? 'var(--bg)' : 'transparent',
+        border: expanded ? '1px solid var(--line)' : '1px solid transparent',
+        borderRadius: 16,
+        padding: expanded ? 16 : '10px 0',
+        transition: 'all .2s',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          cursor: 'pointer',
+          flexWrap: 'wrap',
+        }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 999,
+            background: 'rgba(255,87,34,0.08)',
+            color: 'var(--primary)',
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <I.User size={15} />
+        </div>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 14 }}>
+            {user.display_name ?? '—'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--fg-soft)', fontFamily: 'JetBrains Mono, monospace' }}>
+            {user.id.slice(0, 8)} · {user.phone ?? 'no phone'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {user.roles.length === 0 ? (
+            <span
+              style={{
+                padding: '3px 10px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 600,
+                background: 'rgba(0,0,0,0.05)',
+                color: '#7A6F66',
+              }}
+            >
+              customer
+            </span>
+          ) : (
+            user.roles.map((r) => (
+              <span
+                key={r}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: `${ROLE_COLORS[r] ?? '#7A6F66'}14`,
+                  color: ROLE_COLORS[r] ?? '#7A6F66',
+                }}
+              >
+                {r}
+              </span>
+            ))
+          )}
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--fg-soft)', whiteSpace: 'nowrap' }}>
+          {new Date(user.created_at).toLocaleDateString()}
+        </span>
+        <I.Arrow
+          size={12}
+          style={{
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform .2s',
+            color: 'var(--fg-soft)',
+          }}
+        />
+      </div>
+
+      {expanded && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+          {/* Current roles with revoke */}
+          {user.roles.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--fg-soft)', marginBottom: 8 }}>
+                Current roles
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {user.roles.map((r) => (
+                  <div
+                    key={r}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '5px 10px',
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      background: `${ROLE_COLORS[r] ?? '#7A6F66'}14`,
+                      color: ROLE_COLORS[r] ?? '#7A6F66',
+                    }}
+                  >
+                    {r}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRevoke(r); }}
+                      disabled={busy}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        color: '#EF4444',
+                        fontWeight: 800,
+                        fontSize: 14,
+                        lineHeight: 1,
+                      }}
+                      title={`Revoke ${r}`}
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Grant new roles */}
+          {grantable.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--fg-soft)', marginBottom: 8 }}>
+                Grant role
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {grantable.map((r) => (
+                  <MotionButton
+                    key={r}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleGrant(r); }}
+                    disabled={busy}
+                    className="btn btn-outline"
+                    style={{ padding: '5px 12px', fontSize: 12, borderRadius: 999 }}
+                  >
+                    + {r}
+                  </MotionButton>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ color: '#EF4444', fontSize: 12, marginTop: 8 }}>
+              {error}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

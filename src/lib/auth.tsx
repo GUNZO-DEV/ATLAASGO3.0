@@ -1,30 +1,36 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from './supabase';
 
 type AuthCtx = {
+  /** Supabase user — null until Clerk signs in and clerk-sync exchanges tokens. */
   user: User | null;
   session: Session | null;
   loading: boolean;
-  /** Email + password sign-in. */
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  /** Email + password sign-up. */
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: string | null }>;
-  /** Send a magic-link email. */
-  signInWithOtp: (email: string) => Promise<{ error: string | null }>;
+  /** Signs out of both Clerk and Supabase. */
   signOut: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-function redirectTo(): string {
-  return import.meta.env.VITE_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { getToken: getClerkToken, signOut: clerkSignOut } = useClerkAuth();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const syncingRef = useRef(false);
+  const prevClerkIdRef = useRef<string | null>(null);
 
+  // ── Listen to Supabase auth state (session persist + auto-refresh) ──
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
@@ -43,38 +49,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // ── Sync Clerk → Supabase when Clerk user state changes ────────────
+  useEffect(() => {
+    if (!clerkLoaded) return;
+
+    // User signed out of Clerk → sign out of Supabase too
+    if (!clerkUser) {
+      if (prevClerkIdRef.current) {
+        supabase.auth.signOut();
+        prevClerkIdRef.current = null;
+      }
+      return;
+    }
+
+    // Already synced this Clerk user
+    if (prevClerkIdRef.current === clerkUser.id) return;
+
+    // Already have a Supabase session (e.g. from a persisted cookie)
+    if (session?.user) {
+      prevClerkIdRef.current = clerkUser.id;
+      return;
+    }
+
+    // Prevent concurrent syncs
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+
+    (async () => {
+      try {
+        const clerkToken = await getClerkToken();
+        if (!clerkToken) return;
+
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clerk-sync`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ clerk_token: clerkToken }),
+          },
+        );
+
+        const data = await res.json();
+        if (!res.ok) {
+          console.error('[auth] clerk-sync failed:', data.error);
+          return;
+        }
+
+        // Set the Supabase session — this triggers onAuthStateChange above
+        await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
+
+        prevClerkIdRef.current = clerkUser.id;
+      } catch (err) {
+        console.error('[auth] clerk-sync error:', err);
+      } finally {
+        syncingRef.current = false;
+      }
+    })();
+  }, [clerkLoaded, clerkUser, getClerkToken, session]);
+
   const value = useMemo<AuthCtx>(
     () => ({
       user: session?.user ?? null,
       session,
-      loading,
-      signIn: async (email, password) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return { error: error?.message ?? null };
-      },
-      signUp: async (email, password, displayName) => {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: displayName ? { display_name: displayName } : undefined,
-            emailRedirectTo: `${redirectTo()}/auth?confirmed=1`,
-          },
-        });
-        return { error: error?.message ?? null };
-      },
-      signInWithOtp: async (email) => {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: `${redirectTo()}/orders` },
-        });
-        return { error: error?.message ?? null };
-      },
+      loading:
+        loading ||
+        (!session && clerkLoaded && !!clerkUser && prevClerkIdRef.current !== clerkUser?.id),
       signOut: async () => {
+        prevClerkIdRef.current = null;
         await supabase.auth.signOut();
+        await clerkSignOut();
       },
     }),
-    [session, loading],
+    [session, loading, clerkLoaded, clerkUser, clerkSignOut],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

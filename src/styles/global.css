@@ -1499,7 +1499,8 @@ footer.foot::before {
 .oauth-btn:hover { border-color: var(--fg); transform: translateY(-1px); }
 .auth-toggle {
   display: flex; gap: 4px; padding: 4px;
-  background: var(--bg); border-radius: 999px;
+  background: rgba(255,255,255,0.04); border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.06);
   margin-bottom: 20px;
 }
 .auth-toggle button {
@@ -1508,7 +1509,11 @@ footer.foot::before {
   color: var(--fg-soft); border-radius: 999px;
   transition: all .2s;
 }
-.auth-toggle button.active { background: var(--fg); color: var(--bg); }
+.auth-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255,87,34,0.3);
+}
 .auth-foot {
   margin-top: 18px;
   text-align: center;
@@ -4014,6 +4019,82 @@ main > * {
   max-width: none;
   margin: 0;
 }
+
+/* ── Clerk dark-theme overrides ── */
+.auth-card-pro .cl-formFieldInput,
+.auth-card-pro .cl-formFieldInput[type="text"],
+.auth-card-pro .cl-formFieldInput[type="email"],
+.auth-card-pro .cl-formFieldInput[type="password"] {
+  background: #130F0B !important;
+  color: #F5F0EB !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+}
+.auth-card-pro .cl-formFieldInput:focus {
+  border-color: #FF5722 !important;
+  box-shadow: 0 0 0 1px #FF5722 !important;
+}
+/* Autofill override */
+.auth-card-pro .cl-formFieldInput:-webkit-autofill,
+.auth-card-pro .cl-formFieldInput:-webkit-autofill:hover,
+.auth-card-pro .cl-formFieldInput:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 40px #130F0B inset !important;
+  -webkit-text-fill-color: #F5F0EB !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  caret-color: #F5F0EB !important;
+}
+.auth-card-pro .cl-socialButtonsBlockButton {
+  background: #231E19 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: #F5F0EB !important;
+}
+.auth-card-pro .cl-socialButtonsBlockButton:hover {
+  background: #2C2520 !important;
+}
+.auth-card-pro .cl-socialButtonsBlockButtonText {
+  color: #F5F0EB !important;
+}
+.auth-card-pro .cl-formFieldAction {
+  color: #FF8A65 !important;
+}
+.auth-card-pro .cl-footerActionText {
+  color: #A89E94 !important;
+}
+.auth-card-pro .cl-footerActionLink {
+  color: #FF8A65 !important;
+}
+.auth-card-pro .cl-internal-b3fm6y {
+  background: transparent !important;
+}
+.auth-card-pro .cl-footer {
+  background: transparent !important;
+}
+.auth-card-pro .cl-card {
+  background: #1A1410 !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+.auth-card-pro .cl-otpCodeFieldInput {
+  background: #130F0B !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  color: #F5F0EB !important;
+}
+.auth-card-pro .cl-identityPreview {
+  background: #231E19 !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+.auth-card-pro .cl-identityPreviewText {
+  color: #F5F0EB !important;
+}
+.auth-card-pro .cl-identityPreviewEditButtonIcon {
+  color: #FF8A65 !important;
+}
+.auth-card-pro .cl-alternativeMethodsBlockButton {
+  background: #231E19 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  color: #F5F0EB !important;
+}
+.auth-card-pro .cl-alternativeMethodsBlockButton:hover {
+  background: #2C2520 !important;
+}
 .auth-role-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -4487,6 +4568,13 @@ main > * {
   color: var(--fg-soft);
   font-size: 13px;
   font-weight: 500;
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ck-spin 0.7s linear infinite;
 }
 .checkout-spinner {
   width: 28px; height: 28px;

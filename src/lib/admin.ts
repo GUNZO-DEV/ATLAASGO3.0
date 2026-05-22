@@ -227,38 +227,119 @@ export function useAdminUsers() {
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const [{ data: profiles }, { data: roles }] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id,display_name,phone,created_at')
-          .order('created_at', { ascending: false })
-          .limit(80),
-        supabase.from('user_roles').select('user_id,role'),
-      ]);
-      if (cancelled) return;
-      const roleMap = new Map<string, string[]>();
-      ((roles ?? []) as { user_id: string; role: string }[]).forEach((r) => {
-        const arr = roleMap.get(r.user_id) ?? [];
-        arr.push(r.role);
-        roleMap.set(r.user_id, arr);
-      });
-      setUsers(
-        ((profiles ?? []) as Omit<UserWithRoles, 'roles'>[]).map((p) => ({
-          ...p,
-          roles: roleMap.get(p.id) ?? [],
-        })),
-      );
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const refresh = useCallback(async () => {
+    const [{ data: profiles }, { data: roles }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id,display_name,phone,created_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      supabase.from('user_roles').select('user_id,role'),
+    ]);
+    const roleMap = new Map<string, string[]>();
+    ((roles ?? []) as { user_id: string; role: string }[]).forEach((r) => {
+      const arr = roleMap.get(r.user_id) ?? [];
+      arr.push(r.role);
+      roleMap.set(r.user_id, arr);
+    });
+    setUsers(
+      ((profiles ?? []) as Omit<UserWithRoles, 'roles'>[]).map((p) => ({
+        ...p,
+        roles: roleMap.get(p.id) ?? [],
+      })),
+    );
+    setLoading(false);
   }, []);
 
-  return { users, loading };
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  /** Call the admin-create-user edge function */
+  const createUser = useCallback(
+    async (payload: {
+      email: string;
+      password: string;
+      display_name?: string;
+      phone?: string;
+      role?: string;
+    }): Promise<{ ok: boolean; error?: string }> => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return { ok: false, error: 'Not authenticated' };
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ action: 'create_user', ...payload }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) return { ok: false, error: json.error ?? 'Failed to create user' };
+      await refresh();
+      return { ok: true };
+    },
+    [refresh],
+  );
+
+  /** Grant a role to a user via edge function */
+  const grantRole = useCallback(
+    async (userId: string, role: string): Promise<{ ok: boolean; error?: string }> => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return { ok: false, error: 'Not authenticated' };
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ action: 'grant_role', user_id: userId, role }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) return { ok: false, error: json.error ?? 'Failed to grant role' };
+      await refresh();
+      return { ok: true };
+    },
+    [refresh],
+  );
+
+  /** Revoke a role from a user via edge function */
+  const revokeRole = useCallback(
+    async (userId: string, role: string): Promise<{ ok: boolean; error?: string }> => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return { ok: false, error: 'Not authenticated' };
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ action: 'revoke_role', user_id: userId, role }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) return { ok: false, error: json.error ?? 'Failed to revoke role' };
+      await refresh();
+      return { ok: true };
+    },
+    [refresh],
+  );
+
+  return { users, loading, refresh, createUser, grantRole, revokeRole };
 }
 
 export type AvailableRider = {

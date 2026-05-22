@@ -1,28 +1,45 @@
 import { Routes, Route } from 'react-router-dom';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Nav from './components/Nav';
 import Footer from './components/Footer';
+
+/* ── Only the landing page is eagerly loaded ─────────────────────── */
 import Landing from './pages/Landing';
-import Order from './pages/Order';
-import RestaurantPage from './pages/Restaurant';
-import CartPage from './pages/Cart';
-import Track from './pages/Track';
-import Auth from './pages/Auth';
-import Orders from './pages/Orders';
-import Favorites from './pages/Favorites';
-import Addresses from './pages/Addresses';
-import Notifications from './pages/Notifications';
-import Wallet from './pages/Wallet';
-import Prime from './pages/Prime';
-import Account from './pages/Account';
-import Rider from './pages/Rider';
-import Merchant from './pages/Merchant';
-import Admin from './pages/Admin';
-import ApplyRider from './pages/ApplyRider';
-import ApplyPartner from './pages/ApplyPartner';
-import Campus from './pages/Campus';
-import Checkout from './pages/Checkout';
-import NotFound from './pages/NotFound';
+
+/* ── Everything else is lazy-loaded (code-split) ─────────────────── */
+const Order = lazy(() => import('./pages/Order'));
+const RestaurantPage = lazy(() => import('./pages/Restaurant'));
+const CartPage = lazy(() => import('./pages/Cart'));
+const Track = lazy(() => import('./pages/Track'));
+const Auth = lazy(() => import('./pages/Auth'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const Addresses = lazy(() => import('./pages/Addresses'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+const Prime = lazy(() => import('./pages/Prime'));
+const Account = lazy(() => import('./pages/Account'));
+const Rider = lazy(() => import('./pages/Rider'));
+const Merchant = lazy(() => import('./pages/Merchant'));
+const Admin = lazy(() => import('./pages/Admin'));
+const ApplyRider = lazy(() => import('./pages/ApplyRider'));
+const ApplyPartner = lazy(() => import('./pages/ApplyPartner'));
+const Campus = lazy(() => import('./pages/Campus'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+function PageLoader() {
+  return (
+    <section className="page">
+      <div className="container" style={{ display: 'grid', placeItems: 'center', minHeight: '40vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--fg-soft)' }}>
+          <div className="spinner" style={{ margin: '0 auto 16px' }} />
+          Loading…
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function App() {
   useEffect(() => {
@@ -40,35 +57,37 @@ export default function App() {
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  });
+  }, []);
 
   return (
     <>
       <Nav />
       <main>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/order" element={<Order />} />
-          <Route path="/r/:slug" element={<RestaurantPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/track/:id?" element={<Track />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/addresses" element={<Addresses />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/prime" element={<Prime />} />
-          <Route path="/account" element={<Account />} />
-          <Route path="/rider" element={<Rider />} />
-          <Route path="/rider/apply" element={<ApplyRider />} />
-          <Route path="/merchant" element={<Merchant />} />
-          <Route path="/merchant/apply" element={<ApplyPartner />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/campus" element={<Campus />} />
-          <Route path="/checkout/:id" element={<Checkout />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/order" element={<Order />} />
+            <Route path="/r/:slug" element={<RestaurantPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/track/:id?" element={<Track />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/addresses" element={<Addresses />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/prime" element={<Prime />} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/rider" element={<Rider />} />
+            <Route path="/rider/apply" element={<ApplyRider />} />
+            <Route path="/merchant" element={<Merchant />} />
+            <Route path="/merchant/apply" element={<ApplyPartner />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/campus" element={<Campus />} />
+            <Route path="/checkout/:id" element={<Checkout />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
       <Footer />
     </>
