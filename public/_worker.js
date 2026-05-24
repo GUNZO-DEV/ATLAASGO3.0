@@ -1,53 +1,33 @@
-// _worker.js — Cloudflare Pages edge function
-// Handles SPA routing for dynamic Next.js routes.
-// Static files are served directly; dynamic paths get the placeholder shell.
+// _worker.js — Cloudflare Pages edge worker for AtlaasGo SPA
+// Serves index.html for all navigation requests (client-side routing).
+// Static assets in /assets/ are served directly with immutable cache.
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    let { pathname } = url;
+    const { pathname } = url;
 
-    // Strip trailing slash for matching (except root)
-    if (pathname !== "/" && pathname.endsWith("/")) {
-      pathname = pathname.slice(0, -1);
+    // Static assets — serve directly (hashed filenames = immutable)
+    if (
+      pathname.startsWith('/assets/') ||
+      pathname.startsWith('/logos/') ||
+      pathname.startsWith('/icons/') ||
+      pathname.match(/\.\w{2,5}$/) // .js .css .svg .png .webp .woff2 etc.
+    ) {
+      return env.ASSETS.fetch(request);
     }
 
-    // Dynamic route matching
-    const orderBase = pathname.match(/^\/orders\/([^/]+)$/);
-    const orderChat = pathname.match(/^\/orders\/([^/]+)\/chat$/);
-    const orderCard = pathname.match(/^\/orders\/([^/]+)\/card-payment$/);
-    const orderReview = pathname.match(/^\/orders\/([^/]+)\/review$/);
-    const restaurant = pathname.match(/^\/restaurants\/([^/]+)$/);
+    // All other routes → serve index.html (SPA client-side routing)
+    const indexUrl = new URL('/index.html', request.url);
+    const indexRes = await env.ASSETS.fetch(indexUrl);
 
-    let assetPath = null;
-
-    if (orderChat && orderChat[1] !== "_") {
-      assetPath = "/orders/_/chat.html";
-    } else if (orderCard && orderCard[1] !== "_") {
-      assetPath = "/orders/_/card-payment.html";
-    } else if (orderReview && orderReview[1] !== "_") {
-      assetPath = "/orders/_/review.html";
-    } else if (orderBase && orderBase[1] !== "_") {
-      assetPath = "/orders/_.html";
-    } else if (restaurant && restaurant[1] !== "_") {
-      assetPath = "/restaurants/_.html";
-    }
-
-    if (assetPath) {
-      // Serve the placeholder HTML shell — client JS reads the real ID from URL
-      const assetUrl = new URL(assetPath, request.url);
-      const asset = await env.ASSETS.fetch(assetUrl);
-      return new Response(asset.body, {
-        status: 200,
-        headers: {
-          ...Object.fromEntries(asset.headers),
-          "content-type": "text/html; charset=utf-8",
-          "x-robots-tag": "noindex",
-        },
-      });
-    }
-
-    // For everything else, let Cloudflare serve static files normally
-    return env.ASSETS.fetch(request);
+    return new Response(indexRes.body, {
+      status: 200,
+      headers: {
+        ...Object.fromEntries(indexRes.headers),
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-cache',
+      },
+    });
   },
 };

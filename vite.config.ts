@@ -9,6 +9,12 @@ export default defineConfig({
   },
   server: { port: 5173, host: true },
   build: {
+    // Target modern browsers — smaller bundles, faster parsing
+    target: 'es2022',
+    // Source maps for production debugging (uploaded to Cloudflare, not public)
+    sourcemap: 'hidden',
+    // Increase chunk warning to 300kB (vendor chunks are large but cached)
+    chunkSizeWarningLimit: 300,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -20,5 +26,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  // Environment variable validation — fail build if missing
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
 });

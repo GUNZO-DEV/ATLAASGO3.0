@@ -1,19 +1,38 @@
-# Cloudflare Pages headers
+# Cloudflare Pages headers — production hardened
 # Reference: https://developers.cloudflare.com/pages/configuration/headers/
 
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self), interest-cohort=()
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://*.clerk.com https://img.clerk.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://clerk.atlaasgo.com https://api.stripe.com https://*.clerk.com; frame-src https://*.clerk.accounts.dev https://js.stripe.com https://challenges.cloudflare.com; worker-src 'self' blob:;
 
+# HTML — never cache (deploy updates must propagate instantly)
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Hashed assets — immutable forever
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Service worker — always revalidate (controls cache invalidation)
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
 
+# Manifest
 /manifest.webmanifest
   Cache-Control: public, max-age=3600
   Content-Type: application/manifest+json
+
+# Logos & icons — cache 1 day
+/logos/*
+  Cache-Control: public, max-age=86400
+
+/favicon.svg
+  Cache-Control: public, max-age=86400

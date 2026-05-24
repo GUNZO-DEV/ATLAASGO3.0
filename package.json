@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "verify:schema": "node scripts/parse-schema.mjs && node scripts/check-insert.mjs",
-    "pages:deploy": "npm run build && wrangler pages deploy dist --project-name=atlaasgo",
+    "pages:deploy": "npm run build && node scripts/stamp-sw.mjs && wrangler pages deploy dist --project-name=atlaasgo --branch=main --no-bundle --commit-dirty=true",
     "pages:dev": "npm run build && wrangler pages dev dist",
     "emulators": "npm --prefix backend run emulators",
     "seed": "npm --prefix backend run seed",
