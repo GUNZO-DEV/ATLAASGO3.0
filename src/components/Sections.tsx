@@ -247,8 +247,8 @@ export function Tripersona() {
                 <I.Check size={14} /> Apple Pay, wallet, or cash
               </li>
             </ul>
-            <Link className="persona-cta" to="/order">
-              Download the app <I.Arrow />
+            <Link className="persona-cta" to="/auth?mode=signup&role=customer">
+              Sign up to order <I.Arrow />
             </Link>
             <div className="persona-deco">A</div>
           </div>
@@ -277,8 +277,8 @@ export function Tripersona() {
                 <I.Check size={14} /> Performance bonuses
               </li>
             </ul>
-            <Link className="persona-cta" to="/rider">
-              Start riding <I.Arrow />
+            <Link className="persona-cta" to="/auth?mode=signup&role=rider">
+              Apply as a rider <I.Arrow />
             </Link>
             <div className="persona-deco">G</div>
           </div>
@@ -307,8 +307,8 @@ export function Tripersona() {
                 <I.Check size={14} /> 0 setup fee · 14-day trial
               </li>
             </ul>
-            <Link className="persona-cta" to="/merchant">
-              Partner with us <I.Arrow />
+            <Link className="persona-cta" to="/auth?mode=signup&role=merchant">
+              Apply as a partner <I.Arrow />
             </Link>
             <div className="persona-deco">O</div>
           </div>
@@ -544,17 +544,17 @@ export function PWABanner() {
 
           {/* Three-persona quick-links */}
           <div className="edge-hero-personas">
-            <Link to="/auth" className="edge-persona-pill">
+            <Link to="/auth?mode=signup&role=customer" className="edge-persona-pill">
               <span className="edge-persona-emoji">🍽</span>
               <span>Order food</span>
               <I.Arrow size={10} />
             </Link>
-            <Link to="/rider/apply" className="edge-persona-pill">
+            <Link to="/auth?mode=signup&role=rider" className="edge-persona-pill">
               <span className="edge-persona-emoji">🏍</span>
               <span>Drive & earn</span>
               <I.Arrow size={10} />
             </Link>
-            <Link to="/merchant/apply" className="edge-persona-pill">
+            <Link to="/auth?mode=signup&role=merchant" className="edge-persona-pill">
               <span className="edge-persona-emoji">🏪</span>
               <span>List your restaurant</span>
               <I.Arrow size={10} />
