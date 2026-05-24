@@ -108,13 +108,27 @@ Deno.serve(async (req) => {
     // ── 3. Try sign-in (existing synced user) ────────────────────────
     const existing = await trySignIn(email, password);
     if (existing) {
-      // Sync display name
-      if (displayName) {
-        await supabase
+      // Ensure profile + wallet + role exist (idempotent upserts)
+      await Promise.allSettled([
+        supabase
           .from('profiles')
-          .update({ display_name: displayName })
-          .eq('id', existing.user_id);
-      }
+          .upsert(
+            { id: existing.user_id, display_name: displayName },
+            { onConflict: 'id' },
+          ),
+        supabase
+          .from('user_roles')
+          .upsert(
+            { user_id: existing.user_id, role: 'customer' },
+            { onConflict: 'user_id,role' },
+          ),
+        supabase
+          .from('wallets')
+          .upsert(
+            { user_id: existing.user_id, balance_dh: 0, currency: 'MAD' },
+            { onConflict: 'user_id' },
+          ),
+      ]);
       return json(existing);
     }
 
@@ -129,16 +143,37 @@ Deno.serve(async (req) => {
     if (created?.user) {
       const session = await trySignIn(email, password);
       if (session) {
-        if (displayName) {
-          await supabase
+        // Bootstrap new user: profile, wallet, customer role
+        await Promise.allSettled([
+          supabase
             .from('profiles')
-            .update({ display_name: displayName })
-            .eq('id', session.user_id);
-        }
-        // Ensure customer role
-        await supabase
-          .from('user_roles')
-          .upsert({ user_id: session.user_id, role: 'customer' }, { onConflict: 'user_id,role' });
+            .upsert(
+              { id: session.user_id, display_name: displayName, phone: null },
+              { onConflict: 'id' },
+            ),
+          supabase
+            .from('user_roles')
+            .upsert(
+              { user_id: session.user_id, role: 'customer' },
+              { onConflict: 'user_id,role' },
+            ),
+          supabase
+            .from('wallets')
+            .upsert(
+              { user_id: session.user_id, balance_dh: 0, currency: 'MAD' },
+              { onConflict: 'user_id' },
+            ),
+          // Welcome notification
+          supabase
+            .from('notifications')
+            .insert({
+              user_id: session.user_id,
+              kind: 'system',
+              title: 'Welcome to AtlaasGo',
+              body: 'Your account is ready. Explore restaurants near AUI and place your first order.',
+              payload: {},
+            }),
+        ]);
         return json(session);
       }
     }

@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { FadeUp } from '../components/visual/ScrollReveal';
-import { MotionButton } from '../components/visual/Motion';
+import { MotionButton, AnimatePresence, motion } from '../components/visual/Motion';
 import type { WalletTxKind } from '../lib/database.types';
+
+const stripePromise = loadStripe(
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '',
+);
 
 type TxRow = {
   id: string;
@@ -23,16 +29,121 @@ const TX_LABEL: Record<WalletTxKind, string> = {
   adjustment: 'Adjustment',
 };
 
+const TOPUP_AMOUNTS = [50, 100, 200, 500];
+
+/* ── Top-up form inside <Elements> ── */
+function TopupForm({
+  amount,
+  onSuccess,
+  onCancel,
+}: {
+  amount: number;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setBusy(true);
+    setError(null);
+
+    const { error: submitErr } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/wallet?topped_up=${amount}`,
+      },
+    });
+
+    if (submitErr) {
+      setError(submitErr.message ?? 'Payment failed.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderRadius: 16,
+        padding: 20,
+      }}>
+        <div style={{ marginBottom: 14, fontWeight: 700, fontSize: 15 }}>
+          Top up {amount} dh
+        </div>
+        <PaymentElement onReady={() => setReady(true)} options={{ layout: 'tabs' }} />
+        {!ready && (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--fg-soft)', fontSize: 13 }}>
+            Loading payment methods...
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div style={{ color: '#EF4444', fontSize: 12, marginTop: 10 }}>
+          <I.Shield size={12} /> {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <MotionButton
+          type="submit"
+          className="btn btn-primary btn-lg"
+          style={{ flex: 1 }}
+          disabled={!stripe || !ready || busy}
+        >
+          {busy ? 'Processing…' : `Pay ${amount} dh`}
+        </MotionButton>
+        <MotionButton
+          type="button"
+          className="btn btn-outline"
+          onClick={onCancel}
+          disabled={busy}
+        >
+          Cancel
+        </MotionButton>
+      </div>
+    </form>
+  );
+}
+
 export default function WalletPage() {
   const { user, loading: authLoading } = useAuth();
   const nav = useNavigate();
   const [balance, setBalance] = useState(0);
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [topupAmount, setTopupAmount] = useState<number | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [topupError, setTopupError] = useState<string | null>(null);
+  const [justTopped, setJustTopped] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) nav('/auth?next=/wallet', { replace: true });
   }, [authLoading, user, nav]);
+
+  // Check for successful top-up redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const amt = params.get('topped_up');
+    if (amt) {
+      setJustTopped(Number(amt));
+      window.history.replaceState({}, '', '/wallet');
+      // Reload balance
+      if (user) {
+        supabase.from('wallets').select('balance_dh').eq('user_id', user.id).maybeSingle()
+          .then(({ data }) => {
+            setBalance((data as { balance_dh?: number } | null)?.balance_dh ?? 0);
+          });
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -56,6 +167,32 @@ export default function WalletPage() {
     };
   }, [user]);
 
+  async function startTopup(amount: number) {
+    if (!user) return;
+    setTopupAmount(amount);
+    setTopupError(null);
+    setClientSecret(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('wallet-topup', {
+        body: { amountDh: amount, userId: user.id, customerEmail: user.email },
+      });
+      if (error || !data?.clientSecret) {
+        setTopupError('Could not start top-up. Try again.');
+        return;
+      }
+      setClientSecret(data.clientSecret);
+    } catch {
+      setTopupError('Network error. Check your connection.');
+    }
+  }
+
+  function cancelTopup() {
+    setTopupAmount(null);
+    setClientSecret(null);
+    setTopupError(null);
+  }
+
   return (
     <section className="page">
       <div className="container">
@@ -66,6 +203,24 @@ export default function WalletPage() {
           <h1 className="page-title">Your wallet</h1>
           <p className="page-sub">Top up once, pay anywhere on AtlaasGo.</p>
         </FadeUp>
+
+        {justTopped && (
+          <div style={{
+            background: 'rgba(5,150,105,0.08)',
+            border: '1px solid rgba(5,150,105,0.2)',
+            borderRadius: 14,
+            padding: '14px 18px',
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            color: '#059669',
+            fontWeight: 600,
+            fontSize: 14,
+          }}>
+            <I.Check size={16} /> {justTopped} dh added to your wallet!
+          </div>
+        )}
 
         <FadeUp y={14}>
           <div className="wallet-card">
@@ -78,20 +233,67 @@ export default function WalletPage() {
                 </div>
               </div>
               <div className="wallet-card-chip">
-                <I.Lightning size={14} /> Prime perks active
+                <I.Lightning size={14} /> AtlaasGo Wallet
               </div>
             </div>
-            <div className="wallet-card-actions">
-              <MotionButton
-                className="btn btn-primary btn-lg"
-                onClick={() => alert('Stripe wiring pending — add VITE_STRIPE_PUBLISHABLE_KEY to enable top-up.')}
-              >
-                <I.Plus size={14} /> Top up
-              </MotionButton>
-              <MotionButton className="btn btn-outline btn-lg">Send credit</MotionButton>
-            </div>
+            {!topupAmount && (
+              <div className="wallet-card-actions">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {TOPUP_AMOUNTS.map((amt) => (
+                    <MotionButton
+                      key={amt}
+                      className="btn btn-outline"
+                      onClick={() => startTopup(amt)}
+                    >
+                      +{amt} dh
+                    </MotionButton>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </FadeUp>
+
+        {/* ── Topup payment form ── */}
+        {topupAmount && !clientSecret && !topupError && (
+          <div style={{ textAlign: 'center', padding: 30, color: 'var(--fg-soft)' }}>
+            <div className="spinner" style={{ margin: '0 auto 12px' }} />
+            Preparing payment...
+          </div>
+        )}
+        {topupError && (
+          <div style={{ color: '#EF4444', fontSize: 13, marginTop: 16, textAlign: 'center' }}>
+            {topupError}
+            <button onClick={cancelTopup} style={{ display: 'block', margin: '8px auto', color: 'var(--primary)', fontWeight: 600 }}>
+              Try again
+            </button>
+          </div>
+        )}
+        {clientSecret && topupAmount && (
+          <Elements
+            stripe={stripePromise}
+            options={{
+              clientSecret,
+              appearance: {
+                theme: 'stripe',
+                variables: {
+                  colorPrimary: '#FF5722',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  borderRadius: '14px',
+                },
+              },
+            }}
+          >
+            <TopupForm
+              amount={topupAmount}
+              onSuccess={() => {
+                cancelTopup();
+                // Reload will happen on redirect
+              }}
+              onCancel={cancelTopup}
+            />
+          </Elements>
+        )}
 
         <FadeUp y={14}>
           <div style={{ marginTop: 32 }}>
