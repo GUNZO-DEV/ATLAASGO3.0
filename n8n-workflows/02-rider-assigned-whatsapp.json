@@ -1,0 +1,144 @@
+{
+  "name": "AtlaasGo · 02 · Rider assigned → WhatsApp",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "riders",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            { "keyName": "id", "condition": "eq", "keyValue": "={{$json.payload.rider_id}}" }
+          ]
+        }
+      },
+      "id": "lookup-rider",
+      "name": "Supabase · lookup rider",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [440, 400],
+      "credentials": {
+        "supabaseApi": { "id": "atlaasgo-supabase", "name": "AtlaasGo Supabase (service role)" }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "profiles",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            { "keyName": "id", "condition": "eq", "keyValue": "={{$node[\"Supabase · lookup rider\"].json.user_id}}" }
+          ]
+        }
+      },
+      "id": "lookup-profile",
+      "name": "Supabase · rider profile",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [680, 400],
+      "credentials": {
+        "supabaseApi": { "id": "atlaasgo-supabase", "name": "AtlaasGo Supabase (service role)" }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "orders",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            { "keyName": "id", "condition": "eq", "keyValue": "={{$node[\"Execute Workflow Trigger\"].json.payload.order_id}}" }
+          ]
+        }
+      },
+      "id": "lookup-order",
+      "name": "Supabase · order details",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [920, 400],
+      "credentials": {
+        "supabaseApi": { "id": "atlaasgo-supabase", "name": "AtlaasGo Supabase (service role)" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{$node[\"Supabase · rider profile\"].json.phone}}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "has-phone",
+      "name": "Rider has phone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1160, 400]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "={{$credentials.phoneNumberId}}",
+        "recipientPhoneNumber": "={{$node[\"Supabase · rider profile\"].json.phone}}",
+        "messageType": "text",
+        "textBody": "=🏍 *New trip assigned*\\n\\nOrder *#{{$node[\"Execute Workflow Trigger\"].json.payload.order_id.substring(0,6).toUpperCase()}}*\\n📍 Drop: _{{$node[\"Supabase · order details\"].json.landmark}}_\\n💰 +18 dh\\n\\n👉 Accept now: https://atlaasgo.com/rider"
+      },
+      "id": "send-whatsapp",
+      "name": "WhatsApp · rider",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1400, 320],
+      "credentials": {
+        "whatsAppApi": { "id": "whatsapp-cloud", "name": "AtlaasGo WhatsApp Business" }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Supabase · lookup rider", "type": "main", "index": 0 }]]
+    },
+    "Supabase · lookup rider": {
+      "main": [[{ "node": "Supabase · rider profile", "type": "main", "index": 0 }]]
+    },
+    "Supabase · rider profile": {
+      "main": [[{ "node": "Supabase · order details", "type": "main", "index": 0 }]]
+    },
+    "Supabase · order details": {
+      "main": [[{ "node": "Rider has phone?", "type": "main", "index": 0 }]]
+    },
+    "Rider has phone?": {
+      "main": [
+        [{ "node": "WhatsApp · rider", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "atlaasgo" }, { "name": "rider" }]
+}

@@ -1,0 +1,159 @@
+{
+  "name": "AtlaasGo · Master Event Router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atlaasgo",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-root",
+      "name": "Webhook · /atlaasgo",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "atlaasgo-master",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "atlaasgo-secret",
+          "name": "AtlaasGo Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"id\": $json.body.id, \"kind\": $json.body.kind }",
+        "options": {}
+      },
+      "id": "respond-200",
+      "name": "ACK 200 (instant)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 400]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.body.kind}}",
+        "rules": {
+          "rules": [
+            { "value2": "order.placed",                    "output": 0 },
+            { "value2": "order.status_changed",            "output": 1 },
+            { "value2": "rider.assigned",                  "output": 2 },
+            { "value2": "review.posted",                   "output": 3 },
+            { "value2": "application.rider.submitted",     "output": 4 },
+            { "value2": "application.merchant.submitted",  "output": 5 }
+          ]
+        },
+        "fallbackOutput": 6
+      },
+      "id": "switch-kind",
+      "name": "Switch on kind",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "workflowId": "{{REPLACE_WITH_ORDER_PLACED_WF_ID}}",
+        "options": {}
+      },
+      "id": "wf-order-placed",
+      "name": "→ Order placed",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": "{{REPLACE_WITH_ORDER_STATUS_WF_ID}}",
+        "options": {}
+      },
+      "id": "wf-status-change",
+      "name": "→ Status changed",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 220]
+    },
+    {
+      "parameters": {
+        "workflowId": "{{REPLACE_WITH_RIDER_ASSIGNED_WF_ID}}",
+        "options": {}
+      },
+      "id": "wf-rider-assigned",
+      "name": "→ Rider assigned",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 340]
+    },
+    {
+      "parameters": {
+        "workflowId": "{{REPLACE_WITH_REVIEW_POSTED_WF_ID}}",
+        "options": {}
+      },
+      "id": "wf-review",
+      "name": "→ Review posted",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 460]
+    },
+    {
+      "parameters": {
+        "workflowId": "{{REPLACE_WITH_RIDER_APP_WF_ID}}",
+        "options": {}
+      },
+      "id": "wf-rider-app",
+      "name": "→ Rider application",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 580]
+    },
+    {
+      "parameters": {
+        "workflowId": "{{REPLACE_WITH_MERCHANT_APP_WF_ID}}",
+        "options": {}
+      },
+      "id": "wf-merchant-app",
+      "name": "→ Merchant application",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [920, 700]
+    },
+    {
+      "parameters": {
+        "channel": "ops-alerts",
+        "text": "=⚠️ Unknown event kind from AtlaasGo: `{{$json.body.kind}}`\\n```{{JSON.stringify($json.body, null, 2)}}```"
+      },
+      "id": "unknown-event",
+      "name": "Unknown event → ops",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 820],
+      "notes": "Replace with a Slack/Telegram node once configured."
+    }
+  ],
+  "connections": {
+    "Webhook · /atlaasgo": {
+      "main": [[
+        { "node": "ACK 200 (instant)", "type": "main", "index": 0 },
+        { "node": "Switch on kind",    "type": "main", "index": 0 }
+      ]]
+    },
+    "Switch on kind": {
+      "main": [
+        [{ "node": "→ Order placed",         "type": "main", "index": 0 }],
+        [{ "node": "→ Status changed",       "type": "main", "index": 0 }],
+        [{ "node": "→ Rider assigned",       "type": "main", "index": 0 }],
+        [{ "node": "→ Review posted",        "type": "main", "index": 0 }],
+        [{ "node": "→ Rider application",    "type": "main", "index": 0 }],
+        [{ "node": "→ Merchant application", "type": "main", "index": 0 }],
+        [{ "node": "Unknown event → ops",    "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "atlaasgo" }, { "name": "router" }]
+}

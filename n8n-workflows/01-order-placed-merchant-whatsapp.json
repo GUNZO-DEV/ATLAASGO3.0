@@ -1,0 +1,130 @@
+{
+  "name": "AtlaasGo · 01 · Order placed → merchant WhatsApp",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "restaurants",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{$json.payload.restaurant_id}}"
+            }
+          ]
+        }
+      },
+      "id": "lookup-restaurant",
+      "name": "Supabase · lookup restaurant",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [440, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "atlaasgo-supabase",
+          "name": "AtlaasGo Supabase (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{$json.whatsapp_phone}}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "has-phone",
+      "name": "Has WhatsApp number?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "={{$credentials.phoneNumberId}}",
+        "recipientPhoneNumber": "={{$node[\"Supabase · lookup restaurant\"].json.whatsapp_phone}}",
+        "messageType": "text",
+        "textBody": "=🛎 *New AtlaasGo order*\\n\\nOrder *#{{$node[\"Execute Workflow Trigger\"].json.payload.order_id.substring(0,6).toUpperCase()}}*\\n{{$node[\"Execute Workflow Trigger\"].json.payload.items.length}} items · *{{$node[\"Execute Workflow Trigger\"].json.payload.total_dh}} dh*\\n\\nDrop-off: _{{$node[\"Execute Workflow Trigger\"].json.payload.landmark}}_\\nPayment: {{$node[\"Execute Workflow Trigger\"].json.payload.payment_method || 'card'}}\\n\\n👉 Open dashboard: https://atlaasgo.com/merchant"
+      },
+      "id": "send-whatsapp",
+      "name": "WhatsApp · merchant",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [920, 320],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "whatsapp-cloud",
+          "name": "AtlaasGo WhatsApp Business"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "tableId": "notifications",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "user_id",  "fieldValue": "={{$node[\"Supabase · lookup restaurant\"].json.owner_id}}" },
+            { "fieldId": "kind",     "fieldValue": "order_status" },
+            { "fieldId": "title",    "fieldValue": "New order received" },
+            { "fieldId": "body",     "fieldValue": "=Order #{{$node[\"Execute Workflow Trigger\"].json.payload.order_id.substring(0,6).toUpperCase()}} · {{$node[\"Execute Workflow Trigger\"].json.payload.total_dh}} dh — open the dashboard to accept." },
+            { "fieldId": "payload",  "fieldValue": "={{ { order_id: $node[\"Execute Workflow Trigger\"].json.payload.order_id } }}" }
+          ]
+        }
+      },
+      "id": "insert-notif",
+      "name": "Supabase · in-app notification",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [920, 480],
+      "credentials": {
+        "supabaseApi": {
+          "id": "atlaasgo-supabase",
+          "name": "AtlaasGo Supabase (service role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Supabase · lookup restaurant", "type": "main", "index": 0 }]]
+    },
+    "Supabase · lookup restaurant": {
+      "main": [[{ "node": "Has WhatsApp number?", "type": "main", "index": 0 }]]
+    },
+    "Has WhatsApp number?": {
+      "main": [
+        [
+          { "node": "WhatsApp · merchant", "type": "main", "index": 0 },
+          { "node": "Supabase · in-app notification", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Supabase · in-app notification", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "atlaasgo" }, { "name": "merchant" }]
+}
