@@ -6,7 +6,13 @@ import OrderChat from './OrderChat';
 import { MotionButton } from './visual/Motion';
 import type { OrderRow } from '../lib/database.types';
 
-export default function MerchantOrderCard({ order }: { order: OrderRow }) {
+export default function MerchantOrderCard({
+  order,
+  onChange,
+}: {
+  order: OrderRow;
+  onChange?: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [marking, setMarking] = useState(false);
   const toast = useToast();
@@ -22,6 +28,7 @@ export default function MerchantOrderCard({ order }: { order: OrderRow }) {
         toast.error(result.error);
       } else {
         toast.success('Marked ready · waiting for rider');
+        onChange?.();
       }
     } finally {
       setMarking(false);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
 import type { Coords, OrderRow, OrderStatus, CartItemSnapshot } from './database.types';
 import type { CartItem } from './cart';
@@ -73,30 +73,48 @@ export function useCreateOrder() {
   return { create, submitting, error };
 }
 
-/** Subscribes to live updates of one order. */
+/**
+ * Subscribes to one order. Returns:
+ *  - order:    current row
+ *  - mutate:   optimistically patch the row in local state (instant)
+ *  - refresh:  re-fetch from the DB (use after mutations to confirm)
+ *
+ * Refreshes on:
+ *  - mount
+ *  - postgres_changes realtime event (if publication includes `orders`)
+ *  - tab focus (catches missed events)
+ */
 export function useOrder(orderId: string | undefined) {
   const [order, setOrder] = useState<OrderRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
+
+  const refresh = useCallback(async () => {
+    if (!orderId) return;
+    const { data, error: err } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (cancelledRef.current) return;
+    if (err) setError(err.message);
+    if (data) setOrder(data as OrderRow);
+    setLoading(false);
+  }, [orderId]);
+
+  const mutate = useCallback((patch: Partial<OrderRow>) => {
+    setOrder((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
 
   useEffect(() => {
+    cancelledRef.current = false;
     if (!orderId) {
       setLoading(false);
       return;
     }
-    let cancelled = false;
 
-    supabase
-      .from('orders')
-      .select('*')
-      .eq('id', orderId)
-      .maybeSingle()
-      .then(({ data, error: err }) => {
-        if (cancelled) return;
-        if (err) setError(err.message);
-        if (data) setOrder(data as OrderRow);
-        setLoading(false);
-      });
+    void refresh();
 
     const channel = supabase
       .channel(`order:${orderId}`)
@@ -104,18 +122,23 @@ export function useOrder(orderId: string | undefined) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
         (payload) => {
-          if (!cancelled && payload.new) setOrder(payload.new as OrderRow);
+          if (!cancelledRef.current && payload.new) setOrder(payload.new as OrderRow);
         },
       )
       .subscribe();
 
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [orderId]);
+    // Tab-focus safety net (in case realtime missed an event)
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
 
-  return { order, loading, error, stage: order?.status as OrderStatus | undefined };
+    return () => {
+      cancelledRef.current = true;
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [orderId, refresh]);
+
+  return { order, loading, error, stage: order?.status as OrderStatus | undefined, mutate, refresh };
 }
 
 /** Live list of the current user's recent orders. */
@@ -123,51 +146,63 @@ export function useOrdersList(limit = 20) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
+
+  const refresh = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      if (!cancelledRef.current) {
+        setOrders([]);
+        setLoading(false);
+      }
+      return;
+    }
+    const { data, error: err } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (cancelledRef.current) return;
+    if (err) setError(err.message);
+    setOrders((data ?? []) as OrderRow[]);
+    setLoading(false);
+  }, [limit]);
+
+  const mutate = useCallback((id: string, patch: Partial<OrderRow>) => {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    async function load() {
+    (async () => {
+      await refresh();
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        if (!cancelled) {
-          setOrders([]);
-          setLoading(false);
-        }
-        return;
-      }
-      const { data, error: err } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (cancelled) return;
-      if (err) setError(err.message);
-      setOrders((data ?? []) as OrderRow[]);
-      setLoading(false);
-
+      if (!user || cancelledRef.current) return;
       channel = supabase
         .channel(`orders:${user.id}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'orders', filter: `customer_id=eq.${user.id}` },
-          () => {
-            // Re-fetch on any change to keep ordering & projections simple.
-            void load();
-          },
+          () => void refresh(),
         )
         .subscribe();
-    }
+    })();
 
-    void load();
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
+
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       if (channel) supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
     };
-  }, [limit]);
+  }, [refresh]);
 
-  return { orders, loading, error };
+  return { orders, loading, error, mutate, refresh };
 }

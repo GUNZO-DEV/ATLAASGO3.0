@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import type { OrderRow, OrderAssignmentRow, RiderStatus } from './database.types';
@@ -62,116 +62,124 @@ export function useRiderAssignments() {
     (OrderAssignmentRow & { order: OrderRow | null })[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const cancelledRef = useRef(false);
+
+  const refresh = useCallback(async () => {
+    if (!user) return;
+    const { data: rows } = await supabase
+      .from('order_assignments')
+      .select('*')
+      .eq('rider_id', user.id)
+      .order('assigned_at', { ascending: false })
+      .limit(40);
+    const ids = (rows ?? []).map((r: OrderAssignmentRow) => r.order_id);
+    const { data: ordersData } = ids.length
+      ? await supabase.from('orders').select('*').in('id', ids)
+      : { data: [] };
+    const ordersMap = new Map(
+      ((ordersData ?? []) as OrderRow[]).map((o) => [o.id, o]),
+    );
+    if (cancelledRef.current) return;
+    setAssignments(
+      (rows ?? []).map((r: OrderAssignmentRow) => ({
+        ...r,
+        order: ordersMap.get(r.order_id) ?? null,
+      })),
+    );
+    setLoading(false);
+  }, [user]);
 
   useEffect(() => {
+    cancelledRef.current = false;
     if (!user) {
       setLoading(false);
       return;
     }
-    let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    async function load() {
-      if (!user) return;
-      const { data: rows } = await supabase
-        .from('order_assignments')
-        .select('*')
-        .eq('rider_id', user.id)
-        .order('assigned_at', { ascending: false })
-        .limit(40);
-      const ids = (rows ?? []).map((r: OrderAssignmentRow) => r.order_id);
-      const { data: ordersData } = ids.length
-        ? await supabase.from('orders').select('*').in('id', ids)
-        : { data: [] };
-      const ordersMap = new Map(
-        ((ordersData ?? []) as OrderRow[]).map((o) => [o.id, o]),
-      );
-      if (cancelled) return;
-      setAssignments(
-        (rows ?? []).map((r: OrderAssignmentRow) => ({
-          ...r,
-          order: ordersMap.get(r.order_id) ?? null,
-        })),
-      );
-      setLoading(false);
+    void refresh();
+    channel = supabase
+      .channel(`rider_assignments:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'order_assignments', filter: `rider_id=eq.${user.id}` },
+        () => void refresh(),
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        () => void refresh(),
+      )
+      .subscribe();
 
-      channel = supabase
-        .channel(`rider_assignments:${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'order_assignments',
-            filter: `rider_id=eq.${user.id}`,
-          },
-          () => void load(),
-        )
-        .subscribe();
-    }
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
 
-    void load();
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       if (channel) supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
     };
-  }, [user]);
+  }, [user, refresh]);
 
-  return { assignments, loading };
+  return { assignments, loading, refresh };
 }
 
 /** Orders sitting in the dispatch pool — no active assignment. */
 export function useAvailableOrders() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const cancelledRef = useRef(false);
+
+  const refresh = useCallback(async () => {
+    const { data: ordered } = await supabase
+      .from('orders')
+      .select('*')
+      .in('status', ['ordered', 'preparing'])
+      .order('created_at', { ascending: true })
+      .limit(20);
+    const { data: assignments } = await supabase
+      .from('order_assignments')
+      .select('order_id')
+      .eq('is_active', true);
+    const claimed = new Set(
+      ((assignments ?? []) as { order_id: string }[]).map((a) => a.order_id),
+    );
+    if (cancelledRef.current) return;
+    setOrders(
+      ((ordered ?? []) as OrderRow[]).filter((o) => !claimed.has(o.id)),
+    );
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-
-    async function load() {
-      const { data: ordered } = await supabase
-        .from('orders')
-        .select('*')
-        .in('status', ['ordered', 'preparing'])
-        .order('created_at', { ascending: true })
-        .limit(20);
-      const { data: assignments } = await supabase
-        .from('order_assignments')
-        .select('order_id')
-        .eq('is_active', true);
-      const claimed = new Set(
-        ((assignments ?? []) as { order_id: string }[]).map((a) => a.order_id),
-      );
-      if (cancelled) return;
-      setOrders(
-        ((ordered ?? []) as OrderRow[]).filter((o) => !claimed.has(o.id)),
-      );
-      setLoading(false);
-    }
-
-    void load();
-    channel = supabase
+    cancelledRef.current = false;
+    void refresh();
+    const channel = supabase
       .channel('available_orders')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => void load(),
+        () => void refresh(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'order_assignments' },
-        () => void load(),
+        () => void refresh(),
       )
       .subscribe();
 
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, []);
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
 
-  return { orders, loading };
+    return () => {
+      cancelledRef.current = true;
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refresh]);
+
+  return { orders, loading, refresh };
 }
 
 /** Rider earnings rollups — current week + lifetime. */

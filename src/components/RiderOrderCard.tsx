@@ -16,11 +16,13 @@ export default function RiderOrderCard({
   accepted = false,
   pickedUp = false,
   riderId,
+  onChange,
 }: {
   order: OrderRow;
   accepted?: boolean;
   pickedUp?: boolean;
   riderId: string;
+  onChange?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +36,7 @@ export default function RiderOrderCard({
         toast.error(result.error);
       } else {
         toast.success('Marked as picked up');
+        onChange?.();
       }
     } finally {
       setSubmitting(false);
@@ -48,6 +51,7 @@ export default function RiderOrderCard({
         toast.error(result.error);
       } else {
         toast.info('Customer notified that you\'re arriving');
+        onChange?.();
       }
     } finally {
       setSubmitting(false);
@@ -62,6 +66,7 @@ export default function RiderOrderCard({
         toast.error(result.error);
       } else {
         toast.success('Delivery complete · +18 dh earned');
+        onChange?.();
       }
     } finally {
       setSubmitting(false);
@@ -129,7 +134,16 @@ export default function RiderOrderCard({
             {!accepted ? (
               <MotionButton
                 className="btn btn-success btn-lg"
-                onClick={() => acceptAssignment(order.id, riderId)}
+                onClick={async () => {
+                  setSubmitting(true);
+                  const r = await acceptAssignment(order.id, riderId);
+                  setSubmitting(false);
+                  if (!r.ok) toast.error(r.error);
+                  else {
+                    toast.success('Accepted · head to the restaurant');
+                    onChange?.();
+                  }
+                }}
                 disabled={submitting}
               >
                 Accept order <I.Check size={14} />

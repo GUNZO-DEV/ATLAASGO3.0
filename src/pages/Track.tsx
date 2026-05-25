@@ -32,7 +32,7 @@ export default function Track() {
   const { id } = useParams<{ id?: string }>();
   const { t } = useI18n();
   const { user } = useAuth();
-  const { order, loading, error, stage } = useOrder(id);
+  const { order, loading, error, stage, mutate, refresh } = useOrder(id);
   const { assignment, rider } = useOrderAssignment(id);
   const toast = useToast();
   const [params, setParams] = useSearchParams();
@@ -66,10 +66,14 @@ export default function Track() {
     if (!id) return;
     if (!confirm('Cancel this order? You can\'t undo this.')) return;
     setCancelling(true);
+    // Optimistic: flip the UI to 'cancelled' instantly
+    mutate({ status: 'cancelled' });
     const res = await cancelOrder(id);
     setCancelling(false);
     if (!res.ok) {
       toast.error(res.error || 'Could not cancel — try again');
+      // Roll back by re-fetching the true state
+      void refresh();
     } else {
       toast.success('Order cancelled');
     }

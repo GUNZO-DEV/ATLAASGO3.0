@@ -27,8 +27,8 @@ type Tab = 'pending' | 'active' | 'available' | 'history' | 'earnings';
 function RiderShell() {
   const [tab, setTab] = useState<Tab>('pending');
   const { profile, setStatus } = useRiderProfile();
-  const { assignments } = useRiderAssignments();
-  const { orders: available } = useAvailableOrders();
+  const { assignments, refresh: refreshAssignments } = useRiderAssignments();
+  const { orders: available, refresh: refreshAvailable } = useAvailableOrders();
   const { today, week, tripsToday } = useRiderEarnings();
   const { user } = useAuth();
 
@@ -170,6 +170,10 @@ function RiderShell() {
                     key={a.id}
                     order={a.order}
                     riderId={user.id}
+                    onChange={() => {
+                      void refreshAssignments();
+                      void refreshAvailable();
+                    }}
                   />
                 ),
             )}
@@ -194,6 +198,10 @@ function RiderShell() {
                     accepted={!!a.accepted_at}
                     pickedUp={!!a.picked_up_at}
                     riderId={user.id}
+                    onChange={() => {
+                      void refreshAssignments();
+                      void refreshAvailable();
+                    }}
                   />
                 ),
             )}
@@ -391,9 +399,11 @@ function RiderActiveCard({
 function PendingOrderCard({
   order,
   riderId,
+  onChange,
 }: {
   order: import('../lib/database.types').OrderRow;
   riderId: string;
+  onChange?: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -404,7 +414,10 @@ function PendingOrderCard({
     setSubmitting(true);
     const res = await acceptAssignment(order.id, riderId);
     if (!res.ok) toast.error(res.error);
-    else toast.success('Trip accepted · pick up the order');
+    else {
+      toast.success('Trip accepted · pick up the order');
+      onChange?.();
+    }
     setSubmitting(false);
   }
 
@@ -413,7 +426,10 @@ function PendingOrderCard({
     setSubmitting(true);
     const res = await rejectAssignment(order.id, riderId, reason.trim());
     if (!res.ok) toast.error(res.error);
-    else toast.info('Trip declined');
+    else {
+      toast.info('Trip declined');
+      onChange?.();
+    }
     setSubmitting(false);
     setDeclining(false);
   }

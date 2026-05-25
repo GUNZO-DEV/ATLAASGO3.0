@@ -13,40 +13,45 @@ export function useAdminOrders(filter: AdminOrderFilter = 'live') {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-
-    async function load() {
-      let q = supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(80);
-      if (filter === 'live') {
-        q = q.in('status', ['ordered', 'preparing', 'enRoute', 'outForDelivery', 'arriving']);
-      } else if (filter !== 'all') {
-        q = q.eq('status', filter);
-      }
-      const { data } = await q;
-      if (cancelled) return;
-      setOrders((data ?? []) as OrderRow[]);
-      setLoading(false);
-
-      channel = supabase
-        .channel(`admin_orders:${filter}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'orders' },
-          () => void load(),
-        )
-        .subscribe();
+  const refresh = useCallback(async () => {
+    let q = supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(80);
+    if (filter === 'live') {
+      q = q.in('status', ['ordered', 'preparing', 'enRoute', 'outForDelivery', 'arriving']);
+    } else if (filter !== 'all') {
+      q = q.eq('status', filter);
     }
-
-    void load();
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
+    const { data } = await q;
+    setOrders((data ?? []) as OrderRow[]);
+    setLoading(false);
   }, [filter]);
 
-  return { orders, loading };
+  useEffect(() => {
+    void refresh();
+
+    const channel = supabase
+      .channel(`admin_orders:${filter}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => void refresh(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'order_assignments' },
+        () => void refresh(),
+      )
+      .subscribe();
+
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [filter, refresh]);
+
+  return { orders, loading, refresh };
 }
 
 export type RiderApp = {
@@ -354,22 +359,33 @@ export function useAvailableRiders() {
   const [riders, setRiders] = useState<AvailableRider[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('riders')
-        .select('user_id,vehicle,plate,rating,total_trips')
-        .eq('status', 'online')
-        .order('rating', { ascending: false });
-      if (cancelled) return;
-      setRiders((data ?? []) as AvailableRider[]);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const refresh = useCallback(async () => {
+    const { data } = await supabase
+      .from('riders')
+      .select('user_id,vehicle,plate,rating,total_trips')
+      .eq('status', 'online')
+      .order('rating', { ascending: false });
+    setRiders((data ?? []) as AvailableRider[]);
+    setLoading(false);
   }, []);
 
-  return { riders, loading };
+  useEffect(() => {
+    void refresh();
+    const channel = supabase
+      .channel('available_riders')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'riders' },
+        () => void refresh(),
+      )
+      .subscribe();
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refresh]);
+
+  return { riders, loading, refresh };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { RoleGate } from '../lib/roles';
@@ -59,46 +59,46 @@ function MerchantShell() {
   const [revenueToday, setRevenueToday] = useState(0);
   const [ticketsToday, setTicketsToday] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    async function load() {
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .in('status', ['ordered', 'preparing', 'enRoute', 'outForDelivery', 'arriving'])
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (cancelled) return;
-      setLiveOrders((data ?? []) as OrderRow[]);
+  const refreshOrders = useCallback(async () => {
+    const { data } = await supabase
+      .from('orders')
+      .select('*')
+      .in('status', ['ordered', 'preparing', 'enRoute', 'outForDelivery', 'arriving'])
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setLiveOrders((data ?? []) as OrderRow[]);
 
-      const { data: todayOrders } = await supabase
-        .from('orders')
-        .select('total_dh,created_at')
-        .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
-      if (cancelled) return;
-      const total = (todayOrders ?? []).reduce(
-        (acc: number, o: { total_dh: number }) => acc + o.total_dh,
-        0,
-      );
-      setRevenueToday(total);
-      setTicketsToday((todayOrders ?? []).length);
-
-      channel = supabase
-        .channel('merchant_live')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'orders' },
-          () => void load(),
-        )
-        .subscribe();
-    }
-    void load();
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
+    const { data: todayOrders } = await supabase
+      .from('orders')
+      .select('total_dh,created_at')
+      .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
+    const total = (todayOrders ?? []).reduce(
+      (acc: number, o: { total_dh: number }) => acc + o.total_dh,
+      0,
+    );
+    setRevenueToday(total);
+    setTicketsToday((todayOrders ?? []).length);
   }, []);
+
+  useEffect(() => {
+    void refreshOrders();
+    const channel = supabase
+      .channel('merchant_live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => void refreshOrders(),
+      )
+      .subscribe();
+
+    const onFocus = () => void refreshOrders();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshOrders]);
 
   const tableCounts = useMemo(() => {
     const free = tables.filter((t) => t.status === 'free').length;
@@ -243,7 +243,7 @@ function MerchantShell() {
               </div>
             )}
             {liveOrders.map((o) => (
-              <MerchantOrderCard key={o.id} order={o} />
+              <MerchantOrderCard key={o.id} order={o} onChange={refreshOrders} />
             ))}
           </div>
         )}

@@ -94,8 +94,11 @@ export function useAddresses() {
     refresh().then(() => {
       if (cancelled) return;
     });
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
     };
   }, [refresh]);
 
@@ -181,30 +184,63 @@ export function useNotifications() {
     }
 
     void load();
+
+    // Refetch when the tab regains focus — catches missed realtime events
+    const onFocus = () => void load();
+    window.addEventListener('focus', onFocus);
+
     return () => {
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 
+  // Optimistic update: mark the notification read locally first, then
+  // sync to Supabase. If the write fails, roll back.
   const markRead = useCallback(async (id: string) => {
-    await supabase
+    const ts = new Date().toISOString();
+    let previous: string | null | undefined;
+    setItems((prev) =>
+      prev.map((n) => {
+        if (n.id === id) {
+          previous = n.read_at;
+          return { ...n, read_at: ts };
+        }
+        return n;
+      }),
+    );
+    const { error } = await supabase
       .from('notifications')
-      .update({ read_at: new Date().toISOString() })
+      .update({ read_at: ts })
       .eq('id', id);
+    if (error) {
+      // Roll back
+      setItems((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read_at: previous ?? null } : n)),
+      );
+    }
   }, []);
 
   const markAllRead = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase
+    const ts = new Date().toISOString();
+    // Optimistic: mark every unread as read locally
+    const snapshot = items;
+    setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: ts })));
+    const { error } = await supabase
       .from('notifications')
-      .update({ read_at: new Date().toISOString() })
+      .update({ read_at: ts })
       .eq('user_id', user.id)
       .is('read_at', null);
-  }, []);
+    if (error) {
+      // Roll back to snapshot if it failed
+      setItems(snapshot);
+    }
+  }, [items]);
 
   return { items, unreadCount, loading, markRead, markAllRead };
 }

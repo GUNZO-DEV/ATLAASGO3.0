@@ -39,7 +39,7 @@ const STATUS_COLOR: Record<string, { c: string; bg: string }> = {
 function AdminShell() {
   const [tab, setTab] = useState<Tab>('orders');
   const [filter, setFilter] = useState<AdminOrderFilter>('live');
-  const { orders, loading: ordersLoading } = useAdminOrders(filter);
+  const { orders, loading: ordersLoading, refresh: refreshOrders } = useAdminOrders(filter);
   const {
     rider: riderApps,
     restaurant: restoApps,
@@ -136,7 +136,7 @@ function AdminShell() {
                 </div>
               )}
               {orders.map((o) => (
-                <AdminOrderRow key={o.id} order={o} />
+                <AdminOrderRow key={o.id} order={o} onChange={refreshOrders} />
               ))}
             </div>
           </>
@@ -608,7 +608,13 @@ function UserRow({
   );
 }
 
-function AdminOrderRow({ order }: { order: OrderRow }) {
+function AdminOrderRow({
+  order,
+  onChange,
+}: {
+  order: OrderRow;
+  onChange?: () => void;
+}) {
   const sty = STATUS_COLOR[order.status] ?? { c: '#7A6F66', bg: 'rgba(0,0,0,0.06)' };
   const { riders } = useAvailableRiders();
   const [showRiderSelect, setShowRiderSelect] = useState(false);
@@ -618,7 +624,10 @@ function AdminOrderRow({ order }: { order: OrderRow }) {
   async function quickAction(next: 'preparing' | 'cancelled') {
     const { error } = await supabase.from('orders').update({ status: next }).eq('id', order.id);
     if (error) toast.error(error.message);
-    else toast.success(next === 'preparing' ? 'Order accepted' : 'Order cancelled');
+    else {
+      toast.success(next === 'preparing' ? 'Order accepted' : 'Order cancelled');
+      onChange?.();
+    }
   }
 
   async function handleAssignRider(riderId: string) {
@@ -630,6 +639,7 @@ function AdminOrderRow({ order }: { order: OrderRow }) {
       } else {
         toast.success('Rider assigned · they will be notified');
         setShowRiderSelect(false);
+        onChange?.();
       }
     } finally {
       setAssigning(false);
