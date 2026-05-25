@@ -6,6 +6,7 @@ import {
   markArriving,
   markDelivered,
 } from '../lib/orderActions';
+import { useToast } from '../lib/toast';
 import OrderChat from './OrderChat';
 import { MotionButton } from './visual/Motion';
 import type { OrderRow } from '../lib/database.types';
@@ -23,13 +24,16 @@ export default function RiderOrderCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   async function handlePickup() {
     setSubmitting(true);
     try {
       const result = await markPickedUp(order.id, riderId);
       if (!result.ok) {
-        alert(`Error: ${result.error}`);
+        toast.error(result.error);
+      } else {
+        toast.success('Marked as picked up');
       }
     } finally {
       setSubmitting(false);
@@ -41,7 +45,9 @@ export default function RiderOrderCard({
     try {
       const result = await markArriving(order.id);
       if (!result.ok) {
-        alert(`Error: ${result.error}`);
+        toast.error(result.error);
+      } else {
+        toast.info('Customer notified that you\'re arriving');
       }
     } finally {
       setSubmitting(false);
@@ -53,7 +59,9 @@ export default function RiderOrderCard({
     try {
       const result = await markDelivered(order.id, riderId);
       if (!result.ok) {
-        alert(`Error: ${result.error}`);
+        toast.error(result.error);
+      } else {
+        toast.success('Delivery complete · +18 dh earned');
       }
     } finally {
       setSubmitting(false);

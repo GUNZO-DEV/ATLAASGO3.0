@@ -17,6 +17,7 @@ import {
   rejectAssignment,
 } from '../lib/orderActions';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../lib/toast';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton, MotionCard, MotionStagger, MotionStaggerItem, MotionPop, AnimatePresence } from '../components/visual/Motion';
 import RiderOrderCard from '../components/RiderOrderCard';
@@ -397,11 +398,13 @@ function PendingOrderCard({
   const [submitting, setSubmitting] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState('');
+  const toast = useToast();
 
   async function handleAccept() {
     setSubmitting(true);
     const res = await acceptAssignment(order.id, riderId);
-    if (!res.ok) alert(res.error);
+    if (!res.ok) toast.error(res.error);
+    else toast.success('Trip accepted · pick up the order');
     setSubmitting(false);
   }
 
@@ -409,7 +412,8 @@ function PendingOrderCard({
     if (!reason.trim()) return;
     setSubmitting(true);
     const res = await rejectAssignment(order.id, riderId, reason.trim());
-    if (!res.ok) alert(res.error);
+    if (!res.ok) toast.error(res.error);
+    else toast.info('Trip declined');
     setSubmitting(false);
     setDeclining(false);
   }
@@ -541,7 +545,7 @@ function PoolOrderCard({
 
 export default function Rider() {
   return (
-    <RoleGate any={['rider', 'admin', 'super_admin']}>
+    <RoleGate any={['rider', 'admin', 'super_admin']} pendingKind="rider">
       <RiderShell />
     </RoleGate>
   );

@@ -1,9 +1,12 @@
-import { lazy, Suspense, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useI18n } from '../lib/i18n';
 import { useOrder } from '../lib/orders';
 import { useOrderAssignment } from '../lib/orderAssignment';
+import { cancelOrder } from '../lib/orderActions';
+import { useToast } from '../lib/toast';
+import { useAuth } from '../lib/auth';
 import type { OrderStatus } from '../lib/database.types';
 import OrderChat from '../components/OrderChat';
 import ReviewForm from '../components/ReviewForm';
@@ -28,12 +31,27 @@ const DEFAULT_CUSTOMER_COORDS = { lat: 33.5350, lng: -5.1106 }; // AUI Ifrane
 export default function Track() {
   const { id } = useParams<{ id?: string }>();
   const { t } = useI18n();
+  const { user } = useAuth();
   const { order, loading, error, stage } = useOrder(id);
   const { assignment, rider } = useOrderAssignment(id);
+  const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  const [cancelling, setCancelling] = useState(false);
+
+  // Show success toast on payment return
+  useEffect(() => {
+    if (params.get('paid') === '1') {
+      toast.success('Payment confirmed · your order is on its way!', { duration: 6000 });
+      const np = new URLSearchParams(params);
+      np.delete('paid');
+      setParams(np, { replace: true });
+    }
+  }, [params, setParams, toast]);
 
   const stageIndex = stage ? STAGES.findIndex((s) => s.key === stage) : 0;
   const eta = Math.max(0, (STAGES.length - 1 - stageIndex) * 4);
   const delivered = stage === 'delivered';
+  const cancellable = stage === 'ordered' && order?.customer_id === user?.id;
 
   const customerCoords = order?.coords ?? DEFAULT_CUSTOMER_COORDS;
   const headerLandmark = order?.driver_payload?.headerLandmark ?? 'Near the AUI gate';
@@ -43,6 +61,19 @@ export default function Track() {
     const count = order.items.reduce((acc, i) => acc + i.qty, 0);
     return `${count} item${count === 1 ? '' : 's'} from ${order.items[0].restaurantName}`;
   }, [order]);
+
+  async function handleCancel() {
+    if (!id) return;
+    if (!confirm('Cancel this order? You can\'t undo this.')) return;
+    setCancelling(true);
+    const res = await cancelOrder(id);
+    setCancelling(false);
+    if (!res.ok) {
+      toast.error(res.error || 'Could not cancel — try again');
+    } else {
+      toast.success('Order cancelled');
+    }
+  }
 
   return (
     <section className="page">
@@ -82,6 +113,35 @@ export default function Track() {
             <div style={{ marginTop: 8 }}>
               <Link to="/orders">View your orders</Link>
             </div>
+          </div>
+        )}
+
+        {/* Cancel order CTA — only while still 'ordered' */}
+        {cancellable && (
+          <div style={{
+            marginTop: 16,
+            padding: '14px 18px',
+            background: 'rgba(239,68,68,0.06)',
+            border: '1px dashed rgba(239,68,68,0.24)',
+            borderRadius: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 14,
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--fg-soft)', lineHeight: 1.45 }}>
+              <strong style={{ color: 'var(--fg)' }}>Change of mind?</strong> You can still cancel
+              before the restaurant starts preparing.
+            </div>
+            <MotionButton
+              className="btn btn-outline"
+              onClick={handleCancel}
+              disabled={cancelling}
+              style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#B91C1C' }}
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel order'}
+            </MotionButton>
           </div>
         )}
 

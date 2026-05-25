@@ -347,7 +347,7 @@ function MerchantShell() {
 
 export default function Merchant() {
   return (
-    <RoleGate any={['merchant', 'admin', 'super_admin']}>
+    <RoleGate any={['merchant', 'admin', 'super_admin']} pendingKind="merchant">
       <MerchantShell />
     </RoleGate>
   );

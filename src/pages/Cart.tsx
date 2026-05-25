@@ -6,15 +6,17 @@ import { useI18n } from '../lib/i18n';
 import { useAuth } from '../lib/auth';
 import { useCreateOrder } from '../lib/orders';
 import { useAddresses } from '../lib/customer';
+import { useToast } from '../lib/toast';
 import { IS_STRIPE_CONFIGURED } from '../lib/stripe';
 import { supabase } from '../lib/supabase';
 import type { AddressRow, Coords } from '../lib/database.types';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton, MotionCard, MotionFade, AnimatePresence, motion } from '../components/visual/Motion';
 
-type PayMethod = 'card' | 'cash';
+type PayMethod = 'card' | 'cash' | 'wallet';
 
 const MIN_LANDMARK = 3;
+const MIN_ORDER_DH = 30; // Minimum order subtotal
 
 const SUGGESTIONS = [
   'AUI Dorm 16',
@@ -39,6 +41,7 @@ export default function CartPage() {
   const { create, submitting, error } = useCreateOrder();
   const { addresses } = useAddresses();
   const nav = useNavigate();
+  const toast = useToast();
 
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'saved' | 'new'>('new');
@@ -49,7 +52,30 @@ export default function CartPage() {
   const [locStatus, setLocStatus] = useState<'idle' | 'requesting' | 'denied' | 'error'>('idle');
   const [locError, setLocError] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<PayMethod>(IS_STRIPE_CONFIGURED ? 'card' : 'cash');
+  const [phoneOnFile, setPhoneOnFile] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [useWalletCredit, setUseWalletCredit] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoApplied, setPromoApplied] = useState<string | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const wasCancelled = searchParams.get('cancelled') === '1';
+
+  // Load phone + wallet balance once user is known
+  useEffect(() => {
+    if (!user) {
+      setPhoneOnFile(null);
+      setWalletBalance(0);
+      return;
+    }
+    void Promise.all([
+      supabase.from('profiles').select('phone').eq('id', user.id).maybeSingle(),
+      supabase.from('wallets').select('balance_dh').eq('user_id', user.id).maybeSingle(),
+    ]).then(([{ data: p }, { data: w }]) => {
+      setPhoneOnFile((p as { phone?: string | null } | null)?.phone ?? null);
+      setWalletBalance((w as { balance_dh?: number } | null)?.balance_dh ?? 0);
+    });
+  }, [user]);
 
   // Auto-select default saved address if user has any
   useEffect(() => {
@@ -66,7 +92,22 @@ export default function CartPage() {
     mode === 'saved' ? (selectedAddress?.landmark ?? selectedAddress?.label ?? '') : landmark;
   const effectiveCoords = mode === 'saved' ? selectedAddress?.coords ?? null : coords;
   const landmarkOk = effectiveLandmark.trim().length >= MIN_LANDMARK;
-  const canSubmit = items.length > 0 && landmarkOk && !!effectiveCoords && !submitting;
+  const phoneOk = !!phoneOnFile && phoneOnFile.length >= 8;
+  const subtotalOk = subtotal >= MIN_ORDER_DH;
+
+  // Wallet credit applied (capped to total before wallet)
+  const totalBeforeWallet = Math.max(0, subtotal + deliveryFee + serviceFee - promoDiscount);
+  const walletCredit = useWalletCredit ? Math.min(walletBalance, totalBeforeWallet) : 0;
+  const finalTotal = Math.max(0, totalBeforeWallet - walletCredit);
+  const fullyCoveredByWallet = walletCredit > 0 && finalTotal === 0;
+
+  const canSubmit =
+    items.length > 0 &&
+    landmarkOk &&
+    !!effectiveCoords &&
+    !submitting &&
+    phoneOk &&
+    subtotalOk;
 
   async function captureCoords() {
     if (!('geolocation' in navigator)) {
@@ -93,12 +134,82 @@ export default function CartPage() {
     );
   }
 
+  async function applyPromo() {
+    const code = promoCode.trim().toUpperCase();
+    if (!code) return;
+    setPromoChecking(true);
+    try {
+      const { data, error } = await supabase
+        .from('promotions')
+        .select('code,kind,percent_off,flat_off_dh,min_subtotal_dh,is_active,valid_to,max_redemptions,redemptions')
+        .eq('code', code)
+        .maybeSingle();
+      if (error || !data) {
+        toast.error('Invalid promo code');
+        return;
+      }
+      const promo = data as {
+        code: string;
+        kind: 'percent_off' | 'flat_off' | 'free_delivery' | 'bogo';
+        percent_off: number | null;
+        flat_off_dh: number | null;
+        min_subtotal_dh: number;
+        is_active: boolean;
+        valid_to: string | null;
+        max_redemptions: number | null;
+        redemptions: number;
+      };
+      if (!promo.is_active) { toast.error('This promo code is no longer active'); return; }
+      if (promo.valid_to && new Date(promo.valid_to) < new Date()) {
+        toast.error('This promo code has expired'); return;
+      }
+      if (promo.max_redemptions && promo.redemptions >= promo.max_redemptions) {
+        toast.error('This promo code has reached its limit'); return;
+      }
+      if (subtotal < promo.min_subtotal_dh) {
+        toast.error(`Add ${promo.min_subtotal_dh - subtotal} dh more to use this code`);
+        return;
+      }
+      let discount = 0;
+      if (promo.kind === 'percent_off' && promo.percent_off) {
+        discount = Math.round((subtotal * promo.percent_off) / 100);
+      } else if (promo.kind === 'flat_off' && promo.flat_off_dh) {
+        discount = promo.flat_off_dh;
+      } else if (promo.kind === 'free_delivery') {
+        discount = deliveryFee;
+      }
+      setPromoDiscount(discount);
+      setPromoApplied(code);
+      toast.success(`Promo applied: -${discount} dh`);
+    } finally {
+      setPromoChecking(false);
+    }
+  }
+
+  function clearPromo() {
+    setPromoDiscount(0);
+    setPromoApplied(null);
+    setPromoCode('');
+  }
+
   async function checkout() {
     if (!user) {
       nav(`/auth?next=${encodeURIComponent('/cart')}`);
       return;
     }
-    if (!effectiveCoords || !landmarkOk) return;
+    if (!subtotalOk) {
+      toast.warn(`Minimum order is ${MIN_ORDER_DH} dh — add a bit more.`);
+      return;
+    }
+    if (!phoneOk) {
+      toast.warn('Add a phone number in your account before checking out.');
+      nav('/account?next=/cart');
+      return;
+    }
+    if (!effectiveCoords || !landmarkOk) {
+      toast.warn('Set a landmark and pin your location first.');
+      return;
+    }
 
     const orderId = await create({
       items,
@@ -108,11 +219,51 @@ export default function CartPage() {
       subtotalDh: subtotal,
       deliveryFeeDh: deliveryFee,
       serviceFeeDh: serviceFee,
-      totalDh: total,
+      totalDh: finalTotal,
     });
-    if (!orderId) return;
+    if (!orderId) {
+      toast.error(error || 'Could not place the order — try again');
+      return;
+    }
 
-    if (payMethod === 'card' && IS_STRIPE_CONFIGURED) {
+    // Persist promo + wallet usage on the order row
+    if (promoApplied || walletCredit > 0) {
+      await supabase
+        .from('orders')
+        .update({
+          promotion_code: promoApplied,
+          payment_method: walletCredit > 0 && finalTotal === 0 ? 'wallet' : payMethod,
+        })
+        .eq('id', orderId);
+    }
+
+    // Apply wallet credit immediately as a wallet_transactions row
+    if (walletCredit > 0) {
+      await supabase.from('wallet_transactions').insert({
+        user_id: user.id,
+        order_id: orderId,
+        kind: 'order_payment',
+        amount_dh: -walletCredit,
+        note: `Order ${orderId.slice(0, 8).toUpperCase()}`,
+      });
+      await supabase
+        .from('wallets')
+        .update({ balance_dh: walletBalance - walletCredit })
+        .eq('user_id', user.id);
+    }
+
+    // Increment promo redemption count (best-effort, non-blocking)
+    if (promoApplied) {
+      void supabase.rpc('increment_promo_redemption', { promo_code: promoApplied });
+    }
+
+    // Route based on remaining balance
+    if (fullyCoveredByWallet) {
+      // Whole order paid from wallet — straight to tracking
+      clear();
+      toast.success('Order placed · paid from wallet');
+      nav(`/track/${orderId}`);
+    } else if (payMethod === 'card' && IS_STRIPE_CONFIGURED) {
       // Redirect to our premium checkout page
       clear();
       nav(`/checkout/${orderId}`);
@@ -123,6 +274,7 @@ export default function CartPage() {
         .update({ payment_method: 'cash' })
         .eq('id', orderId);
       clear();
+      toast.success('Order placed · pay on delivery');
       nav(`/track/${orderId}`);
     }
   }
@@ -418,10 +570,186 @@ export default function CartPage() {
                 <span>{t('cart.service')}</span>
                 <span>{serviceFee} dh</span>
               </div>
+              {promoDiscount > 0 && (
+                <div className="sum-row" style={{ color: '#059669', fontWeight: 600 }}>
+                  <span>Promo · {promoApplied}</span>
+                  <span>−{promoDiscount} dh</span>
+                </div>
+              )}
+              {walletCredit > 0 && (
+                <div className="sum-row" style={{ color: '#4F46E5', fontWeight: 600 }}>
+                  <span>Wallet credit</span>
+                  <span>−{walletCredit} dh</span>
+                </div>
+              )}
               <div className="sum-row total">
                 <span>{t('cart.total')}</span>
-                <span>{total} dh</span>
+                <span>{finalTotal} dh</span>
               </div>
+
+              {/* ── Min-order warning ── */}
+              {!subtotalOk && (
+                <div
+                  style={{
+                    margin: '14px 0 4px',
+                    padding: '10px 12px',
+                    background: 'rgba(245,158,11,0.08)',
+                    border: '1px solid rgba(245,158,11,0.20)',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    color: '#B45309',
+                    lineHeight: 1.45,
+                    fontWeight: 600,
+                  }}
+                >
+                  Minimum order is {MIN_ORDER_DH} dh — add {MIN_ORDER_DH - subtotal} dh more to checkout.
+                </div>
+              )}
+
+              {/* ── Phone-missing warning ── */}
+              {user && !phoneOk && (
+                <div
+                  style={{
+                    margin: '14px 0 4px',
+                    padding: '12px 14px',
+                    background: 'rgba(245,158,11,0.08)',
+                    border: '1px solid rgba(245,158,11,0.20)',
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: '#B45309',
+                    lineHeight: 1.45,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <I.Phone size={16} style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <strong>Add a phone number</strong> so your rider can reach you.{' '}
+                    <Link to="/account?next=/cart" style={{ color: 'var(--primary)', fontWeight: 700 }}>
+                      Add now
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Promo code ── */}
+              <div style={{ margin: '18px 0 8px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-soft)', marginBottom: 8 }}>
+                  Promo code
+                </div>
+                {promoApplied ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 14px',
+                      background: 'rgba(5,150,105,0.08)',
+                      border: '1px solid rgba(5,150,105,0.24)',
+                      borderRadius: 12,
+                    }}
+                  >
+                    <I.Check size={14} style={{ color: '#059669' }} />
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#059669' }}>
+                      {promoApplied} applied · −{promoDiscount} dh
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearPromo}
+                      style={{
+                        background: 'none',
+                        border: 0,
+                        cursor: 'pointer',
+                        color: 'var(--fg-soft)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="WELCOME50"
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--line)',
+                        borderRadius: 12,
+                        fontSize: 13,
+                        fontFamily: 'inherit',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={applyPromo}
+                      disabled={!promoCode.trim() || promoChecking}
+                      className="btn btn-outline"
+                      style={{ padding: '0 16px', fontSize: 13 }}
+                    >
+                      {promoChecking ? '…' : 'Apply'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Wallet credit ── */}
+              {user && walletBalance > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setUseWalletCredit((v) => !v)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '12px 14px',
+                    background: useWalletCredit ? 'rgba(99,91,255,0.08)' : 'var(--surface)',
+                    border: `2px solid ${useWalletCredit ? '#635BFF' : 'var(--line)'}`,
+                    borderRadius: 14,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    marginTop: 8,
+                    transition: 'all .2s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: 'linear-gradient(135deg, #635BFF, #8E85FF)',
+                      display: 'grid', placeItems: 'center', color: 'white', flexShrink: 0,
+                    }}
+                  >
+                    <I.Wallet size={16} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      Use wallet credit{useWalletCredit && walletCredit > 0 ? ` · −${walletCredit} dh` : ''}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-soft)' }}>
+                      Balance: {walletBalance} dh
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: 22, height: 22, borderRadius: 6,
+                      border: `2px solid ${useWalletCredit ? '#635BFF' : 'var(--line)'}`,
+                      background: useWalletCredit ? '#635BFF' : 'transparent',
+                      display: 'grid', placeItems: 'center', color: 'white',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {useWalletCredit && <I.Check size={12} />}
+                  </div>
+                </button>
+              )}
 
               {/* ── Payment method selector ── */}
               <div style={{ margin: '18px 0 8px' }}>
@@ -518,13 +846,19 @@ export default function CartPage() {
                   ? 'Placing order…'
                   : !user
                     ? 'Sign in to checkout'
-                    : !effectiveCoords
-                      ? 'Capture GPS first'
-                      : !landmarkOk
-                        ? 'Add a landmark'
-                        : payMethod === 'card'
-                          ? `Pay ${total} dh`
-                          : `Order · ${total} dh (cash)`}{' '}
+                    : !subtotalOk
+                      ? `Add ${MIN_ORDER_DH - subtotal} dh more`
+                      : !phoneOk
+                        ? 'Add phone in account'
+                        : !effectiveCoords
+                          ? 'Capture GPS first'
+                          : !landmarkOk
+                            ? 'Add a landmark'
+                            : fullyCoveredByWallet
+                              ? `Place order · paid from wallet`
+                              : payMethod === 'card'
+                                ? `Pay ${finalTotal} dh`
+                                : `Order · ${finalTotal} dh (cash)`}{' '}
                 <I.Arrow />
               </MotionButton>
               <p

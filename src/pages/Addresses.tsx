@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { useAddresses } from '../lib/customer';
+import { useToast } from '../lib/toast';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton } from '../components/visual/Motion';
 import type { Coords } from '../lib/database.types';
@@ -30,6 +31,7 @@ export default function AddressesPage() {
   const { user, loading: authLoading } = useAuth();
   const { addresses, save, remove, setDefault, loading } = useAddresses();
   const nav = useNavigate();
+  const toast = useToast();
 
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState('');
@@ -54,15 +56,18 @@ export default function AddressesPage() {
           lng: pos.coords.longitude,
           accuracyM: pos.coords.accuracy,
         }),
-      (err) => alert(err.message),
+      (err) => toast.error(err.message),
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }
 
   async function onSave() {
-    if (!label.trim() || !line1.trim() || !coords) return;
+    if (!label.trim() || !line1.trim() || !coords) {
+      toast.warn('Label, address and GPS pin are required');
+      return;
+    }
     setBusy(true);
-    await save({
+    const id = await save({
       label: label.trim(),
       line1: line1.trim(),
       building: building.trim() || null,
@@ -73,14 +78,19 @@ export default function AddressesPage() {
       is_campus: isCampus,
     });
     setBusy(false);
-    setLabel('');
-    setLine1('');
-    setBuilding('');
-    setRoom('');
-    setLandmark('');
-    setCoords(null);
-    setIsCampus(false);
-    setAdding(false);
+    if (id) {
+      toast.success(`Address "${label.trim()}" saved`);
+      setLabel('');
+      setLine1('');
+      setBuilding('');
+      setRoom('');
+      setLandmark('');
+      setCoords(null);
+      setIsCampus(false);
+      setAdding(false);
+    } else {
+      toast.error('Could not save address — try again');
+    }
   }
 
   return (

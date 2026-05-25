@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as I from '../icons/Icon';
 import { markPreparing } from '../lib/orderActions';
+import { useToast } from '../lib/toast';
 import OrderChat from './OrderChat';
 import { MotionButton } from './visual/Motion';
 import type { OrderRow } from '../lib/database.types';
@@ -8,6 +9,7 @@ import type { OrderRow } from '../lib/database.types';
 export default function MerchantOrderCard({ order }: { order: OrderRow }) {
   const [expanded, setExpanded] = useState(false);
   const [marking, setMarking] = useState(false);
+  const toast = useToast();
 
   const ageMin = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000);
   const urgent = ageMin >= 12;
@@ -17,7 +19,9 @@ export default function MerchantOrderCard({ order }: { order: OrderRow }) {
     try {
       const result = await markPreparing(order.id);
       if (!result.ok) {
-        alert(`Error: ${result.error}`);
+        toast.error(result.error);
+      } else {
+        toast.success('Marked ready · waiting for rider');
       }
     } finally {
       setMarking(false);

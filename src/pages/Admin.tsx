@@ -13,6 +13,7 @@ import {
 } from '../lib/admin';
 import { assignRider } from '../lib/orderActions';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../lib/toast';
 import type { OrderRow, AppRole } from '../lib/database.types';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton } from '../components/visual/Motion';
@@ -612,9 +613,12 @@ function AdminOrderRow({ order }: { order: OrderRow }) {
   const { riders } = useAvailableRiders();
   const [showRiderSelect, setShowRiderSelect] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const toast = useToast();
 
   async function quickAction(next: 'preparing' | 'cancelled') {
-    await supabase.from('orders').update({ status: next }).eq('id', order.id);
+    const { error } = await supabase.from('orders').update({ status: next }).eq('id', order.id);
+    if (error) toast.error(error.message);
+    else toast.success(next === 'preparing' ? 'Order accepted' : 'Order cancelled');
   }
 
   async function handleAssignRider(riderId: string) {
@@ -622,8 +626,9 @@ function AdminOrderRow({ order }: { order: OrderRow }) {
     try {
       const result = await assignRider(order.id, riderId);
       if (!result.ok) {
-        alert(`Error: ${result.error}`);
+        toast.error(result.error);
       } else {
+        toast.success('Rider assigned · they will be notified');
         setShowRiderSelect(false);
       }
     } finally {

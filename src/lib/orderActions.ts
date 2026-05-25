@@ -1,6 +1,28 @@
 import { supabase } from './supabase';
 import type { OrderStatus } from './database.types';
 
+/** Best-effort customer notification on order state change. */
+async function notifyCustomer(
+  orderId: string,
+  title: string,
+  body: string,
+): Promise<void> {
+  const { data } = await supabase
+    .from('orders')
+    .select('customer_id')
+    .eq('id', orderId)
+    .maybeSingle();
+  const customerId = (data as { customer_id?: string } | null)?.customer_id;
+  if (!customerId) return;
+  void supabase.from('notifications').insert({
+    user_id: customerId,
+    kind: 'order_status',
+    title,
+    body,
+    payload: { order_id: orderId },
+  });
+}
+
 /**
  * The order workflow state machine. Transitions are enforced both here (UX
  * guardrail) and in Postgres CHECK constraints + RLS (security guardrail).
@@ -42,6 +64,7 @@ export async function markPreparing(orderId: string): Promise<ActionResult> {
     .update({ status: 'preparing' as OrderStatus })
     .eq('id', orderId);
   if (error) return err(error);
+  void notifyCustomer(orderId, 'Order accepted', 'The restaurant is preparing your order.');
   return ok();
 }
 
@@ -61,6 +84,25 @@ export async function assignRider(
     .from('order_assignments')
     .insert({ order_id: orderId, rider_id: riderId, is_active: true });
   if (insErr) return err(insErr);
+
+  // Resolve rider's user_id (rider_id is the riders.id PK, not the user id)
+  const { data: riderRow } = await supabase
+    .from('riders')
+    .select('user_id')
+    .eq('id', riderId)
+    .maybeSingle();
+  const riderUserId = (riderRow as { user_id?: string } | null)?.user_id;
+
+  // Notify the rider (best-effort, non-blocking)
+  if (riderUserId) {
+    void supabase.from('notifications').insert({
+      user_id: riderUserId,
+      kind: 'rider_assignment',
+      title: 'New trip assigned',
+      body: `Order #${orderId.slice(0, 6).toUpperCase()} — open the rider dashboard to accept.`,
+      payload: { order_id: orderId },
+    });
+  }
   // Don't change order status — rider must accept first
   return ok();
 }
@@ -80,6 +122,7 @@ export async function acceptAssignment(orderId: string, riderId: string): Promis
     .update({ status: 'enRoute' as OrderStatus })
     .eq('id', orderId);
   if (oErr) return err(oErr);
+  void notifyCustomer(orderId, 'Driver assigned', 'Your driver is on the way to the restaurant.');
   return ok();
 }
 
@@ -98,6 +141,7 @@ export async function markPickedUp(orderId: string, riderId: string): Promise<Ac
     .update({ status: 'outForDelivery' as OrderStatus })
     .eq('id', orderId);
   if (oErr) return err(oErr);
+  void notifyCustomer(orderId, 'Out for delivery', 'Your driver has picked up the order.');
   return ok();
 }
 
@@ -108,6 +152,7 @@ export async function markArriving(orderId: string): Promise<ActionResult> {
     .update({ status: 'arriving' as OrderStatus })
     .eq('id', orderId);
   if (error) return err(error);
+  void notifyCustomer(orderId, 'Arriving now', 'Your driver is 1–2 minutes away.');
   return ok();
 }
 
@@ -126,6 +171,7 @@ export async function markDelivered(orderId: string, riderId: string): Promise<A
     .update({ status: 'delivered' as OrderStatus })
     .eq('id', orderId);
   if (oErr) return err(oErr);
+  void notifyCustomer(orderId, 'Delivered ✓', 'Enjoy your meal! Leave a review for your driver.');
   return ok();
 }
 

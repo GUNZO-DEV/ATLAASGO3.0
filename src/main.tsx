@@ -8,6 +8,7 @@ import { ThemeProvider } from './lib/theme';
 import { I18nProvider } from './lib/i18n';
 import { AuthProvider } from './lib/auth';
 import { RolesProvider } from './lib/roles';
+import { ToastProvider } from './lib/toast';
 import SmoothScroll from './components/SmoothScroll';
 import ErrorBoundary from './components/ErrorBoundary';
 import { registerSW } from './lib/pwa';
@@ -36,13 +37,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         >
           <ThemeProvider>
             <I18nProvider>
-              <AuthProvider>
-                <RolesProvider>
-                  <SmoothScroll>
-                    <App />
-                  </SmoothScroll>
-                </RolesProvider>
-              </AuthProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <RolesProvider>
+                    <SmoothScroll>
+                      <App />
+                    </SmoothScroll>
+                  </RolesProvider>
+                </AuthProvider>
+              </ToastProvider>
             </I18nProvider>
           </ThemeProvider>
         </ClerkProvider>

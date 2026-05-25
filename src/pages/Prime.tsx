@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../lib/toast';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton, MotionCard, MotionPop } from '../components/visual/Motion';
 import type { PrimeTier } from '../lib/database.types';
@@ -54,6 +55,7 @@ const TIERS: Array<{
 export default function PrimePage() {
   const { user } = useAuth();
   const nav = useNavigate();
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const [active, setActive] = useState<PrimeTier | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -122,13 +124,13 @@ export default function PrimePage() {
         },
       });
       if (error || !data?.url) {
-        alert('Could not start checkout. Try again.');
+        toast.error('Could not start checkout. Try again.');
         setBuying(null);
         return;
       }
       window.location.href = data.url;
     } catch {
-      alert('Network error. Check your connection.');
+      toast.error('Network error. Check your connection.');
       setBuying(null);
     }
   }

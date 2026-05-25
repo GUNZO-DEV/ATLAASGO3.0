@@ -164,13 +164,22 @@ export default function Nav() {
               )}
             </div>
           ) : (
-            <Link
-              className="btn btn-primary"
-              to="/auth"
-              style={{ padding: '10px 18px', fontSize: 13 }}
-            >
-              {t('nav.signin')}
-            </Link>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Link
+                className="btn btn-outline nav-signin"
+                to="/auth"
+                style={{ padding: '10px 14px', fontSize: 13 }}
+              >
+                {t('nav.signin')}
+              </Link>
+              <Link
+                className="btn btn-primary"
+                to="/auth?mode=signup"
+                style={{ padding: '10px 16px', fontSize: 13 }}
+              >
+                Sign up
+              </Link>
+            </div>
           )}
 
           <button
