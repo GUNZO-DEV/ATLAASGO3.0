@@ -4913,3 +4913,414 @@ input, select, textarea {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ============================================================ */
+/*           PRODUCTION-GRADE MOBILE PASS                      */
+/*  Goal: feels like a native iOS/Android app at ≤ 768px      */
+/* ============================================================ */
+
+@media (max-width: 768px) {
+
+  /* ── Body: edge-to-edge content ────────────────────────── */
+  body {
+    /* Make the page background the brand color so iOS status bar / rubber-band
+       feels integrated with the app, not "white site behind brown app" */
+    background: var(--bg);
+  }
+
+  /* ── Containers: less padding, more width ──────────────── */
+  .container {
+    padding: 0 18px !important;
+  }
+
+  /* ── Page layout: trim insane top padding (no big top hero band) ── */
+  .page {
+    padding: calc(72px + var(--safe-top)) 0 24px !important;
+    min-height: calc(100vh - 80px);
+  }
+  .page-hero {
+    padding: calc(72px + var(--safe-top)) 0 24px !important;
+  }
+
+  /* ── Page titles: tighter, mobile-feel ─────────────────── */
+  .page-title { font-size: 28px !important; line-height: 1.08 !important; letter-spacing: -0.02em !important; margin-top: 8px !important; }
+  .page-sub   { font-size: 14px !important; line-height: 1.5 !important; }
+  .section-tag { font-size: 10px !important; padding: 4px 10px !important; }
+
+  /* ── Native press feedback on cards / buttons ──────────── */
+  .btn, .icon-btn, .legend-card, .resto-card, .persona, .cart-item,
+  .driver-card-pro, .order-row, .tabbar-item, .nav-drawer-panel a,
+  .account-link, .account-card, .address-card, button[type="button"],
+  a.btn, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s cubic-bezier(.16,1,.3,1), box-shadow 0.18s;
+  }
+  .btn:active,
+  .icon-btn:active,
+  .legend-card:active,
+  .resto-card:active,
+  .persona:active,
+  .driver-card-pro:active,
+  .tabbar-item:active,
+  .account-link:active,
+  button[type="button"]:active,
+  a.btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ── Top nav: compact, transparent on scroll ───────────── */
+  .nav-wrap {
+    top: 6px !important;
+    padding: 0 8px;
+  }
+  .nav {
+    padding: 8px 12px !important;
+    border-radius: 14px !important;
+  }
+  .nav-logo { gap: 7px !important; }
+  .nav-logo span:last-child { font-size: 15px !important; }
+  .logo-mark { width: 28px !important; height: 28px !important; }
+
+  /* Hide most top-nav icons on mobile — bottom tab bar handles them */
+  .nav-links { display: none !important; }
+  .nav-actions .lang-pill,
+  .nav-actions [aria-label="Toggle theme"],
+  .nav-actions [aria-label="Notifications"] {
+    display: none !important;
+  }
+  /* Keep only: cart icon + auth CTA (if logged out) + menu */
+  /* When logged in, also hide the account dropdown trigger — tab bar Account tab handles it */
+  .nav-actions .nav-user-label { display: none !important; }
+
+  /* ── Hero: mobile composition ─────────────────────────── */
+  .hero {
+    padding-top: calc(80px + var(--safe-top)) !important;
+    padding-bottom: 28px !important;
+    min-height: auto !important;
+  }
+  .hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 9vw, 42px) !important;
+    line-height: 1.05 !important;
+    letter-spacing: -0.025em !important;
+  }
+  .hero .lead {
+    font-size: 14.5px !important;
+    line-height: 1.55 !important;
+  }
+  .hero-stage {
+    min-height: 360px !important;
+    transform: scale(0.85);
+    transform-origin: top center;
+    margin-top: -12px;
+  }
+  /* Reduce float-card clutter on small screens */
+  .float-card.fc-4 { display: none; }
+  .float-card { transform: scale(0.85); }
+  .svc-toggle { width: 100%; }
+  .cta-row { gap: 10px !important; }
+  .cta-row .btn { flex: 1; }
+  .trust-row {
+    margin-top: 22px !important;
+    padding: 14px 16px !important;
+    gap: 14px !important;
+  }
+  .trust-stat .num { font-size: 22px !important; }
+  .trust-stat .lbl { font-size: 10px !important; }
+
+  /* ── Restaurant grids: single column with bigger cards ── */
+  .resto-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .resto-card .resto-img {
+    height: 180px !important;
+  }
+  .resto-card .resto-body {
+    padding: 14px 16px !important;
+  }
+  .resto-name {
+    font-size: 16px !important;
+  }
+
+  /* Local legends become horizontal scroll snap ─────────── */
+  .legends-rail {
+    padding: 0 18px 8px !important;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+  }
+  .legend-card {
+    flex: 0 0 80% !important;
+    scroll-snap-align: start;
+  }
+
+  /* Cuisine chips: scroll horizontally, snap, no scrollbar */
+  .cuisine-filter {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 4px;
+    margin-bottom: 18px;
+  }
+  .cuisine-chip {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+
+  /* Restaurant page (the menu screen) ────────────────────── */
+  .resto-hero {
+    height: 220px !important;
+  }
+
+  /* ── Cart: full-bleed cards ────────────────────────────── */
+  .cart-grid {
+    gap: 16px !important;
+  }
+  .cart-list {
+    border-radius: 16px !important;
+  }
+  .cart-summary {
+    border-radius: 16px !important;
+    padding: 18px !important;
+  }
+  .cart-item {
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+  .cart-thumb {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 12px !important;
+    flex-shrink: 0;
+  }
+
+  /* ── Track page mobile: hero compact, map prominent ───── */
+  .track-eta {
+    display: none !important; /* hero already has the big number */
+  }
+  .track-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .timeline {
+    border-radius: 18px !important;
+    padding: 16px !important;
+  }
+  .rider-card-pro {
+    border-radius: 16px !important;
+  }
+
+  /* ── Orders list: tap-friendly ─────────────────────────── */
+  .empty-state {
+    padding: 36px 20px !important;
+    border-radius: 18px !important;
+  }
+  .empty-state h3 {
+    font-size: 18px !important;
+  }
+
+  /* ── Auth page: stack & breathe ────────────────────────── */
+  .auth-page-grid {
+    grid-template-columns: 1fr !important;
+    gap: 22px !important;
+  }
+  .auth-side {
+    text-align: center;
+  }
+  .auth-side-title {
+    font-size: 26px !important;
+  }
+  .auth-card {
+    padding: 22px !important;
+    border-radius: 20px !important;
+  }
+
+  /* ── Account: stack & breathe ──────────────────────────── */
+  .account-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .account-card {
+    padding: 20px !important;
+    border-radius: 18px !important;
+  }
+  .account-link {
+    padding: 14px 16px !important;
+  }
+
+  /* ── Admin, Rider, Merchant: full-width ────────────────── */
+  .admin-shell, .rider-shell, .merchant-shell {
+    padding: 0 !important;
+  }
+
+  /* ── Sections: tighter on mobile ───────────────────────── */
+  section.bloc {
+    padding: 48px 0 !important;
+  }
+  .section-title {
+    font-size: 24px !important;
+    line-height: 1.15 !important;
+  }
+  .section-sub {
+    font-size: 14px !important;
+  }
+
+  /* ── Footer: less padding ──────────────────────────────── */
+  .foot {
+    padding: 36px 18px calc(28px + var(--safe-bot)) !important;
+  }
+  .foot-grid {
+    gap: 28px !important;
+  }
+  .foot-bottom {
+    margin-top: 36px !important;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* ── Bottom-sheet style modals ─────────────────────────── */
+  .modal,
+  [role="dialog"]:not(.nav-drawer-panel):not(.cl-rootBox) {
+    border-radius: 24px 24px 0 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 90vh !important;
+    animation: sheet-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+  @keyframes sheet-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* ── Confetti for delivered orders & celebrations ─────── */
+  .hero-eta-num,
+  .checkout-total-amount {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Improve text rendering on retina ──────────────────── */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ── Sticky nav-wrap doesn't overlap content ──────────── */
+  .nav-wrap {
+    background: transparent;
+  }
+
+  /* ── Persona cards: single column ──────────────────────── */
+  .tri-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .persona {
+    padding: 26px 22px !important;
+    border-radius: 22px !important;
+  }
+  .persona h3 {
+    font-size: 22px !important;
+  }
+  .persona-deco {
+    display: none !important;
+  }
+
+  /* ── How it works: single column ───────────────────────── */
+  .how-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .how-card {
+    padding: 20px !important;
+  }
+
+  /* ── Sticky nav stays compact on scroll ────────────────── */
+  .nav.scrolled {
+    padding: 6px 12px !important;
+  }
+
+  /* ── Disable expensive parallax animations on small ──── */
+  .mountain-layer {
+    will-change: auto;
+  }
+
+  /* ── Skeleton lines render bigger on mobile ────────────── */
+  .skeleton-line {
+    height: 14px;
+    margin-top: 8px;
+    border-radius: 8px;
+  }
+
+  /* ── PWA banner on mobile ──────────────────────────────── */
+  .edge-hero {
+    padding: 48px 18px 60px !important;
+  }
+  .edge-hero-title {
+    font-size: 30px !important;
+    line-height: 1.05 !important;
+  }
+  .edge-hero-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  .edge-hero-btn {
+    width: 100%;
+  }
+  .edge-hero-personas {
+    flex-direction: column;
+    width: 100%;
+  }
+  .edge-persona-pill {
+    justify-content: center;
+  }
+}
+
+/* ── Extra-small phones (< 380px) ─────────────────────────── */
+@media (max-width: 380px) {
+  .hero h1 { font-size: clamp(28px, 8vw, 36px) !important; }
+  .page-title { font-size: 24px !important; }
+  .section-title { font-size: 22px !important; }
+  .container { padding: 0 14px !important; }
+  .tabbar-item { font-size: 9px !important; }
+  .tabbar-item svg { width: 18px !important; height: 18px !important; }
+}
+
+/* ── Tablet (768-1024) tweaks ─────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .container { max-width: 720px; }
+  .resto-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ── Forced-colors mode (Windows high contrast) ───────────── */
+@media (forced-colors: active) {
+  .btn-primary, .tabbar-item.active {
+    border: 2px solid ButtonText;
+  }
+}
+
+/* ── Hide marketing footer on mobile; bottom tab bar IS the navigation ─── */
+@media (max-width: 768px) {
+  .foot {
+    display: none;
+  }
+  /* Compact "made with love" line shown only on mobile */
+  body.has-tabbar main::after {
+    content: "AtlaasGo · Built in Ifrane 🏔";
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    color: var(--fg-soft);
+    padding: 16px 18px 24px;
+    opacity: 0.6;
+  }
+}

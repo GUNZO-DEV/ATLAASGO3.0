@@ -3,6 +3,21 @@ import { Link } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useI18n } from '../lib/i18n';
 import PhoneMockup from './PhoneMockup';
+import MobileHero from './MobileHero';
+
+/** Use matchMedia so we render the correct hero only ONCE per breakpoint */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => setMobile(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return mobile;
+}
 
 type Pt = [number, number];
 
@@ -29,11 +44,15 @@ function MountainLayer({ depth, color, height = 240, points }: { depth: 'far' | 
 }
 
 export default function Hero() {
+  const isMobile = useIsMobile();
   const [svc, setSvc] = useState<'food' | 'services'>('food');
   const stageRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
   const sunRef = useRef<HTMLDivElement>(null);
   const { t } = useI18n();
+
+  // ── Mobile: render the tight, thumb-friendly hero ─────────────
+  if (isMobile) return <MobileHero />;
 
   useEffect(() => {
     const stage = stageRef.current;
