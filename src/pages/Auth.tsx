@@ -4,6 +4,7 @@ import { SignIn, SignUp } from '@clerk/clerk-react';
 import * as I from '../icons/Icon';
 import { useAuth } from '../lib/auth';
 import { useRoles } from '../lib/roles';
+import { useSEO } from '../lib/seo';
 
 type Mode = 'signin' | 'signup';
 type SignupRole = 'customer' | 'rider' | 'merchant';
@@ -153,6 +154,7 @@ const ROLE_CARDS: Array<{
 ];
 
 export default function AuthPage() {
+  useSEO({ title: 'Sign in', description: 'Sign in or create your AtlaasGo account — customer, rider, or merchant.' });
   const { user, loading } = useAuth();
   const { roles, loading: rolesLoading } = useRoles();
   const nav = useNavigate();

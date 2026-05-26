@@ -4,6 +4,7 @@ import { LocalLegends, HowItWorks, Tripersona, PWABanner } from '../components/S
 import SocialProof from '../components/SocialProof';
 import InstallToast from '../components/InstallToast';
 import MobileHomeScreen from '../components/MobileHomeScreen';
+import { useSEO } from '../lib/seo';
 
 // Pinned-scroll narrative section — desktop only (heavy, scroll-locked)
 const PinnedStory = lazy(() => import('../components/visual/PinnedStory'));
@@ -50,6 +51,24 @@ function useIsMobile(): boolean {
 
 export default function Landing() {
   const isMobile = useIsMobile();
+  useSEO({
+    title: undefined,
+    description:
+      "AtlaasGo — Ifrane's premium delivery service. 28+ local partners, average 22-minute delivery, dorm-drop, cash or card. Built for AUI and the Atlas region.",
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'AtlaasGo',
+      url: 'https://atlaasgo.com',
+      logo: 'https://atlaasgo.com/icons/icon-512.png',
+      sameAs: [],
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Ifrane',
+        addressCountry: 'MA',
+      },
+    },
+  });
 
   // ── Mobile: a single, curated app-feel landing screen ────────────
   if (isMobile) {

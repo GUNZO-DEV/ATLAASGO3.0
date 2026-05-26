@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import Nav from './components/Nav';
 import Footer from './components/Footer';
 import MobileTabBar from './components/MobileTabBar';
+import InstallToast from './components/InstallToast';
 
 /* ── Only the landing page is eagerly loaded ─────────────────────── */
 import Landing from './pages/Landing';
@@ -62,8 +63,9 @@ export default function App() {
 
   return (
     <>
+      <a href="#main" className="skip-link">Skip to content</a>
       <Nav />
-      <main>
+      <main id="main" tabIndex={-1}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -92,6 +94,7 @@ export default function App() {
       </main>
       <Footer />
       <MobileTabBar />
+      <InstallToast />
     </>
   );
 }

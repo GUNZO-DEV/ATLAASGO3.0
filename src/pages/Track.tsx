@@ -15,6 +15,7 @@ import OrderReceipt from '../components/OrderReceipt';
 import DriverCard from '../components/DriverCard';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton } from '../components/visual/Motion';
+import { useSEO } from '../lib/seo';
 
 // Leaflet ships ~80 KB so we lazy-load it
 const TrackMap = lazy(() => import('../components/TrackMap'));
@@ -26,6 +27,7 @@ export default function Track() {
   const { user } = useAuth();
   const { order, loading, error, stage, mutate, refresh } = useOrder(id);
   const { assignment, rider } = useOrderAssignment(id);
+  useSEO({ title: `Order #${(id ?? '').slice(0, 6).toUpperCase()}`, noindex: true });
   const toast = useToast();
   const [params, setParams] = useSearchParams();
   const [cancelling, setCancelling] = useState(false);

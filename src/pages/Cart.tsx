@@ -2,6 +2,21 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useCart } from '../lib/cart';
+import MobileCart from '../components/MobileCart';
+import { useSEO } from '../lib/seo';
+
+function useIsMobile(): boolean {
+  const [m, setM] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => setM(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return m;
+}
 import { useI18n } from '../lib/i18n';
 import { useAuth } from '../lib/auth';
 import { useCreateOrder } from '../lib/orders';
@@ -28,6 +43,13 @@ const SUGGESTIONS = [
 ];
 
 export default function CartPage() {
+  const isMobile = useIsMobile();
+  useSEO({ title: 'Cart', noindex: true });
+  if (isMobile) return <MobileCart />;
+  return <DesktopCartPage />;
+}
+
+function DesktopCartPage() {
   const { t } = useI18n();
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);

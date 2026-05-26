@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useI18n } from '../lib/i18n';
@@ -6,6 +6,21 @@ import { useRestaurants, CUISINES } from '../lib/catalog';
 import { useFavorites } from '../lib/customer';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import type { RestaurantRow } from '../lib/database.types';
+import MobileOrder from '../components/MobileOrder';
+import { useSEO } from '../lib/seo';
+
+function useIsMobile(): boolean {
+  const [m, setM] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => setM(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return m;
+}
 
 const VARIANT_LABELS: Record<string, string> = {};
 
@@ -15,6 +30,16 @@ function tagClass(tag: string | null | undefined) {
 }
 
 export default function Order() {
+  const isMobile = useIsMobile();
+  useSEO({
+    title: 'Browse restaurants',
+    description: '28+ local Ifrane restaurants. Filter by cuisine, sort by fastest delivery, free delivery on first order.',
+  });
+  if (isMobile) return <MobileOrder />;
+  return <DesktopOrder />;
+}
+
+function DesktopOrder() {
   const { t } = useI18n();
   const [params] = useSearchParams();
   const isCampus = params.get('campus') === '1';

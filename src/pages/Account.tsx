@@ -8,6 +8,20 @@ import { useToast } from '../lib/toast';
 import { useMyApplications, type UserApplication } from '../lib/applications';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton } from '../components/visual/Motion';
+import MobileAccount from '../components/MobileAccount';
+
+function useIsMobile(): boolean {
+  const [m, setM] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => setM(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return m;
+}
 
 const APP_STATUS_META: Record<
   UserApplication['status'],
@@ -28,20 +42,28 @@ function isValidPhone(raw: string): boolean {
 }
 
 export default function AccountPage() {
+  const isMobile = useIsMobile();
   const { user, loading: authLoading, signOut } = useAuth();
   const { isRider, isMerchant, isAdmin } = useRoles();
   const { apps, loading: appsLoading } = useMyApplications();
   const nav = useNavigate();
   const toast = useToast();
 
+  useEffect(() => {
+    if (!authLoading && !user && !isMobile)
+      nav('/auth?next=/account', { replace: true });
+  }, [authLoading, user, nav, isMobile]);
+
+  if (isMobile && user) return <MobileAccount />;
+  if (isMobile && !user && !authLoading) {
+    nav('/auth?next=/account', { replace: true });
+    return null;
+  }
+
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [originalPhone, setOriginalPhone] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !user) nav('/auth?next=/account', { replace: true });
-  }, [authLoading, user, nav]);
 
   useEffect(() => {
     if (!user) return;

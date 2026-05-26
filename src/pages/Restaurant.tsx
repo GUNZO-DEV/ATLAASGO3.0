@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import * as I from '../icons/Icon';
 import { useRestaurant } from '../lib/catalog';
@@ -6,6 +7,21 @@ import { useI18n } from '../lib/i18n';
 import { useFavorites } from '../lib/customer';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton } from '../components/visual/Motion';
+import MobileRestaurant from '../components/MobileRestaurant';
+import { useSEO } from '../lib/seo';
+
+function useIsMobile(): boolean {
+  const [m, setM] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => setM(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return m;
+}
 
 const HEADER_GRADS: Record<number, string> = {
   0: 'linear-gradient(135deg, var(--amber), var(--primary))',
@@ -32,6 +48,32 @@ export default function RestaurantPage() {
   const nav = useNavigate();
   const { has: isFav, toggle: toggleFav } = useFavorites('restaurant');
   const { has: isItemFav, toggle: toggleItemFav } = useFavorites('menu_item');
+  const isMobile = useIsMobile();
+
+  useSEO({
+    title: restaurant ? `${restaurant.name} · ${restaurant.cuisine}` : 'Restaurant',
+    description: restaurant
+      ? `${restaurant.name} in Ifrane — ${restaurant.cuisine}${restaurant.description ? '. ' + restaurant.description.slice(0, 130) : ''}`
+      : undefined,
+    jsonLd: restaurant
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'Restaurant',
+          name: restaurant.name,
+          servesCuisine: restaurant.cuisine_tags,
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: restaurant.rating,
+            bestRating: 5,
+          },
+          address: { '@type': 'PostalAddress', addressLocality: 'Ifrane', addressCountry: 'MA' },
+        }
+      : undefined,
+  });
+
+  if (!loading && restaurant && isMobile) {
+    return <MobileRestaurant restaurant={restaurant} />;
+  }
 
   if (loading) {
     return (
