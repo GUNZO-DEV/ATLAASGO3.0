@@ -62,7 +62,7 @@ export function useMyApplications() {
 
       // Subscribe to changes (admin approves → user sees update live)
       channel = supabase
-        .channel(`my_apps:${user.id}`)
+        .channel(`my_apps:${user.id}:${Math.random().toString(36).slice(2)}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'rider_applications', filter: `applicant_id=eq.${user.id}` },

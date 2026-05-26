@@ -83,7 +83,7 @@ function MerchantShell() {
   useEffect(() => {
     void refreshOrders();
     const channel = supabase
-      .channel('merchant_live')
+      .channel(`merchant_live:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },

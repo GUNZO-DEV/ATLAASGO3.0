@@ -51,7 +51,7 @@ export function useOrderChat(orderId: string | undefined) {
       });
 
     const channel = supabase
-      .channel(`order_messages:${orderId}`)
+      .channel(`order_messages:${orderId}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

@@ -46,7 +46,7 @@ export function RolesProvider({ children }: { children: ReactNode }) {
 
     // Subscribe so admin role-grants reflect live without a refresh
     channel = supabase
-      .channel(`my_roles:${user.id}`)
+      .channel(`my_roles:${user.id}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${user.id}` },

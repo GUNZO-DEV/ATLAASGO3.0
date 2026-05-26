@@ -29,7 +29,7 @@ export function useAdminOrders(filter: AdminOrderFilter = 'live') {
     void refresh();
 
     const channel = supabase
-      .channel(`admin_orders:${filter}`)
+      .channel(`admin_orders:${filter}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
@@ -372,7 +372,7 @@ export function useAvailableRiders() {
   useEffect(() => {
     void refresh();
     const channel = supabase
-      .channel('available_riders')
+      .channel(`available_riders:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'riders' },

@@ -171,8 +171,11 @@ export function useNotifications() {
       setItems((data ?? []) as NotificationRow[]);
       setLoading(false);
 
+      // Unique suffix so multiple components calling this hook don't collide
+      // on the same channel name (causes "cannot add postgres_changes after
+      // subscribe()" errors).
       channel = supabase
-        .channel(`notifications:${user.id}`)
+        .channel(`notifications:${user.id}:${Math.random().toString(36).slice(2)}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },

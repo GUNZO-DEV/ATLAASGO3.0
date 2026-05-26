@@ -117,7 +117,7 @@ export function useOrder(orderId: string | undefined) {
     void refresh();
 
     const channel = supabase
-      .channel(`order:${orderId}`)
+      .channel(`order:${orderId}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
@@ -185,7 +185,7 @@ export function useOrdersList(limit = 20) {
       } = await supabase.auth.getUser();
       if (!user || cancelledRef.current) return;
       channel = supabase
-        .channel(`orders:${user.id}`)
+        .channel(`orders:${user.id}:${Math.random().toString(36).slice(2)}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'orders', filter: `customer_id=eq.${user.id}` },

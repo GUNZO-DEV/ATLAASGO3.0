@@ -8,21 +8,60 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  recoverIn: number;
 }
 
+/**
+ * Top-level error boundary. Shows a branded "something went wrong" screen
+ * when a child component throws.
+ *
+ * Recovery strategy:
+ *   - Catches the error and shows a friendly card
+ *   - Auto-tries to recover after 5 seconds (resets state, lets children
+ *     re-render). If the underlying state has changed (e.g. user navigated,
+ *     hook re-subscribed cleanly), the app comes back without a reload.
+ *   - Manual "Reload App" button is also there for cases where the error
+ *     is genuinely stuck (forces SW unregister + cache clear + full reload).
+ */
 export default class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null };
+  state: State = { hasError: false, error: null, recoverIn: 5 };
+  private timer: ReturnType<typeof setInterval> | null = null;
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    return { hasError: true, error, recoverIn: 5 };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // eslint-disable-next-line no-console
     console.error('[AtlaasGo] Uncaught error:', error, info.componentStack);
+
+    // Start a soft-recovery countdown — most "errors" are transient
+    // (a stale realtime channel, a one-shot fetch failure). After 5s, try
+    // unwinding the boundary and letting children remount.
+    if (this.timer) clearInterval(this.timer);
+    this.timer = setInterval(() => {
+      this.setState((s): State => {
+        if (s.recoverIn <= 1) {
+          if (this.timer) clearInterval(this.timer);
+          this.timer = null;
+          return { hasError: false, error: null, recoverIn: 5 };
+        }
+        return { ...s, recoverIn: s.recoverIn - 1 };
+      });
+    }, 1000);
   }
 
+  componentWillUnmount() {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  handleReset = () => {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    this.setState({ hasError: false, error: null, recoverIn: 5 });
+  };
+
   handleReload = () => {
-    // Unregister service worker to clear any stale cache
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((regs) => {
         regs.forEach((r) => r.unregister());
@@ -39,38 +78,54 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div
           style={{
-            minHeight: '100vh',
+            minHeight: '60vh',
             display: 'grid',
             placeItems: 'center',
-            background: '#0D0A08',
-            color: '#F5F0EB',
+            color: 'var(--fg)',
             fontFamily: 'Inter, system-ui, sans-serif',
             padding: 24,
           }}
         >
           <div style={{ textAlign: 'center', maxWidth: 420 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🏔️</div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
-              Something went wrong
+            <h1 style={{ fontFamily: 'Montserrat', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
+              Hiccup detected
             </h1>
-            <p style={{ color: '#A89E94', fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
-              AtlaasGo hit an unexpected error. This usually fixes itself with a refresh.
+            <p style={{ color: 'var(--fg-soft)', fontSize: 14, marginBottom: 20, lineHeight: 1.55 }}>
+              Auto-recovering in {this.state.recoverIn}s…
             </p>
-            <button
-              onClick={this.handleReload}
-              style={{
-                background: '#FF5722',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 12,
-                padding: '12px 32px',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Reload App
-            </button>
+            <div style={{ display: 'inline-flex', gap: 10 }}>
+              <button
+                onClick={this.handleReset}
+                style={{
+                  background: 'var(--primary)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 12,
+                  padding: '10px 20px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Try now
+              </button>
+              <button
+                onClick={this.handleReload}
+                style={{
+                  background: 'transparent',
+                  color: 'var(--fg-soft)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '10px 18px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Hard reload
+              </button>
+            </div>
             {import.meta.env.DEV && this.state.error && (
               <pre
                 style={{
@@ -78,8 +133,8 @@ export default class ErrorBoundary extends Component<Props, State> {
                   textAlign: 'left',
                   fontSize: 11,
                   color: '#EF4444',
-                  background: '#1A1410',
-                  padding: 16,
+                  background: 'rgba(0,0,0,0.04)',
+                  padding: 12,
                   borderRadius: 8,
                   overflow: 'auto',
                   maxHeight: 200,

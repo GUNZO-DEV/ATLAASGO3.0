@@ -99,7 +99,7 @@ export function useRiderAssignments() {
 
     void refresh();
     channel = supabase
-      .channel(`rider_assignments:${user.id}`)
+      .channel(`rider_assignments:${user.id}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'order_assignments', filter: `rider_id=eq.${user.id}` },
@@ -156,7 +156,7 @@ export function useAvailableOrders() {
     cancelledRef.current = false;
     void refresh();
     const channel = supabase
-      .channel('available_orders')
+      .channel(`available_orders:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
