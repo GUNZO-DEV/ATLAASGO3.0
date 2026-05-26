@@ -6,35 +6,9 @@ import InstallToast from '../components/InstallToast';
 import MobileHomeScreen from '../components/MobileHomeScreen';
 import { useSEO } from '../lib/seo';
 
-// Pinned-scroll narrative section — desktop only (heavy, scroll-locked)
-const PinnedStory = lazy(() => import('../components/visual/PinnedStory'));
-
-const STORY_BEATS = [
-  {
-    eyebrow: 'Chapter 1 · Discover',
-    title: 'A medina kitchen, in your palm.',
-    body: 'Real recipes from families who have cooked Ifrane for decades — vetted, photographed, and curated. No ghost kitchens. No commissary food.',
-    emoji: '🫖',
-  },
-  {
-    eyebrow: 'Chapter 2 · Tap',
-    title: 'One landmark. One pin. Done.',
-    body: 'Drop a GPS pin, type "near the Grand Mosque", and your driver knows exactly where you are. The Moroccan way of describing a place — engineered into the protocol.',
-    emoji: '📍',
-  },
-  {
-    eyebrow: 'Chapter 3 · Track',
-    title: 'Watch it climb the Atlas.',
-    body: 'Live timeline, six-stage ETA, weather-aware estimates. Chat with Youssef on the way — quick replies, location share, all in one tap.',
-    emoji: '🏔',
-  },
-  {
-    eyebrow: 'Chapter 4 · Earn',
-    title: 'A platform that pays its riders.',
-    body: '60–90 dh/hour average, daily payouts, SOS-safe. Performance bonuses you can see climb in real-time. Made for student-riders and Atlas regulars.',
-    emoji: '🏍',
-  },
-];
+// Pinned 3D isometric Atlas Journey — desktop only (heavy, scroll-locked).
+// Lazy-loaded so initial paint stays fast.
+const AtlasJourney = lazy(() => import('../components/AtlasJourney'));
 
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(() =>
@@ -84,11 +58,11 @@ export default function Landing() {
   return (
     <>
       <Hero />
+      <HowItWorks />
       <Suspense fallback={null}>
-        <PinnedStory beats={STORY_BEATS} label="The AtlaasGo Story" />
+        <AtlasJourney />
       </Suspense>
       <LocalLegends />
-      <HowItWorks />
       <SocialProof />
       <Tripersona />
       <PWABanner />
