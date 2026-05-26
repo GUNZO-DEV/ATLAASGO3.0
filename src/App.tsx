@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
 import Nav from './components/Nav';
 import Footer from './components/Footer';
+import MobileTabBar from './components/MobileTabBar';
 
 /* ── Only the landing page is eagerly loaded ─────────────────────── */
 import Landing from './pages/Landing';
@@ -90,6 +91,7 @@ export default function App() {
         </Suspense>
       </main>
       <Footer />
+      <MobileTabBar />
     </>
   );
 }

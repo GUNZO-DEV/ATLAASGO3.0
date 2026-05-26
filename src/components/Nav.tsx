@@ -192,6 +192,144 @@ export default function Nav() {
           </button>
         </div>
       </nav>
+
+      {/* ── Mobile drawer (slides in from right) ───────────────────────── */}
+      <div
+        className={`nav-drawer ${open ? 'open' : ''}`}
+        onClick={() => setOpen(false)}
+        aria-hidden={!open}
+      >
+        <aside
+          className="nav-drawer-panel"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-label="Menu"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <Link to="/" className="nav-logo" onClick={() => setOpen(false)}>
+              <span className="logo-mark"><I.Logo size={18} /></span>
+              <span>AtlaasGo</span>
+            </Link>
+            <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Close menu">
+              <I.Close size={16} />
+            </button>
+          </div>
+
+          {user && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 16px', marginBottom: 16,
+              background: 'linear-gradient(135deg, rgba(255,87,34,0.10), rgba(255,138,101,0.06))',
+              border: '1px solid rgba(255,87,34,0.20)',
+              borderRadius: 16,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: 'linear-gradient(135deg, #FF5722, #FF8A65)',
+                color: 'white', fontWeight: 800, fontSize: 16,
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}>
+                {(user.email || 'A').charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.email?.split('@')[0]}
+                </div>
+                <Link to="/account" className="nav-link" style={{ fontSize: 12, padding: 0 }}>
+                  View account →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          <DrawerItem to="/order"        icon={<I.Search size={16} />}   label={t('nav.order')} />
+          <DrawerItem to="/campus"       icon={<I.Home size={16} />}     label="Campus drop" />
+          <DrawerItem to="/cart"         icon={<I.Bag size={16} />}      label="Cart" badge={cartCount} />
+          {user && (
+            <>
+              <DrawerItem to="/orders"        icon={<I.Receipt size={16} />}   label="Orders" />
+              <DrawerItem to="/notifications" icon={<I.Lightning size={16} />} label="Notifications" badge={unreadCount} />
+              <DrawerItem to="/favorites"     icon={<I.Heart size={16} />}     label="Favorites" />
+              <DrawerItem to="/addresses"     icon={<I.Pin size={16} />}       label="Addresses" />
+              <DrawerItem to="/wallet"        icon={<I.Wallet size={16} />}    label="Wallet" />
+            </>
+          )}
+          <DrawerItem to="/prime" icon={<I.Star size={16} />} label="Prime" />
+
+          {(isRider || isMerchant || isAdmin) && (
+            <div style={{ height: 1, background: 'var(--line)', margin: '12px 0' }} />
+          )}
+          {(isRider || isAdmin) && <DrawerItem to="/rider"    icon={<I.Bike size={16} />}  label="Rider dashboard" />}
+          {(isMerchant || isAdmin) && <DrawerItem to="/merchant" icon={<I.Box size={16} />} label="Restaurant POS" />}
+          {isAdmin && <DrawerItem to="/admin" icon={<I.Shield size={16} />} label="Admin" />}
+
+          <div style={{ height: 1, background: 'var(--line)', margin: '12px 0' }} />
+
+          {/* Language + theme */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 4px' }}>
+            <div className="lang-pill" role="group" aria-label="Language" style={{ flex: 1 }}>
+              {LANGS.map((l) => (
+                <button key={l} className={lang === l ? 'active' : ''} onClick={() => setLang(l)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <button className="icon-btn" onClick={toggle} aria-label="Toggle theme">
+              {theme === 'dark' ? <I.Sun /> : <I.Moon />}
+            </button>
+          </div>
+
+          {/* Auth CTA */}
+          {!user ? (
+            <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+              <Link to="/auth" className="btn btn-outline" onClick={() => setOpen(false)}>
+                {t('nav.signin')}
+              </Link>
+              <Link to="/auth?mode=signup" className="btn btn-primary" onClick={() => setOpen(false)}>
+                Sign up
+              </Link>
+            </div>
+          ) : (
+            <button
+              className="btn btn-outline"
+              onClick={async () => { await signOut(); setOpen(false); }}
+              style={{ marginTop: 16 }}
+            >
+              Sign out
+            </button>
+          )}
+        </aside>
+      </div>
     </div>
+  );
+}
+
+function DrawerItem({ to, icon, label, badge }: { to: string; icon: React.ReactNode; label: string; badge?: number }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) => `nav-dropdown-row${isActive ? ' active' : ''}`}
+      style={({ isActive }) => ({
+        padding: '12px 16px',
+        borderRadius: 12,
+        background: isActive ? 'rgba(255,87,34,0.08)' : 'transparent',
+        color: isActive ? 'var(--primary)' : 'var(--fg)',
+        fontWeight: isActive ? 700 : 600,
+      })}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+        {icon}
+        <span style={{ flex: 1 }}>{label}</span>
+        {badge && badge > 0 ? (
+          <span style={{
+            background: 'var(--primary)', color: 'white',
+            fontSize: 11, fontWeight: 800, padding: '2px 8px',
+            borderRadius: 999, minWidth: 18, textAlign: 'center',
+          }}>
+            {badge > 99 ? '99+' : badge}
+          </span>
+        ) : null}
+      </span>
+    </NavLink>
   );
 }

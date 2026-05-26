@@ -876,6 +876,113 @@ export default function CartPage() {
           </div>
         )}
       </div>
+
+      {/* ── Mobile sticky checkout bar — always thumb-reachable ───────── */}
+      {items.length > 0 && (
+        <MobileStickyCheckout
+          submitting={submitting}
+          canSubmit={canSubmit}
+          finalTotal={finalTotal}
+          fullyCoveredByWallet={fullyCoveredByWallet}
+          subtotalOk={subtotalOk}
+          phoneOk={phoneOk}
+          effectiveCoords={effectiveCoords}
+          landmarkOk={landmarkOk}
+          subtotal={subtotal}
+          payMethod={payMethod}
+          user={user}
+          onClick={checkout}
+        />
+      )}
     </section>
+  );
+}
+
+/** Sticky bottom-of-screen primary CTA — visible only on mobile (≤ 768px) */
+function MobileStickyCheckout({
+  submitting,
+  canSubmit,
+  finalTotal,
+  fullyCoveredByWallet,
+  subtotalOk,
+  phoneOk,
+  effectiveCoords,
+  landmarkOk,
+  subtotal,
+  payMethod,
+  user,
+  onClick,
+}: {
+  submitting: boolean;
+  canSubmit: boolean;
+  finalTotal: number;
+  fullyCoveredByWallet: boolean;
+  subtotalOk: boolean;
+  phoneOk: boolean;
+  effectiveCoords: unknown;
+  landmarkOk: boolean;
+  subtotal: number;
+  payMethod: 'card' | 'cash' | 'wallet';
+  user: { email?: string | null } | null;
+  onClick: () => void;
+}) {
+  // Set sticky-cta marker on body so MobileTabBar can pad accordingly
+  useEffect(() => {
+    document.body.classList.add('has-sticky-cta');
+    return () => document.body.classList.remove('has-sticky-cta');
+  }, []);
+
+  const label = submitting
+    ? 'Placing order…'
+    : !user
+      ? 'Sign in to checkout'
+      : !subtotalOk
+        ? `Add ${MIN_ORDER_DH - subtotal} dh more`
+        : !phoneOk
+          ? 'Add phone in account'
+          : !effectiveCoords
+            ? 'Capture GPS first'
+            : !landmarkOk
+              ? 'Add a landmark'
+              : fullyCoveredByWallet
+                ? `Place order · wallet`
+                : payMethod === 'card'
+                  ? `Pay ${finalTotal} dh`
+                  : `Order · ${finalTotal} dh`;
+
+  return (
+    <div className="sticky-action-bar">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-soft)' }}>
+          Total
+        </div>
+        <div style={{
+          fontFamily: 'Montserrat',
+          fontWeight: 900,
+          fontSize: 20,
+          color: 'var(--primary)',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1.1,
+        }}>
+          {finalTotal} dh
+        </div>
+      </div>
+      <button
+        onClick={onClick}
+        disabled={!canSubmit && !!user}
+        className="btn btn-primary"
+        style={{
+          flex: '0 0 auto',
+          padding: '14px 22px',
+          fontSize: 14,
+          fontWeight: 700,
+          opacity: canSubmit ? 1 : 0.6,
+          minHeight: 50,
+          borderRadius: 14,
+        }}
+      >
+        {label}
+      </button>
+    </div>
   );
 }

@@ -4670,3 +4670,246 @@ main > * {
   background: rgba(255, 255, 255, 0.06);
 }
 
+
+/* ========================================================================== */
+/*                        MOBILE-FIRST POLISH                                 */
+/* ========================================================================== */
+
+/* CSS custom-property for safe areas — fall back to 0 on non-iOS */
+:root {
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bot:    env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  --tabbar-h:    62px;
+}
+
+/* iOS PWA: respect notch + home indicator everywhere */
+body {
+  padding-left:  var(--safe-left);
+  padding-right: var(--safe-right);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: contain; /* kill rubber-banding into chrome */
+}
+
+/* Native-feel momentum scrolling on iOS */
+html, body, .page, [data-scroll] {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── iOS zoom prevention on input focus ─────────────────────────────────── */
+input, select, textarea {
+  font-size: 16px !important; /* iOS won't zoom if font-size >= 16px */
+}
+@media (min-width: 768px) {
+  input, select, textarea {
+    font-size: 14px !important; /* desktop can shrink back */
+  }
+}
+
+/* ── Touch targets: at least 44x44 on mobile ─────────────────────────────── */
+@media (max-width: 768px) {
+  .btn, .icon-btn, button, [role="button"], a.btn {
+    min-height: 44px;
+  }
+  .btn-sm {
+    min-height: 36px;
+  }
+}
+
+/* ── Mobile bottom tab bar ───────────────────────────────────────────────── */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--tabbar-h) + var(--safe-bot));
+  padding-bottom: var(--safe-bot);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--line);
+  z-index: 80;
+  display: none; /* hidden on desktop */
+  align-items: stretch;
+  justify-content: space-around;
+}
+@media (max-width: 768px) {
+  .tabbar { display: flex; }
+  body.has-tabbar main {
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bot) + 12px);
+  }
+}
+.tabbar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--fg-soft);
+  text-decoration: none;
+  position: relative;
+  padding: 8px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tabbar-item.active {
+  color: var(--primary);
+}
+.tabbar-item.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 2.5px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--primary), #FF8A65);
+}
+.tabbar-item svg { width: 20px; height: 20px; }
+.tabbar-badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 16px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--primary);
+  color: white;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--surface);
+  box-shadow: 0 2px 6px rgba(255,87,34,0.4);
+}
+
+/* ── Sticky bottom action bar (cart total, place order, etc) ────────────── */
+.sticky-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + var(--safe-bot));
+  z-index: 70;
+  padding: 12px 16px calc(12px + var(--safe-bot)) 16px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--line);
+  display: none;
+}
+@media (max-width: 768px) {
+  .sticky-action-bar { display: flex; gap: 12px; align-items: center; }
+  body.has-tabbar.has-sticky-cta main {
+    padding-bottom: calc(var(--tabbar-h) + 70px + var(--safe-bot));
+  }
+}
+
+/* ── Mobile nav drawer overlay ──────────────────────────────────────────── */
+.nav-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.nav-drawer.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.nav-drawer-panel {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: min(86vw, 340px);
+  background: var(--surface);
+  padding: calc(20px + var(--safe-top)) 22px calc(20px + var(--safe-bot));
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.18);
+  overflow-y: auto;
+}
+.nav-drawer.open .nav-drawer-panel {
+  transform: translateX(0);
+}
+
+/* ── Page hero: tighten on mobile ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  .page-title { font-size: 28px !important; line-height: 1.1; }
+  .page-sub   { font-size: 14px !important; }
+  .section-title { font-size: 26px !important; line-height: 1.15; }
+  h1 { font-size: clamp(30px, 8vw, 44px) !important; }
+}
+
+/* ── Hide chunky scrollbars on mobile rails ─────────────────────────────── */
+@media (max-width: 768px) {
+  .legends-rail,
+  .resto-grid,
+  .cuisine-filter {
+    scrollbar-width: none;
+  }
+  .legends-rail::-webkit-scrollbar,
+  .resto-grid::-webkit-scrollbar,
+  .cuisine-filter::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── PWA standalone mode: respect status bar ────────────────────────────── */
+@media all and (display-mode: standalone) {
+  body { padding-top: var(--safe-top); }
+  .nav { padding-top: max(8px, var(--safe-top)) !important; }
+}
+
+/* ── Reduce hover-lift on touch devices (avoid sticky hover) ────────────── */
+@media (hover: none) {
+  .resto-card:hover,
+  .legend-card:hover,
+  .persona:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ── Order tracking: stack map first on mobile ──────────────────────────── */
+@media (max-width: 880px) {
+  .track-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .track-main-grid > div:first-child {
+    min-height: 320px;
+  }
+}
+
+/* ── Skeleton shimmer respects color scheme ─────────────────────────────── */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--line) 60%, transparent) 0%,
+    color-mix(in srgb, var(--line) 80%, transparent) 50%,
+    color-mix(in srgb, var(--line) 60%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 12px;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
