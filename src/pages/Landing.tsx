@@ -1,12 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import Hero from '../components/Hero';
 import { LocalLegends, HowItWorks, Tripersona, PWABanner } from '../components/Sections';
 import SocialProof from '../components/SocialProof';
 import InstallToast from '../components/InstallToast';
-import { FadeUp } from '../components/visual/ScrollReveal';
+import MobileHomeScreen from '../components/MobileHomeScreen';
 
-// Pinned-scroll narrative section stays — keeps the brand storytelling beat
-// the user already liked. Lazy-loaded so initial paint stays fast.
+// Pinned-scroll narrative section — desktop only (heavy, scroll-locked)
 const PinnedStory = lazy(() => import('../components/visual/PinnedStory'));
 
 const STORY_BEATS = [
@@ -36,19 +35,39 @@ const STORY_BEATS = [
   },
 ];
 
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const on = () => setMobile(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return mobile;
+}
+
 export default function Landing() {
+  const isMobile = useIsMobile();
+
+  // ── Mobile: a single, curated app-feel landing screen ────────────
+  if (isMobile) {
+    return (
+      <>
+        <MobileHomeScreen />
+        <InstallToast />
+      </>
+    );
+  }
+
+  // ── Desktop: full marketing narrative ────────────────────────────
   return (
     <>
       <Hero />
-
       <Suspense fallback={null}>
         <PinnedStory beats={STORY_BEATS} label="The AtlaasGo Story" />
       </Suspense>
-
-      {/* No FadeUp wrappers below the fold — they use ScrollTrigger with
-          immediateRender, which leaves elements at opacity:0 if the trigger
-          ever fails to fire (mobile, low-end, Lenis timing). Internal entry
-          animations on each section are enough. */}
       <LocalLegends />
       <HowItWorks />
       <SocialProof />
