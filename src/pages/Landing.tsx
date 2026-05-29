@@ -9,6 +9,8 @@ import { useSEO } from '../lib/seo';
 // Pinned 3D isometric Atlas Journey — desktop only (heavy, scroll-locked).
 // Lazy-loaded so initial paint stays fast.
 const AtlasJourney = lazy(() => import('../components/AtlasJourney'));
+// Interactive 3D AUI campus diorama — also lazy-loaded (Three.js scene).
+const Campus3D = lazy(() => import('../components/Campus3D'));
 
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(() =>
@@ -61,6 +63,9 @@ export default function Landing() {
       <HowItWorks />
       <Suspense fallback={null}>
         <AtlasJourney />
+      </Suspense>
+      <Suspense fallback={null}>
+        <Campus3D />
       </Suspense>
       <LocalLegends />
       <SocialProof />
