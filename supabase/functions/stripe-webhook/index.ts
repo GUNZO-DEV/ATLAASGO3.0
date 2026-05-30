@@ -4,11 +4,14 @@
  * Handles Stripe webhook events for order payments, Prime subscriptions,
  * and wallet top-ups. Updates order status and triggers notifications.
  *
- * Required secrets:
+ * Required secrets (set via Supabase Dashboard → Edge Functions → Secrets):
  *   STRIPE_SECRET_KEY=sk_live_…
- *   STRIPE_WEBHOOK_SECRET=whsec_…
+ *   STRIPE_WEBHOOK_SECRET=whsec_…           ← from Stripe Dashboard
+ *   SUPABASE_URL                            ← auto
+ *   SUPABASE_SERVICE_ROLE_KEY               ← auto
  *
- * POST — called by Stripe's webhook system
+ * Deploy: verify_jwt = false (Stripe signs the request, no JWT to expect)
+ * Endpoint: https://toywtnupchfywhtdhxvj.supabase.co/functions/v1/stripe-webhook
  */
 import Stripe from 'https://esm.sh/stripe@17.7.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
@@ -51,8 +54,9 @@ Deno.serve(async (req) => {
         const orderId = pi.metadata?.orderId;
 
         if (orderId) {
-          // Update order: mark as preparing (payment confirmed)
-          const { error } = await supabase
+          // Advance order: mark as preparing (payment confirmed). Idempotent —
+          // only flips when still in 'ordered', so replays are safe.
+          const { error: updateErr } = await supabase
             .from('orders')
             .update({
               status: 'preparing',
@@ -60,10 +64,11 @@ Deno.serve(async (req) => {
               stripe_payment_intent_id: pi.id,
             })
             .eq('id', orderId)
-            .in('status', ['ordered']); // Only advance if still in 'ordered'
+            .in('status', ['ordered']);
 
-          if (!error) {
-            // Get customer info for notification
+          if (updateErr) {
+            console.error('order update failed', orderId, updateErr);
+          } else {
             const { data: order } = await supabase
               .from('orders')
               .select('customer_id, total_dh')
@@ -71,54 +76,48 @@ Deno.serve(async (req) => {
               .maybeSingle();
 
             if (order?.customer_id) {
-              // Create notification for customer
               await supabase.from('notifications').insert({
                 user_id: order.customer_id,
                 kind: 'order_status',
                 title: 'Payment confirmed',
-                body: `Your payment of ${order.total_dh} dh was successful. Your order is being prepared.`,
+                body: `Your payment of ${order.total_dh} DH was successful. Your order is being prepared.`,
                 payload: { orderId, status: 'preparing' },
               });
             }
           }
         }
 
-        // Check for wallet top-up metadata
+        // Wallet top-up branch
         const walletUserId = pi.metadata?.walletTopupUserId;
         const topupAmountDh = pi.metadata?.topupAmountDh;
         if (walletUserId && topupAmountDh) {
-          const amount = parseFloat(topupAmountDh);
+          const amount = Math.round(Number(topupAmountDh));
+          if (!Number.isFinite(amount) || amount <= 0) {
+            console.error('wallet-topup: bad amount', topupAmountDh);
+          } else {
+            // RPC handles wallet + ledger insert atomically + the
+            // NOT NULL/CHECK guards. Idempotency comes from Stripe's
+            // event_id semantics + our reference field.
+            const { error: rpcErr } = await supabase.rpc('credit_wallet', {
+              p_user_id: walletUserId,
+              p_amount: amount,
+              p_kind: 'topup',
+              p_reference: `stripe:${pi.id}`,
+              p_metadata: { paymentIntentId: pi.id, source: 'stripe' },
+            });
 
-          // Credit wallet
-          await supabase.rpc('credit_wallet', {
-            p_user_id: walletUserId,
-            p_amount: amount,
-          }).catch(() => {
-            // Fallback: direct update if RPC doesn't exist
-            return supabase
-              .from('wallets')
-              .upsert(
-                { user_id: walletUserId, balance_dh: amount },
-                { onConflict: 'user_id' },
-              );
-          });
-
-          // Insert transaction record
-          await supabase.from('wallet_transactions').insert({
-            user_id: walletUserId,
-            kind: 'topup',
-            amount_dh: amount,
-            reference: `Stripe ${pi.id.slice(-8)}`,
-          });
-
-          // Notification
-          await supabase.from('notifications').insert({
-            user_id: walletUserId,
-            kind: 'wallet',
-            title: 'Wallet topped up',
-            body: `${amount} dh added to your wallet.`,
-            payload: { amount, paymentIntentId: pi.id },
-          });
+            if (rpcErr) {
+              console.error('credit_wallet failed', rpcErr);
+            } else {
+              await supabase.from('notifications').insert({
+                user_id: walletUserId,
+                kind: 'system',
+                title: 'Wallet topped up',
+                body: `${amount} DH added to your wallet.`,
+                payload: { amount, paymentIntentId: pi.id },
+              });
+            }
+          }
         }
 
         break;
@@ -130,7 +129,6 @@ Deno.serve(async (req) => {
         const orderId = pi.metadata?.orderId;
 
         if (orderId) {
-          // Get customer for notification
           const { data: order } = await supabase
             .from('orders')
             .select('customer_id')
@@ -157,7 +155,6 @@ Deno.serve(async (req) => {
         const userId = session.metadata?.userId;
 
         if (tier && userId && session.payment_status === 'paid') {
-          // Activate Prime subscription
           const expiresAt = new Date();
           if (tier === 'campus_pass') {
             expiresAt.setMonth(expiresAt.getMonth() + 6); // ~semester
@@ -174,7 +171,9 @@ Deno.serve(async (req) => {
                 is_active: true,
                 started_at: new Date().toISOString(),
                 expires_at: expiresAt.toISOString(),
-                stripe_session_id: session.id,
+                stripe_subscription_id: session.subscription
+                  ? String(session.subscription)
+                  : session.id,
               },
               { onConflict: 'user_id' },
             );
@@ -183,15 +182,27 @@ Deno.serve(async (req) => {
             user_id: userId,
             kind: 'system',
             title: `Prime ${tier.replace('_', ' ')} activated`,
-            body: `Welcome to Prime! Your free delivery perks are now active.`,
+            body: 'Welcome to Prime! Your free delivery perks are now active.',
             payload: { tier },
           });
         }
         break;
       }
 
+      // ── Subscription cancelled / expired ───────────────────────────
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as Stripe.Subscription;
+        const subId = sub.id;
+        await supabase
+          .from('prime_subscriptions')
+          .update({ is_active: false, expires_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', subId);
+        break;
+      }
+
       default:
-        // Unhandled event type — log but don't error
+        // Unhandled event types are logged but acknowledged so Stripe
+        // doesn't retry forever.
         console.log(`Unhandled event type: ${event.type}`);
     }
 
