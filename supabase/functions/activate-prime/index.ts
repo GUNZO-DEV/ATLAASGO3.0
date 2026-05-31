@@ -66,29 +66,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Deactivate any existing subscription
-    await supabase
-      .from('prime_subscriptions')
-      .update({ is_active: false })
-      .eq('user_id', userId)
-      .eq('is_active', true);
-
-    // Create the new subscription
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + durationDays);
 
-    const { error: insErr } = await supabase.from('prime_subscriptions').insert({
-      user_id: userId,
-      tier,
-      started_at: new Date().toISOString(),
-      expires_at: expiresAt.toISOString(),
-      stripe_subscription_id: session.payment_intent as string,
-      is_active: true,
-    });
+    const { error: upsertErr } = await supabase
+      .from('prime_subscriptions')
+      .upsert(
+        {
+          user_id: userId,
+          tier,
+          is_active: true,
+          started_at: new Date().toISOString(),
+          expires_at: expiresAt.toISOString(),
+          stripe_subscription_id: (session.payment_intent as string) ?? session.id,
+        },
+        { onConflict: 'user_id' },
+      );
 
-    if (insErr) {
+    if (upsertErr) {
       return new Response(
-        JSON.stringify({ error: insErr.message }),
+        JSON.stringify({ error: upsertErr.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
