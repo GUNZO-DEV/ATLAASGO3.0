@@ -230,18 +230,17 @@ export default function MobileCart() {
         })
         .eq('id', orderId);
     }
+    // Wallet credit via SECURITY DEFINER RPC (atomic debit + ledger row;
+    // a direct client write is RLS-blocked and used non-existent columns).
     if (walletCredit > 0) {
-      await supabase.from('wallet_transactions').insert({
-        user_id: user.id,
-        order_id: orderId,
-        kind: 'order_payment',
-        amount_dh: -walletCredit,
-        note: `Order ${orderId.slice(0, 8).toUpperCase()}`,
+      const { error: walletErr } = await supabase.rpc('pay_order_with_wallet', {
+        p_order_id: orderId,
+        p_amount: walletCredit,
       });
-      await supabase
-        .from('wallets')
-        .update({ balance_dh: walletBalance - walletCredit })
-        .eq('user_id', user.id);
+      if (walletErr) {
+        toast.error('Could not apply wallet credit — try again');
+        return;
+      }
     }
     if (promoApplied) {
       void supabase.rpc('increment_promo_redemption', { promo_code: promoApplied });

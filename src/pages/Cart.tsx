@@ -259,19 +259,18 @@ function DesktopCartPage() {
         .eq('id', orderId);
     }
 
-    // Apply wallet credit immediately as a wallet_transactions row
+    // Apply wallet credit via the SECURITY DEFINER RPC, which debits the
+    // balance and writes the ledger row atomically (a direct client write
+    // is blocked by RLS and used the wrong columns).
     if (walletCredit > 0) {
-      await supabase.from('wallet_transactions').insert({
-        user_id: user.id,
-        order_id: orderId,
-        kind: 'order_payment',
-        amount_dh: -walletCredit,
-        note: `Order ${orderId.slice(0, 8).toUpperCase()}`,
+      const { error: walletErr } = await supabase.rpc('pay_order_with_wallet', {
+        p_order_id: orderId,
+        p_amount: walletCredit,
       });
-      await supabase
-        .from('wallets')
-        .update({ balance_dh: walletBalance - walletCredit })
-        .eq('user_id', user.id);
+      if (walletErr) {
+        toast.error('Could not apply wallet credit — try again');
+        return;
+      }
     }
 
     // Increment promo redemption count (best-effort, non-blocking)

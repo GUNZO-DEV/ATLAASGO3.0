@@ -1,7 +1,12 @@
 import { supabase } from './supabase';
 import type { OrderStatus } from './database.types';
 
-/** Best-effort customer notification on order state change. */
+/** Best-effort customer notification on order state change.
+ *  Routed through the notify_order_participant RPC: a customer's
+ *  notification row is written for a DIFFERENT user (the customer) while
+ *  this code runs as the rider/merchant, which RLS blocks on a direct
+ *  insert. The SECURITY DEFINER RPC verifies both caller and recipient
+ *  are participants in the order, then writes the row safely. */
 async function notifyCustomer(
   orderId: string,
   title: string,
@@ -14,12 +19,12 @@ async function notifyCustomer(
     .maybeSingle();
   const customerId = (data as { customer_id?: string } | null)?.customer_id;
   if (!customerId) return;
-  void supabase.from('notifications').insert({
-    user_id: customerId,
-    kind: 'order_status',
-    title,
-    body,
-    payload: { order_id: orderId },
+  void supabase.rpc('notify_order_participant', {
+    p_order_id: orderId,
+    p_recipient: customerId,
+    p_kind: 'order_status',
+    p_title: title,
+    p_body: body,
   });
 }
 
@@ -93,14 +98,16 @@ export async function assignRider(
     .maybeSingle();
   const riderUserId = (riderRow as { user_id?: string } | null)?.user_id;
 
-  // Notify the rider (best-effort, non-blocking)
+  // Notify the rider (best-effort, non-blocking). Routed through the RPC:
+  // once the assignment row above is inserted, the rider counts as an
+  // order participant, so notify_order_participant can deliver to them.
   if (riderUserId) {
-    void supabase.from('notifications').insert({
-      user_id: riderUserId,
-      kind: 'rider_assignment',
-      title: 'New trip assigned',
-      body: `Order #${orderId.slice(0, 6).toUpperCase()} — open the rider dashboard to accept.`,
-      payload: { order_id: orderId },
+    void supabase.rpc('notify_order_participant', {
+      p_order_id: orderId,
+      p_recipient: riderUserId,
+      p_kind: 'rider_assignment',
+      p_title: 'New trip assigned',
+      p_body: `Order #${orderId.slice(0, 6).toUpperCase()} — open the rider dashboard to accept.`,
     });
   }
   // Don't change order status — rider must accept first
