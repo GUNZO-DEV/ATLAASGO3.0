@@ -4095,6 +4095,126 @@ main > * {
 .auth-card-pro .cl-alternativeMethodsBlockButton:hover {
   background: #2C2520 !important;
 }
+
+/* ══ Centered single-card auth layout ════════════════════════════ */
+.auth-page--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 96px 20px 64px;
+}
+.auth-center {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.auth-brand {
+  text-align: center;
+  margin-bottom: 22px;
+}
+.auth-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #FF5722, #FF8A65);
+  box-shadow: 0 10px 30px rgba(255, 87, 34, 0.32);
+}
+.auth-brand-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 900;
+  font-size: clamp(26px, 4vw, 34px);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 8px;
+  color: var(--fg);
+}
+.auth-brand-sub {
+  font-size: 15px;
+  color: var(--fg-soft);
+  margin: 0 auto;
+  max-width: 360px;
+  line-height: 1.5;
+}
+.auth-card--center {
+  width: 100%;
+  max-width: 460px;
+  margin: 0;
+  padding: 24px 24px 20px;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+/* Let the Clerk widget fill the card width cleanly */
+.auth-card--center .cl-rootBox,
+.auth-card--center .cl-card {
+  width: 100% !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.auth-card--center .cl-header { display: none !important; }
+
+/* Role context banner inside the card */
+.auth-role-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: rgba(255, 87, 34, 0.08);
+  border: 1px solid rgba(255, 87, 34, 0.18);
+  font-size: 13px;
+  color: var(--fg);
+}
+.auth-role-banner-emoji { font-size: 18px; line-height: 1; }
+.auth-role-banner-text { flex: 1; }
+.auth-role-banner-text strong { color: var(--primary); }
+.auth-role-banner-change {
+  background: none;
+  border: 0;
+  color: var(--fg-soft);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.auth-next-step {
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  color: var(--fg-soft);
+  line-height: 1.45;
+}
+.auth-next-step strong { color: var(--primary); }
+.auth-trust {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--fg-soft);
+}
+.auth-trust span { display: inline-flex; align-items: center; gap: 6px; }
+.auth-trust svg { color: var(--primary); flex-shrink: 0; }
+
 .auth-role-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

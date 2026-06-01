@@ -7,7 +7,7 @@
  * Cache version must be bumped on every deploy. The deploy script
  * handles this automatically via sed, or bump manually.
  */
-const CACHE = 'atlaasgo-6d69a550';
+const CACHE = 'atlaasgo-234a8aad';
 const PRECACHE = ['/manifest.webmanifest', '/favicon.svg'];
 
 // ── Install: precache shell assets ──────────────────────────────────

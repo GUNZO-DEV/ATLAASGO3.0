@@ -337,92 +337,25 @@ export default function AuthPage() {
     : null;
 
   return (
-    <section className="auth-page">
-      <div className="container auth-page-grid">
-        {/* Left: brand pitch (or role-specific pitch) */}
-        <div className="auth-side">
-          {activeRoleCard ? (
-            <>
-              <button
-                onClick={() => setSignupRole(null)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: 'none',
-                  border: 0,
-                  padding: 0,
-                  color: 'var(--fg-soft)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  marginBottom: 18,
-                }}
-              >
-                <I.Arrow size={12} style={{ transform: 'rotate(180deg)' }} /> Change role
-              </button>
-              <div style={{ fontSize: 56, marginBottom: 14 }}>{activeRoleCard.emoji}</div>
-              <h1 className="auth-side-title">{activeRoleCard.title}</h1>
-              <p className="auth-side-sub">{activeRoleCard.sub}</p>
-
-              <div className="auth-perks">
-                {activeRoleCard.perks.map((p) => (
-                  <div key={p}>
-                    <I.Check size={14} /> {p}
-                  </div>
-                ))}
-              </div>
-
-              {(signupRole === 'rider' || signupRole === 'merchant') && (
-                <div style={{
-                  marginTop: 22,
-                  padding: '12px 14px',
-                  background: 'rgba(255,87,34,0.08)',
-                  border: '1px solid rgba(255,87,34,0.18)',
-                  borderRadius: 12,
-                  fontSize: 12,
-                  color: 'var(--fg-soft)',
-                  lineHeight: 1.45,
-                }}>
-                  <strong style={{ color: 'var(--primary)' }}>Next step:</strong>{' '}
-                  After signing up, you'll fill out a short application. Our team reviews
-                  applications within {signupRole === 'rider' ? '48' : '24'} hours.
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="section-tag">
-                <I.Lightning size={11} /> Atlas welcome
-              </div>
-              <h1 className="auth-side-title">
-                One account.<br />
-                <span style={{
-                  background: 'linear-gradient(135deg, #FF5722, #FF8A65, #FFB74D)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  color: 'transparent',
-                }}>
-                  Three ways in.
-                </span>
-              </h1>
-              <p className="auth-side-sub">
-                Customer, merchant, or rider — sign up once and pick the experience that fits
-                your day.
-              </p>
-
-              <div className="auth-perks">
-                <div><I.Check size={14} /> Free delivery for new accounts</div>
-                <div><I.Check size={14} /> AUI student discount</div>
-                <div><I.Check size={14} /> One-tap reorder of favourites</div>
-                <div><I.Check size={14} /> Privacy-first — your data stays in eu-west-3</div>
-              </div>
-            </>
-          )}
+    <section className="auth-page auth-page--center">
+      <div className="auth-center">
+        {/* Brand header */}
+        <div className="auth-brand">
+          <span className="auth-brand-mark">
+            <I.Logo size={26} />
+          </span>
+          <h1 className="auth-brand-title">
+            {activeRoleCard ? activeRoleCard.title : 'Welcome to AtlaasGo'}
+          </h1>
+          <p className="auth-brand-sub">
+            {activeRoleCard
+              ? activeRoleCard.sub
+              : "Ifrane's premium delivery — sign in or create your account."}
+          </p>
         </div>
 
-        {/* Right: Clerk auth */}
-        <div className="auth-card auth-card-pro">
+        {/* The single auth card */}
+        <div className="auth-card auth-card-pro auth-card--center">
           <div className="auth-toggle">
             <button
               className={mode === 'signin' ? 'active' : ''}
@@ -438,7 +371,28 @@ export default function AuthPage() {
             </button>
           </div>
 
-          <div style={{ marginTop: 8 }}>
+          {/* Role context banner (only when a signup role is chosen) */}
+          {activeRoleCard && (
+            <div className="auth-role-banner">
+              <span className="auth-role-banner-emoji">{activeRoleCard.emoji}</span>
+              <span className="auth-role-banner-text">
+                Signing up as <strong>{activeRoleCard.title.replace(/^I /, '').replace(/^own a/, 'a')}</strong>
+              </span>
+              <button className="auth-role-banner-change" onClick={() => setSignupRole(null)}>
+                Change
+              </button>
+            </div>
+          )}
+
+          {(signupRole === 'rider' || signupRole === 'merchant') && (
+            <div className="auth-next-step">
+              <strong>Next step:</strong>{' '}
+              After signing up you'll complete a short application. We review within{' '}
+              {signupRole === 'rider' ? '48' : '24'} hours.
+            </div>
+          )}
+
+          <div style={{ marginTop: 4 }}>
             {mode === 'signin' ? (
               <SignIn routing="hash" appearance={clerkAppearance} />
             ) : (
@@ -449,6 +403,12 @@ export default function AuthPage() {
               />
             )}
           </div>
+        </div>
+
+        {/* Trust strip */}
+        <div className="auth-trust">
+          <span><I.Shield size={13} /> Privacy-first · data in eu-west-3</span>
+          <span><I.Check size={13} /> Free delivery for new accounts</span>
         </div>
       </div>
     </section>
