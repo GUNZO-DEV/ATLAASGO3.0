@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+# Auth + checkout + tracking are user-specific, no value to index
+Disallow: /auth
+Disallow: /cart
+Disallow: /checkout/
+Disallow: /track/
+Disallow: /orders
+Disallow: /account
+Disallow: /addresses
+Disallow: /notifications
+Disallow: /wallet
+Disallow: /admin
+Disallow: /rider
+Disallow: /merchant
+
+Sitemap: https://atlaasgo.com/sitemap.xml
