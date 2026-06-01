@@ -75,22 +75,20 @@ ALTER FUNCTION public.on_restaurant_app_approved() SET search_path = public, pg_
 REVOKE EXECUTE ON FUNCTION public.on_rider_app_approved()      FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.on_restaurant_app_approved() FROM PUBLIC, anon, authenticated;
 
--- ── 4. RLS predicates are not user RPCs ────────────────────────────
--- These functions are invoked transitively by RLS policies (as the
--- policy owner). Direct EXECUTE from anon/authenticated only widens
--- the public API surface; revoking it doesn't break RLS evaluation.
-DO $$
-DECLARE fn record;
-BEGIN
-  FOR fn IN
-    SELECT p.oid::regprocedure::text AS sig
-      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-     WHERE n.nspname='public'
-       AND p.proname IN (
-         'is_group_participant','is_order_participant','is_restaurant_staff',
-         'current_user_has_role','has_role'
-       )
-  LOOP
-    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', fn.sig);
-  END LOOP;
-END $$;
+-- ── 4. RLS predicate helpers MUST keep EXECUTE for anon/authenticated ──
+-- DO NOT revoke EXECUTE on these. An earlier version of this migration
+-- did, on the false assumption that RLS invokes them "as the policy
+-- owner." It does not: Postgres evaluates RLS USING/WITH CHECK
+-- expressions as the *querying* role, so anon/authenticated must hold
+-- EXECUTE on every function referenced inside a policy. These helpers
+-- back 49+ policies (current_user_has_role, has_role) plus the
+-- is_*_participant / is_restaurant_staff checks; revoking produced
+-- "permission denied for function current_user_has_role" for ordinary
+-- users and took down the catalog, role lookup, and login redirect.
+-- They are SECURITY DEFINER and only read role/membership data, so the
+-- advisor's "callable by authenticated" note is acceptable here.
+GRANT EXECUTE ON FUNCTION public.current_user_has_role(public.app_role) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role)        TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_order_participant(uuid, uuid)       TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_group_participant(uuid, uuid)       TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_restaurant_staff(uuid, uuid)        TO anon, authenticated;
