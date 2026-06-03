@@ -2,15 +2,17 @@ import { MotiView } from 'moti';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, MapPin, Receipt, Star } from 'lucide-react-native';
+import { Bell, MapPin, Receipt, Star, User } from 'lucide-react-native';
 import { CategoryGrid } from '../components/CategoryGrid';
 import { useCategories } from '../hooks/useCategories';
 import { useRestaurants } from '../hooks/useRestaurants';
+import { useAuth } from '../lib/auth';
 
 export default function Home() {
   const router = useRouter();
   const { categories } = useCategories();
   const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
+  const { user } = useAuth();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
@@ -58,12 +60,22 @@ export default function Home() {
                 <Receipt size={16} color="#1A1410" />
               </View>
             </Pressable>
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center bg-white"
-              style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
+            <Pressable
+              onPress={() => router.push('/sign-in')}
+              accessibilityRole="button"
+              accessibilityLabel={user ? 'Account' : 'Sign in'}
             >
-              <Bell size={16} color="#1A1410" />
-            </View>
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{
+                  backgroundColor: user ? '#FF5722' : '#fff',
+                  borderWidth: 1,
+                  borderColor: user ? '#FF5722' : 'rgba(26,20,16,0.08)',
+                }}
+              >
+                <User size={16} color={user ? '#fff' : '#1A1410'} />
+              </View>
+            </Pressable>
           </View>
         </MotiView>
 
