@@ -6,28 +6,31 @@ import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { AuthProvider } from '../lib/auth';
 import { ClerkSupabaseBridge } from '../lib/ClerkSupabaseBridge';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { tokenCache } from '../lib/tokenCache';
 
 const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
 export default function RootLayout() {
   return (
-    <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <AuthProvider>
-            <ClerkSupabaseBridge />
-            <StatusBar style="dark" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: '#FBF7F2' },
-                animation: 'slide_from_right',
-              }}
-            />
-          </AuthProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </ClerkProvider>
+    <ErrorBoundary>
+      <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <AuthProvider>
+              <ClerkSupabaseBridge />
+              <StatusBar style="dark" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: '#FBF7F2' },
+                  animation: 'slide_from_right',
+                }}
+              />
+            </AuthProvider>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </ClerkProvider>
+    </ErrorBoundary>
   );
 }

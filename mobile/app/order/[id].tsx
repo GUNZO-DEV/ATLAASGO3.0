@@ -1,12 +1,13 @@
 import { MotiView } from 'moti';
 import { useEffect } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Bike, MapPin, MessageCircle, Phone } from 'lucide-react-native';
+import { ArrowLeft, Bike, MapPin, Phone } from 'lucide-react-native';
 import { ProgressTimeline } from '../../components/ProgressTimeline';
 import { PressableScale } from '../../components/primitives/PressableScale';
 import { useDemoOrderProgress, useOrderStatus } from '../../hooks/useOrderStatus';
+import { useAssignedRider } from '../../hooks/useAssignedRider';
 import { ORDER_STAGES } from '../../lib/types';
 
 export default function OrderScreen() {
@@ -17,6 +18,7 @@ export default function OrderScreen() {
   const { order, stage: liveStage } = useOrderStatus(isDemo ? undefined : id);
   const { stage: demoStage } = useDemoOrderProgress('ordered');
   const stage = isDemo ? demoStage : liveStage;
+  const { rider } = useAssignedRider(isDemo ? undefined : id);
 
   // Avoid unused-var TS noise
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function OrderScreen() {
           <ProgressTimeline stage={stage} />
         </View>
 
-        {/* Rider card */}
+        {/* Rider card — real assigned rider, or a finding-your-rider state */}
         <MotiView
           from={{ opacity: 0, translateY: 14 }}
           animate={{ opacity: 1, translateY: 0 }}
@@ -115,34 +117,55 @@ export default function OrderScreen() {
             borderColor: 'rgba(26,20,16,0.08)',
           }}
         >
-          <View
-            className="w-12 h-12 rounded-full items-center justify-center"
-            style={{ backgroundColor: '#FFB74D' }}
-          >
-            <Text className="text-white font-display text-lg" style={{ fontWeight: '800' }}>Y</Text>
-          </View>
-          <View className="ml-3 flex-1">
-            <Text className="font-display text-[15px]" style={{ fontWeight: '700' }}>Youssef Benali</Text>
-            <Text className="text-[12px] mt-0.5" style={{ color: '#7A6F66' }}>
-              Honda CG · 9123-A · 4.9 ★
-            </Text>
-          </View>
-          <PressableScale>
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center mr-2"
-              style={{ backgroundColor: '#FF5722' }}
-            >
-              <MessageCircle size={16} color="#fff" />
-            </View>
-          </PressableScale>
-          <PressableScale>
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center"
-              style={{ backgroundColor: '#1A1410' }}
-            >
-              <Phone size={16} color="#fff" />
-            </View>
-          </PressableScale>
+          {rider ? (
+            <>
+              <View
+                className="w-12 h-12 rounded-full items-center justify-center"
+                style={{ backgroundColor: '#FFB74D' }}
+              >
+                <Text className="text-white font-display text-lg" style={{ fontWeight: '800' }}>
+                  {rider.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="font-display text-[15px]" style={{ fontWeight: '700' }} numberOfLines={1}>
+                  {rider.name}
+                </Text>
+                <Text className="text-[12px] mt-0.5" style={{ color: '#7A6F66' }} numberOfLines={1}>
+                  {[rider.vehicle, rider.plate, rider.rating != null ? `${rider.rating} ★` : null]
+                    .filter(Boolean)
+                    .join(' · ') || 'On the way'}
+                </Text>
+              </View>
+              {rider.phone ? (
+                <PressableScale onPress={() => Linking.openURL(`tel:${rider.phone}`)}>
+                  <View
+                    className="w-10 h-10 rounded-full items-center justify-center"
+                    style={{ backgroundColor: '#1A1410' }}
+                  >
+                    <Phone size={16} color="#fff" />
+                  </View>
+                </PressableScale>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <View
+                className="w-12 h-12 rounded-full items-center justify-center"
+                style={{ backgroundColor: 'rgba(26,20,16,0.06)' }}
+              >
+                <Bike size={20} color="#7A6F66" />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="font-display text-[15px]" style={{ fontWeight: '700', color: '#1A1410' }}>
+                  Finding your rider…
+                </Text>
+                <Text className="text-[12px] mt-0.5" style={{ color: '#7A6F66' }}>
+                  We’ll assign the nearest available rider.
+                </Text>
+              </View>
+            </>
+          )}
         </MotiView>
 
         {!isDemo && __DEV__ && (

@@ -17,16 +17,15 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
   groceries: 'Groceries',
 };
 
-const DEMO_TOTAL_DH: Record<CategoryKey, number> = {
-  food: 138,
-  pharmacy: 84,
-  groceries: 212,
-};
-
 export default function Checkout() {
   const router = useRouter();
-  const { category } = useLocalSearchParams<{ category?: string }>();
+  const { category, totalDh: totalParam } = useLocalSearchParams<{
+    category?: string;
+    totalDh?: string;
+  }>();
   const categoryKey = (category as CategoryKey) ?? 'food';
+  // Real order total is passed in from the cart/menu step. No hardcoded prices.
+  const totalDh = Math.max(0, Math.round(Number(totalParam) || 0));
 
   const [landmark, setLandmark] = useState('');
   const [notes, setNotes] = useState('');
@@ -36,9 +35,18 @@ export default function Checkout() {
 
   const landmarkValid = landmark.trim().length >= MIN_LANDMARK_LENGTH;
   const coordsReady = !!coords;
-  const canSubmit = landmarkValid && coordsReady && !submitting;
+  const canSubmit = !!user && landmarkValid && coordsReady && totalDh > 0 && !submitting;
 
   const handleSubmit = async () => {
+    // Production: a real order requires a signed-in user (RLS enforces
+    // orders.customer_id = auth.uid()). No demo fallback.
+    if (!user) {
+      Alert.alert('Sign in to order', 'Create an account or sign in to place your order.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Sign in', onPress: () => router.push('/sign-in') },
+      ]);
+      return;
+    }
     if (!coords) {
       Alert.alert('Location required', 'Tap "Capture" to share your GPS pin first.');
       return;
@@ -47,12 +55,8 @@ export default function Checkout() {
       Alert.alert('Landmark required', 'Add a quick landmark so your driver finds you.');
       return;
     }
-    // A real order requires a signed-in user (RLS: orders.customer_id = auth.uid()).
-    // Until mobile auth (Clerk) is connected, fall through to a demo timeline so
-    // the screen stays reviewable rather than throwing an RLS error.
-    if (!user) {
-      const demoId = `demo-${Math.random().toString(36).slice(2, 8)}`;
-      router.replace({ pathname: '/order/[id]', params: { id: demoId } });
+    if (totalDh <= 0) {
+      Alert.alert('Cart is empty', 'Add items before placing an order.');
       return;
     }
     const orderId = await create({
@@ -60,14 +64,13 @@ export default function Checkout() {
       category: categoryKey,
       coords,
       landmark: landmark.trim(),
-      totalDh: DEMO_TOTAL_DH[categoryKey],
+      totalDh,
       deliveryNotes: notes.trim() || undefined,
     });
     if (orderId) {
       router.replace({ pathname: '/order/[id]', params: { id: orderId } });
     } else {
-      const demoId = `demo-${Math.random().toString(36).slice(2, 8)}`;
-      router.replace({ pathname: '/order/[id]', params: { id: demoId } });
+      Alert.alert('Could not place order', 'Please try again in a moment.');
     }
   };
 
@@ -177,7 +180,7 @@ export default function Checkout() {
         >
           <View className="flex-row justify-between mb-2">
             <Text className="text-white/60 text-[12px] font-semibold">Subtotal</Text>
-            <Text className="text-white text-[13px] font-semibold">{DEMO_TOTAL_DH[categoryKey]} dh</Text>
+            <Text className="text-white text-[13px] font-semibold">{totalDh} dh</Text>
           </View>
           <View className="flex-row justify-between mb-2">
             <Text className="text-white/60 text-[12px] font-semibold">Delivery</Text>
@@ -189,14 +192,14 @@ export default function Checkout() {
           >
             <Text className="text-white font-display text-[15px]" style={{ fontWeight: '800' }}>Total</Text>
             <Text className="text-white font-display text-[18px]" style={{ fontWeight: '800', letterSpacing: -0.4 }}>
-              {DEMO_TOTAL_DH[categoryKey]} dh
+              {totalDh} dh
             </Text>
           </View>
         </MotiView>
 
         {createError && (
           <Text className="mt-3 text-[12px]" style={{ color: '#EF4444' }}>
-            Couldn't create order in Firestore — using demo flow. ({createError.message})
+            {createError.message}
           </Text>
         )}
       </ScrollView>
@@ -227,12 +230,16 @@ export default function Checkout() {
           >
             <Text className="text-white font-bold text-[15px] mr-2" style={{ letterSpacing: 0.2 }}>
               {submitting
-                ? 'Sending to driver…'
-                : !coordsReady
-                  ? 'Capture GPS first'
-                  : !landmarkValid
-                    ? 'Add a landmark'
-                    : `Place order · ${DEMO_TOTAL_DH[categoryKey]} dh`}
+                ? 'Placing order…'
+                : !user
+                  ? 'Sign in to order'
+                  : !coordsReady
+                    ? 'Capture GPS first'
+                    : !landmarkValid
+                      ? 'Add a landmark'
+                      : totalDh <= 0
+                        ? 'Cart is empty'
+                        : `Place order · ${totalDh} dh`}
             </Text>
             <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
           </View>

@@ -7,6 +7,7 @@ import { PressableScale } from '../../components/primitives/PressableScale';
 import { Pulse } from '../../components/primitives/Pulse';
 import { useOrderStatus } from '../../hooks/useOrderStatus';
 import { useAdvanceOrder } from '../../hooks/useAdvanceOrder';
+import { useAuth } from '../../lib/auth';
 import { ORDER_STAGES, type OrderStage } from '../../lib/types';
 import { STAGE_LABELS } from '../../lib/theme';
 
@@ -21,12 +22,39 @@ const NEXT_STAGE_CTA: Record<OrderStage, string | null> = {
 export default function DriverAssignment() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { order, stage, loading } = useOrderStatus(id);
+  const { user, loading: authLoading } = useAuth();
+  const { order, stage, loading } = useOrderStatus(user ? id : undefined);
   const { advanceFrom, pending } = useAdvanceOrder(id);
 
   const cta = NEXT_STAGE_CTA[stage];
   const stageIndex = ORDER_STAGES.indexOf(stage);
   const progressPct = ((stageIndex + 1) / ORDER_STAGES.length) * 100;
+
+  // Signed-out: a rider must be authenticated to load assigned orders
+  // (RLS scopes orders to the assigned rider). Show a clear prompt instead
+  // of an endless "Loading assignment…".
+  if (!authLoading && !user) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0E0A07' }} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Navigation size={32} color="#FF8A65" />
+          <Text
+            style={{ color: '#FBF7F2', fontWeight: '800', fontSize: 20, marginTop: 16, textAlign: 'center' }}
+          >
+            Sign in to drive
+          </Text>
+          <Text style={{ color: '#7A6F66', fontSize: 14, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+            Sign in with your rider account to view and manage delivery assignments.
+          </Text>
+          <PressableScale onPress={() => router.replace('/sign-in')}>
+            <View style={{ backgroundColor: '#FF5722', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Sign in</Text>
+            </View>
+          </PressableScale>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0E0A07' }} edges={['top']}>

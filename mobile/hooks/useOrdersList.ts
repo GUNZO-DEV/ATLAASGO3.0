@@ -6,8 +6,8 @@ const SELECT = 'id, customer_id, status, created_at, coords, landmark, driver_pa
 
 /**
  * Live list of the most recent orders, from Supabase. Subscribes to realtime
- * INSERT/UPDATE on `orders` so the list stays current (replaces the old
- * Firestore onSnapshot). RLS scopes what the signed-in user can see.
+ * INSERT/UPDATE on `orders` so the list stays current. RLS scopes the rows to
+ * the signed-in user (a customer sees only their own orders).
  */
 export function useOrdersList(max = 20) {
   const [orders, setOrders] = useState<Order[]>([]);
