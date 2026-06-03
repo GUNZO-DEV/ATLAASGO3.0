@@ -8,6 +8,7 @@ import { LandmarkInput, MIN_LANDMARK_LENGTH } from '../components/LandmarkInput'
 import { PressableScale } from '../components/primitives/PressableScale';
 import { useLocation } from '../hooks/useLocation';
 import { useCreateOrder } from '../hooks/useCreateOrder';
+import { useAuth } from '../lib/auth';
 import type { CategoryKey } from '../lib/types';
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
@@ -31,6 +32,7 @@ export default function Checkout() {
   const [notes, setNotes] = useState('');
   const { coords, status: locStatus, capture, error: locError } = useLocation();
   const { create, submitting, error: createError } = useCreateOrder();
+  const { user } = useAuth();
 
   const landmarkValid = landmark.trim().length >= MIN_LANDMARK_LENGTH;
   const coordsReady = !!coords;
@@ -45,8 +47,16 @@ export default function Checkout() {
       Alert.alert('Landmark required', 'Add a quick landmark so your driver finds you.');
       return;
     }
+    // A real order requires a signed-in user (RLS: orders.customer_id = auth.uid()).
+    // Until mobile auth (Clerk) is connected, fall through to a demo timeline so
+    // the screen stays reviewable rather than throwing an RLS error.
+    if (!user) {
+      const demoId = `demo-${Math.random().toString(36).slice(2, 8)}`;
+      router.replace({ pathname: '/order/[id]', params: { id: demoId } });
+      return;
+    }
     const orderId = await create({
-      customerId: 'demo-user',
+      customerId: user.id,
       category: categoryKey,
       coords,
       landmark: landmark.trim(),
@@ -56,10 +66,6 @@ export default function Checkout() {
     if (orderId) {
       router.replace({ pathname: '/order/[id]', params: { id: orderId } });
     } else {
-      /**
-       * Firestore not configured yet — fall back to a demo orderId so the
-       * timeline screen is still reviewable end-to-end during prototype review.
-       */
       const demoId = `demo-${Math.random().toString(36).slice(2, 8)}`;
       router.replace({ pathname: '/order/[id]', params: { id: demoId } });
     }

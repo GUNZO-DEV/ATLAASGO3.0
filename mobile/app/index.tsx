@@ -1,14 +1,16 @@
 import { MotiView } from 'moti';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, MapPin, Receipt } from 'lucide-react-native';
+import { Bell, MapPin, Receipt, Star } from 'lucide-react-native';
 import { CategoryGrid } from '../components/CategoryGrid';
 import { useCategories } from '../hooks/useCategories';
+import { useRestaurants } from '../hooks/useRestaurants';
 
 export default function Home() {
   const router = useRouter();
   const { categories } = useCategories();
+  const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
@@ -87,10 +89,82 @@ export default function Home() {
           </Text>
         </MotiView>
 
-        <CategoryGrid
-          categories={categories}
-          onSelect={(c) => router.push({ pathname: '/checkout', params: { category: c.id } })}
-        />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          <CategoryGrid
+            categories={categories}
+            onSelect={(c) => router.push({ pathname: '/checkout', params: { category: c.id } })}
+          />
+
+          {/* ── Live restaurants from Supabase (the real backend) ── */}
+          <View className="mt-8 flex-row items-center justify-between">
+            <Text
+              className="font-display text-[20px]"
+              style={{ fontWeight: '800', letterSpacing: -0.6, color: '#1A1410' }}
+            >
+              Open in Ifrane
+            </Text>
+            {!restosLoading && (
+              <Text className="text-[12px] font-bold" style={{ color: '#7A6F66' }}>
+                {restaurants.length} live
+              </Text>
+            )}
+          </View>
+
+          {restosLoading ? (
+            <View className="py-10 items-center">
+              <ActivityIndicator color="#FF5722" />
+              <Text className="mt-3 text-[13px]" style={{ color: '#7A6F66' }}>
+                Loading live restaurants…
+              </Text>
+            </View>
+          ) : restosError ? (
+            <Text className="mt-4 text-[13px]" style={{ color: '#B91C1C' }}>
+              Couldn’t reach the backend: {restosError}
+            </Text>
+          ) : (
+            <View className="mt-4" style={{ gap: 10 }}>
+              {restaurants.map((r, i) => (
+                <MotiView
+                  key={r.id}
+                  from={{ opacity: 0, translateY: 10 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 280, delay: Math.min(i * 40, 400) }}
+                >
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/checkout', params: { category: 'food' } })}
+                    className="flex-row items-center bg-white rounded-2xl p-3.5"
+                    style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}
+                  >
+                    <View
+                      className="w-12 h-12 rounded-xl items-center justify-center"
+                      style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}
+                    >
+                      <Text style={{ fontSize: 24 }}>{r.emoji ?? '🍽️'}</Text>
+                    </View>
+                    <View className="ml-3 flex-1">
+                      <Text className="text-[15px] font-bold" style={{ color: '#1A1410' }} numberOfLines={1}>
+                        {r.name}
+                      </Text>
+                      <Text className="text-[12px] mt-0.5" style={{ color: '#7A6F66' }} numberOfLines={1}>
+                        {[r.cuisine, r.time_min ? `${r.time_min} min` : null, r.fee_dh != null ? `${r.fee_dh} dh` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                    {r.rating != null && (
+                      <View className="flex-row items-center" style={{ gap: 3 }}>
+                        <Star size={13} color="#FF5722" fill="#FF5722" />
+                        <Text className="text-[13px] font-bold" style={{ color: '#1A1410' }}>
+                          {r.rating}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                </MotiView>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       </View>
     </SafeAreaView>
   );

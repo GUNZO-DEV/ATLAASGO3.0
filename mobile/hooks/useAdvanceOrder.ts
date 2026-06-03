@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { updateDoc } from 'firebase/firestore';
-import { orderDoc } from '../lib/firestore';
+import { supabase } from '../lib/supabase';
 import { ORDER_STAGES, type OrderStage } from '../lib/types';
 
 /**
- * Driver-side mutation. Advances the order to the next stage in ORDER_STAGES,
- * or to a specific stage. The customer screen's onSnapshot picks up the change
- * and animates its timeline accordingly.
+ * Driver-side mutation, on Supabase. Advances the order to the next stage (or a
+ * specific one). The customer screen's realtime subscription picks up the
+ * UPDATE and animates the timeline. RLS enforces that only an assigned rider /
+ * admin can actually perform the update.
  */
 export function useAdvanceOrder(orderId: string | undefined) {
   const [pending, setPending] = useState(false);
@@ -17,15 +17,16 @@ export function useAdvanceOrder(orderId: string | undefined) {
       if (!orderId) return false;
       setPending(true);
       setError(null);
-      try {
-        await updateDoc(orderDoc(orderId), { status: next });
-        return true;
-      } catch (e) {
-        setError(e as Error);
+      const { error: err } = await supabase
+        .from('orders')
+        .update({ status: next })
+        .eq('id', orderId);
+      setPending(false);
+      if (err) {
+        setError(new Error(err.message));
         return false;
-      } finally {
-        setPending(false);
       }
+      return true;
     },
     [orderId],
   );

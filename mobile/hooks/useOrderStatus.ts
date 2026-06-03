@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot } from 'firebase/firestore';
-import { orderDoc } from '../lib/firestore';
-import type { Order, OrderStage } from '../lib/types';
-import { ORDER_STAGES } from '../lib/types';
+import { supabase } from '../lib/supabase';
+import { mapOrderRow, ORDER_STAGES, type Order, type OrderRow, type OrderStage } from '../lib/types';
+
+const SELECT = 'id, customer_id, status, created_at, coords, landmark, driver_payload, total_dh';
 
 /**
- * Real-time order status. When Firestore isn't configured we fall back to a
- * driven local demo so the timeline component is reviewable without backend.
+ * Real-time status for one order, from Supabase. Loads the row then subscribes
+ * to UPDATE events on that specific order id so the timeline animates live
+ * (replaces the Firestore onSnapshot path).
  */
 export function useOrderStatus(orderId: string | undefined) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -19,28 +20,50 @@ export function useOrderStatus(orderId: string | undefined) {
       setLoading(false);
       return;
     }
-    let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(
-        orderDoc(orderId),
-        (snap) => {
-          if (snap.exists()) {
-            const data = snap.data();
-            setOrder(data);
-            setStage(data.status);
-          }
-          setLoading(false);
-        },
-        (err) => {
-          setError(err);
-          setLoading(false);
-        },
-      );
-    } catch (err) {
-      setError(err as Error);
+    let cancelled = false;
+
+    async function load() {
+      const { data, error: err } = await supabase
+        .from('orders')
+        .select(SELECT)
+        .eq('id', orderId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (err) {
+        setError(new Error(err.message));
+      } else if (data) {
+        const mapped = mapOrderRow(data as OrderRow);
+        setOrder(mapped);
+        // Only drive the timeline for stages it knows about.
+        if ((ORDER_STAGES as readonly string[]).includes(mapped.status)) {
+          setStage(mapped.status as OrderStage);
+        }
+      }
       setLoading(false);
     }
-    return () => unsub?.();
+
+    load();
+
+    const channel = supabase
+      .channel(`order-${orderId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
+        (payload) => {
+          const row = payload.new as OrderRow;
+          const mapped = mapOrderRow(row);
+          setOrder(mapped);
+          if ((ORDER_STAGES as readonly string[]).includes(mapped.status)) {
+            setStage(mapped.status as OrderStage);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [orderId]);
 
   return { order, stage, setStage, loading, error };

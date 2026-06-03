@@ -1,4 +1,7 @@
-import type { GeoPoint, Timestamp } from 'firebase/firestore';
+/**
+ * Mobile order types — aligned to the Supabase `orders` table (snake_case in
+ * the DB; we expose a camelCase view to the screens via mappers in the hooks).
+ */
 
 export type CategoryKey = 'food' | 'pharmacy' | 'groceries';
 
@@ -11,34 +14,68 @@ export type Category = {
   partnerCount: number;
 };
 
+// The Supabase order_status enum (matches the web app + DB).
 export const ORDER_STAGES = ['ordered', 'preparing', 'enRoute', 'outForDelivery', 'arriving'] as const;
 export type OrderStage = (typeof ORDER_STAGES)[number];
+// Terminal states exist in the DB enum too, but the timeline only animates the above.
+export type OrderStatus = OrderStage | 'delivered' | 'cancelled';
 
-/**
- * Driver-side header view. Mirrored fields on the order doc keep the driver
- * read path single-document — no joins needed in the dispatch app.
- */
+export type Coords = { lat: number; lng: number; accuracyM?: number };
+
 export type DriverPayload = {
   headerLandmark: string;
-  coords: GeoPoint;
-  deliveryNotes?: string;
+  coords: Coords;
+  deliveryNotes?: string | null;
 };
 
+/** Camel-cased order as the screens consume it (mapped from the DB row). */
 export type Order = {
   id: string;
   customerId: string;
-  category: CategoryKey;
-  status: OrderStage;
-  createdAt: Timestamp;
-  /** GPS captured at checkout from expo-location. */
-  coords: { lat: number; lng: number; accuracyM?: number };
-  /** Mandatory free-text landmark (Moroccan-style location reference). */
+  status: OrderStatus;
+  createdAt: string; // ISO timestamp from Postgres
+  coords: Coords;
   landmark: string;
-  /** Mirrored data optimised for the driver app's assignment header. */
   driverPayload: DriverPayload;
   totalDh: number;
+  /** Optional — DB has no single category column; kept for UI compatibility. */
+  category?: CategoryKey;
 };
 
-export type NewOrderInput = Omit<Order, 'id' | 'createdAt' | 'status' | 'driverPayload'> & {
+export type NewOrderInput = {
+  customerId: string;
+  category?: CategoryKey;
+  coords: Coords;
+  landmark: string;
+  totalDh: number;
   deliveryNotes?: string;
 };
+
+/** Raw Supabase row shape (snake_case) → mapped to Order by mapOrderRow(). */
+export type OrderRow = {
+  id: string;
+  customer_id: string;
+  status: OrderStatus;
+  created_at: string;
+  coords: Coords | null;
+  landmark: string | null;
+  driver_payload: DriverPayload | null;
+  total_dh: number | null;
+};
+
+export function mapOrderRow(row: OrderRow): Order {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    status: row.status,
+    createdAt: row.created_at,
+    coords: row.coords ?? { lat: 0, lng: 0 },
+    landmark: row.landmark ?? '',
+    driverPayload:
+      row.driver_payload ?? {
+        headerLandmark: row.landmark ?? '',
+        coords: row.coords ?? { lat: 0, lng: 0 },
+      },
+    totalDh: row.total_dh ?? 0,
+  };
+}

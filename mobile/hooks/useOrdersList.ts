@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, query, orderBy, limit } from 'firebase/firestore';
-import { ordersCol } from '../lib/firestore';
-import type { Order } from '../lib/types';
+import { supabase } from '../lib/supabase';
+import { mapOrderRow, type Order, type OrderRow } from '../lib/types';
+
+const SELECT = 'id, customer_id, status, created_at, coords, landmark, driver_payload, total_dh';
 
 /**
- * Live list of the most recent orders. Used by the dev orders index to
- * navigate between customer and driver perspectives without auth wiring.
+ * Live list of the most recent orders, from Supabase. Subscribes to realtime
+ * INSERT/UPDATE on `orders` so the list stays current (replaces the old
+ * Firestore onSnapshot). RLS scopes what the signed-in user can see.
  */
 export function useOrdersList(max = 20) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -13,24 +15,33 @@ export function useOrdersList(max = 20) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(
-        query(ordersCol(), orderBy('createdAt', 'desc'), limit(max)),
-        (snap) => {
-          setOrders(snap.docs.map((d) => d.data()));
-          setLoading(false);
-        },
-        (err) => {
-          setError(err);
-          setLoading(false);
-        },
-      );
-    } catch (e) {
-      setError(e as Error);
+    let cancelled = false;
+
+    async function load() {
+      const { data, error: err } = await supabase
+        .from('orders')
+        .select(SELECT)
+        .order('created_at', { ascending: false })
+        .limit(max);
+      if (cancelled) return;
+      if (err) setError(new Error(err.message));
+      else setOrders(((data ?? []) as OrderRow[]).map(mapOrderRow));
       setLoading(false);
     }
-    return () => unsub?.();
+
+    load();
+
+    const channel = supabase
+      .channel('orders-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        load();
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [max]);
 
   return { orders, loading, error };
