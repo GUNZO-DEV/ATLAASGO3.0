@@ -1,13 +1,14 @@
+import { useMemo, useRef, useState } from 'react';
 import { MotiView } from 'moti';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MapPin, Receipt, ShoppingBag, Star, User } from 'lucide-react-native';
-import { CategoryGrid } from '../components/CategoryGrid';
 import { useCategories } from '../hooks/useCategories';
 import { useRestaurants } from '../hooks/useRestaurants';
 import { useAuth } from '../lib/auth';
 import { useCart } from '../lib/cart';
+import type { CategoryKey } from '../lib/types';
 
 export default function Home() {
   const router = useRouter();
@@ -15,6 +16,18 @@ export default function Home() {
   const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
   const { user } = useAuth();
   const cartCount = useCart((s) => s.count());
+
+  // Tapping a category filters the restaurant list in place (and scrolls to
+  // it). Only food restaurants exist today; pharmacy/groceries are upcoming.
+  const [activeCategory, setActiveCategory] = useState<CategoryKey>('food');
+  const scrollRef = useRef<ScrollView>(null);
+  const listY = useRef(0);
+
+  const visibleRestaurants = useMemo(() => {
+    // All seeded restaurants are food venues, so 'food' shows everything.
+    // pharmacy/groceries have no partners yet → empty (handled below).
+    return activeCategory === 'food' ? restaurants : [];
+  }, [restaurants, activeCategory]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
@@ -133,23 +146,61 @@ export default function Home() {
           </Text>
         </MotiView>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <CategoryGrid
-            categories={categories}
-            onSelect={(c) => router.push({ pathname: '/checkout', params: { category: c.id } })}
-          />
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        >
+          {/* Category chips — tap to filter the list below */}
+          <View className="flex-row" style={{ gap: 10 }}>
+            {categories.map((c) => {
+              const active = c.id === activeCategory;
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => {
+                    setActiveCategory(c.id as CategoryKey);
+                    scrollRef.current?.scrollTo({ y: Math.max(0, listY.current - 12), animated: true });
+                  }}
+                  className="flex-1"
+                >
+                  <View
+                    className="rounded-2xl p-4 items-center"
+                    style={{
+                      backgroundColor: active ? '#FF5722' : '#fff',
+                      borderWidth: 1,
+                      borderColor: active ? '#FF5722' : 'rgba(26,20,16,0.08)',
+                    }}
+                  >
+                    <Text style={{ fontSize: 26 }}>{c.emoji}</Text>
+                    <Text
+                      className="text-[13px] font-bold mt-1.5"
+                      style={{ color: active ? '#fff' : '#1A1410' }}
+                    >
+                      {c.label}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
 
-          {/* ── Live restaurants from Supabase (the real backend) ── */}
-          <View className="mt-8 flex-row items-center justify-between">
+          {/* ── Restaurant list (filtered by category) ── */}
+          <View
+            className="mt-8 flex-row items-center justify-between"
+            onLayout={(e) => {
+              listY.current = e.nativeEvent.layout.y;
+            }}
+          >
             <Text
               className="font-display text-[20px]"
               style={{ fontWeight: '800', letterSpacing: -0.6, color: '#1A1410' }}
             >
-              Open in Ifrane
+              {activeCategory === 'food' ? 'Open in Ifrane' : categories.find((c) => c.id === activeCategory)?.label}
             </Text>
-            {!restosLoading && (
+            {!restosLoading && activeCategory === 'food' && (
               <Text className="text-[12px] font-bold" style={{ color: '#7A6F66' }}>
-                {restaurants.length} live
+                {visibleRestaurants.length} live
               </Text>
             )}
           </View>
@@ -158,16 +209,28 @@ export default function Home() {
             <View className="py-10 items-center">
               <ActivityIndicator color="#FF5722" />
               <Text className="mt-3 text-[13px]" style={{ color: '#7A6F66' }}>
-                Loading live restaurants…
+                Loading restaurants…
               </Text>
             </View>
           ) : restosError ? (
             <Text className="mt-4 text-[13px]" style={{ color: '#B91C1C' }}>
               Couldn’t reach the backend: {restosError}
             </Text>
+          ) : visibleRestaurants.length === 0 ? (
+            <View
+              className="mt-4 rounded-3xl p-6"
+              style={{ backgroundColor: '#FFF1EB', borderWidth: 1, borderColor: 'rgba(255,87,34,0.15)' }}
+            >
+              <Text className="font-display text-[16px]" style={{ fontWeight: '700', color: '#1A1410' }}>
+                Coming soon
+              </Text>
+              <Text className="mt-1 text-[13px]" style={{ color: '#7A6F66', lineHeight: 18 }}>
+                {categories.find((c) => c.id === activeCategory)?.label} partners are launching in Ifrane shortly. Tap Food to order now.
+              </Text>
+            </View>
           ) : (
             <View className="mt-4" style={{ gap: 10 }}>
-              {restaurants.map((r, i) => (
+              {visibleRestaurants.map((r, i) => (
                 <MotiView
                   key={r.id}
                   from={{ opacity: 0, translateY: 10 }}
