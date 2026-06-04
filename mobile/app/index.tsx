@@ -1,33 +1,33 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { MotiView } from 'moti';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { MapPin, Receipt, ShoppingBag, Star, User } from 'lucide-react-native';
+import { MapPin, Receipt, Star, User } from 'lucide-react-native';
+import { CategoryGrid } from '../components/CategoryGrid';
 import { useCategories } from '../hooks/useCategories';
 import { useRestaurants } from '../hooks/useRestaurants';
 import { useAuth } from '../lib/auth';
-import { useCart } from '../lib/cart';
-import type { CategoryKey } from '../lib/types';
 
 export default function Home() {
   const router = useRouter();
   const { categories } = useCategories();
   const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
   const { user } = useAuth();
-  const cartCount = useCart((s) => s.count());
 
-  // Tapping a category filters the restaurant list in place (and scrolls to
-  // it). Only food restaurants exist today; pharmacy/groceries are upcoming.
-  const [activeCategory, setActiveCategory] = useState<CategoryKey>('food');
   const scrollRef = useRef<ScrollView>(null);
   const listY = useRef(0);
 
-  const visibleRestaurants = useMemo(() => {
-    // All seeded restaurants are food venues, so 'food' shows everything.
-    // pharmacy/groceries have no partners yet → empty (handled below).
-    return activeCategory === 'food' ? restaurants : [];
-  }, [restaurants, activeCategory]);
+  // "Browse" keeps the same cards/design — it just scrolls to the live
+  // restaurant list (all venues are food today) or notes upcoming categories.
+  function handleBrowse(categoryId: string) {
+    if (categoryId === 'food') {
+      scrollRef.current?.scrollTo({ y: Math.max(0, listY.current - 12), animated: true });
+    } else {
+      const label = categories.find((c) => c.id === categoryId)?.label ?? 'This category';
+      Alert.alert(`${label} — coming soon`, `${label} partners are launching in Ifrane shortly. Tap Food to order now.`);
+    }
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
@@ -63,36 +63,6 @@ export default function Home() {
             </View>
           </View>
           <View className="flex-row items-center">
-            <Pressable
-              onPress={() => router.push('/cart')}
-              accessibilityRole="button"
-              accessibilityLabel="Cart"
-            >
-              <View
-                className="w-10 h-10 rounded-full items-center justify-center bg-white mr-2"
-                style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
-              >
-                <ShoppingBag size={16} color="#1A1410" />
-                {cartCount > 0 && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -4,
-                      right: -4,
-                      minWidth: 18,
-                      height: 18,
-                      borderRadius: 999,
-                      backgroundColor: '#FF5722',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingHorizontal: 4,
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>{cartCount}</Text>
-                  </View>
-                )}
-              </View>
-            </Pressable>
             <Pressable
               onPress={() => router.push('/orders')}
               accessibilityRole="button"
@@ -146,46 +116,10 @@ export default function Home() {
           </Text>
         </MotiView>
 
-        <ScrollView
-          ref={scrollRef}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        >
-          {/* Category chips — tap to filter the list below */}
-          <View className="flex-row" style={{ gap: 10 }}>
-            {categories.map((c) => {
-              const active = c.id === activeCategory;
-              return (
-                <Pressable
-                  key={c.id}
-                  onPress={() => {
-                    setActiveCategory(c.id as CategoryKey);
-                    scrollRef.current?.scrollTo({ y: Math.max(0, listY.current - 12), animated: true });
-                  }}
-                  className="flex-1"
-                >
-                  <View
-                    className="rounded-2xl p-4 items-center"
-                    style={{
-                      backgroundColor: active ? '#FF5722' : '#fff',
-                      borderWidth: 1,
-                      borderColor: active ? '#FF5722' : 'rgba(26,20,16,0.08)',
-                    }}
-                  >
-                    <Text style={{ fontSize: 26 }}>{c.emoji}</Text>
-                    <Text
-                      className="text-[13px] font-bold mt-1.5"
-                      style={{ color: active ? '#fff' : '#1A1410' }}
-                    >
-                      {c.label}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          <CategoryGrid categories={categories} onSelect={(c) => handleBrowse(c.id)} />
 
-          {/* ── Restaurant list (filtered by category) ── */}
+          {/* ── Live restaurants from Supabase (the real backend) ── */}
           <View
             className="mt-8 flex-row items-center justify-between"
             onLayout={(e) => {
@@ -196,11 +130,11 @@ export default function Home() {
               className="font-display text-[20px]"
               style={{ fontWeight: '800', letterSpacing: -0.6, color: '#1A1410' }}
             >
-              {activeCategory === 'food' ? 'Open in Ifrane' : categories.find((c) => c.id === activeCategory)?.label}
+              Open in Ifrane
             </Text>
-            {!restosLoading && activeCategory === 'food' && (
+            {!restosLoading && (
               <Text className="text-[12px] font-bold" style={{ color: '#7A6F66' }}>
-                {visibleRestaurants.length} live
+                {restaurants.length} live
               </Text>
             )}
           </View>
@@ -209,28 +143,16 @@ export default function Home() {
             <View className="py-10 items-center">
               <ActivityIndicator color="#FF5722" />
               <Text className="mt-3 text-[13px]" style={{ color: '#7A6F66' }}>
-                Loading restaurants…
+                Loading live restaurants…
               </Text>
             </View>
           ) : restosError ? (
             <Text className="mt-4 text-[13px]" style={{ color: '#B91C1C' }}>
               Couldn’t reach the backend: {restosError}
             </Text>
-          ) : visibleRestaurants.length === 0 ? (
-            <View
-              className="mt-4 rounded-3xl p-6"
-              style={{ backgroundColor: '#FFF1EB', borderWidth: 1, borderColor: 'rgba(255,87,34,0.15)' }}
-            >
-              <Text className="font-display text-[16px]" style={{ fontWeight: '700', color: '#1A1410' }}>
-                Coming soon
-              </Text>
-              <Text className="mt-1 text-[13px]" style={{ color: '#7A6F66', lineHeight: 18 }}>
-                {categories.find((c) => c.id === activeCategory)?.label} partners are launching in Ifrane shortly. Tap Food to order now.
-              </Text>
-            </View>
           ) : (
             <View className="mt-4" style={{ gap: 10 }}>
-              {visibleRestaurants.map((r, i) => (
+              {restaurants.map((r, i) => (
                 <MotiView
                   key={r.id}
                   from={{ opacity: 0, translateY: 10 }}
