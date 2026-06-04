@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import { MotiView } from 'moti';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { MapPin, Receipt, Star, User } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Receipt, Star, User } from 'lucide-react-native';
 import { CategoryGrid } from '../components/CategoryGrid';
 import { useCategories } from '../hooks/useCategories';
 import { useRestaurants } from '../hooks/useRestaurants';
@@ -15,19 +15,11 @@ export default function Home() {
   const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
   const { user } = useAuth();
 
-  const scrollRef = useRef<ScrollView>(null);
-  const listY = useRef(0);
-
-  // "Browse" keeps the same cards/design — it just scrolls to the live
-  // restaurant list (all venues are food today) or notes upcoming categories.
-  function handleBrowse(categoryId: string) {
-    if (categoryId === 'food') {
-      scrollRef.current?.scrollTo({ y: Math.max(0, listY.current - 12), animated: true });
-    } else {
-      const label = categories.find((c) => c.id === categoryId)?.label ?? 'This category';
-      Alert.alert(`${label} — coming soon`, `${label} partners are launching in Ifrane shortly. Tap Food to order now.`);
-    }
-  }
+  // Tapping a category hides the others (shows just that one + its
+  // restaurants). The "All categories" back row brings them all back.
+  const [selected, setSelected] = useState<string | null>(null);
+  const selectedLabel = categories.find((c) => c.id === selected)?.label ?? '';
+  const shownCategories = selected ? categories.filter((c) => c.id === selected) : categories;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
@@ -116,43 +108,67 @@ export default function Home() {
           </Text>
         </MotiView>
 
-        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <CategoryGrid categories={categories} onSelect={(c) => handleBrowse(c.id)} />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          {/* When a category is selected, show a back row to bring them all back */}
+          {selected && (
+            <Pressable onPress={() => setSelected(null)}>
+              <View
+                className="flex-row items-center mb-3 self-start rounded-full px-3.5 py-2"
+                style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
+              >
+                <ArrowLeft size={15} color="#1A1410" />
+                <Text className="ml-1.5 text-[13px] font-bold" style={{ color: '#1A1410' }}>
+                  All categories
+                </Text>
+              </View>
+            </Pressable>
+          )}
 
-          {/* ── Live restaurants from Supabase (the real backend) ── */}
-          <View
-            className="mt-8 flex-row items-center justify-between"
-            onLayout={(e) => {
-              listY.current = e.nativeEvent.layout.y;
-            }}
-          >
-            <Text
-              className="font-display text-[20px]"
-              style={{ fontWeight: '800', letterSpacing: -0.6, color: '#1A1410' }}
-            >
-              Open in Ifrane
-            </Text>
-            {!restosLoading && (
-              <Text className="text-[12px] font-bold" style={{ color: '#7A6F66' }}>
-                {restaurants.length} live
-              </Text>
-            )}
-          </View>
+          <CategoryGrid categories={shownCategories} onSelect={(c) => setSelected(c.id)} />
 
-          {restosLoading ? (
-            <View className="py-10 items-center">
-              <ActivityIndicator color="#FF5722" />
-              <Text className="mt-3 text-[13px]" style={{ color: '#7A6F66' }}>
-                Loading live restaurants…
-              </Text>
-            </View>
-          ) : restosError ? (
-            <Text className="mt-4 text-[13px]" style={{ color: '#B91C1C' }}>
-              Couldn’t reach the backend: {restosError}
-            </Text>
-          ) : (
-            <View className="mt-4" style={{ gap: 10 }}>
-              {restaurants.map((r, i) => (
+          {/* ── Restaurants for the selected category ── */}
+          {selected ? (
+            <>
+              <View className="mt-8 flex-row items-center justify-between">
+                <Text
+                  className="font-display text-[20px]"
+                  style={{ fontWeight: '800', letterSpacing: -0.6, color: '#1A1410' }}
+                >
+                  {selected === 'food' ? 'Open in Ifrane' : selectedLabel}
+                </Text>
+                {!restosLoading && selected === 'food' && (
+                  <Text className="text-[12px] font-bold" style={{ color: '#7A6F66' }}>
+                    {restaurants.length} live
+                  </Text>
+                )}
+              </View>
+
+              {selected !== 'food' ? (
+                <View
+                  className="mt-4 rounded-3xl p-6"
+                  style={{ backgroundColor: '#FFF1EB', borderWidth: 1, borderColor: 'rgba(255,87,34,0.15)' }}
+                >
+                  <Text className="font-display text-[16px]" style={{ fontWeight: '700', color: '#1A1410' }}>
+                    Coming soon
+                  </Text>
+                  <Text className="mt-1 text-[13px]" style={{ color: '#7A6F66', lineHeight: 18 }}>
+                    {selectedLabel} partners are launching in Ifrane shortly. Tap “All categories”, then Food, to order now.
+                  </Text>
+                </View>
+              ) : restosLoading ? (
+                <View className="py-10 items-center">
+                  <ActivityIndicator color="#FF5722" />
+                  <Text className="mt-3 text-[13px]" style={{ color: '#7A6F66' }}>
+                    Loading live restaurants…
+                  </Text>
+                </View>
+              ) : restosError ? (
+                <Text className="mt-4 text-[13px]" style={{ color: '#B91C1C' }}>
+                  Couldn’t reach the backend: {restosError}
+                </Text>
+              ) : (
+                <View className="mt-4" style={{ gap: 10 }}>
+                  {restaurants.map((r, i) => (
                 <MotiView
                   key={r.id}
                   from={{ opacity: 0, translateY: 10 }}
@@ -191,8 +207,10 @@ export default function Home() {
                   </Pressable>
                 </MotiView>
               ))}
-            </View>
-          )}
+                </View>
+              )}
+            </>
+          ) : null}
         </ScrollView>
       </View>
     </SafeAreaView>
