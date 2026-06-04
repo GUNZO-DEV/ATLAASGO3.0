@@ -2,17 +2,19 @@ import { MotiView } from 'moti';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, MapPin, Receipt, Star, User } from 'lucide-react-native';
+import { MapPin, Receipt, ShoppingBag, Star, User } from 'lucide-react-native';
 import { CategoryGrid } from '../components/CategoryGrid';
 import { useCategories } from '../hooks/useCategories';
 import { useRestaurants } from '../hooks/useRestaurants';
 import { useAuth } from '../lib/auth';
+import { useCart } from '../lib/cart';
 
 export default function Home() {
   const router = useRouter();
   const { categories } = useCategories();
   const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
   const { user } = useAuth();
+  const cartCount = useCart((s) => s.count());
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
@@ -48,6 +50,36 @@ export default function Home() {
             </View>
           </View>
           <View className="flex-row items-center">
+            <Pressable
+              onPress={() => router.push('/cart')}
+              accessibilityRole="button"
+              accessibilityLabel="Cart"
+            >
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center bg-white mr-2"
+                style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
+              >
+                <ShoppingBag size={16} color="#1A1410" />
+                {cartCount > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -4,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 999,
+                      backgroundColor: '#FF5722',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>{cartCount}</Text>
+                  </View>
+                )}
+              </View>
+            </Pressable>
             <Pressable
               onPress={() => router.push('/orders')}
               accessibilityRole="button"
@@ -143,7 +175,7 @@ export default function Home() {
                   transition={{ type: 'timing', duration: 280, delay: Math.min(i * 40, 400) }}
                 >
                   <Pressable
-                    onPress={() => router.push({ pathname: '/checkout', params: { category: 'food' } })}
+                    onPress={() => router.push({ pathname: '/restaurant/[id]', params: { id: r.id } })}
                     className="flex-row items-center bg-white rounded-2xl p-3.5"
                     style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}
                   >
