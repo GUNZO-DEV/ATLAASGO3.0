@@ -15,14 +15,17 @@ export default function Home() {
   const { restaurants, loading: restosLoading, error: restosError } = useRestaurants();
   const { user } = useAuth();
 
-  // Tapping a category hides the others (shows just that one + its
-  // restaurants). The "All categories" back row brings them all back.
+  // Tapping a category hides the others and the whole screen adopts that
+  // category's personality (voice + accent color). "All categories" resets.
   const [selected, setSelected] = useState<string | null>(null);
-  const selectedLabel = categories.find((c) => c.id === selected)?.label ?? '';
+  const active = selected ? categories.find((c) => c.id === selected) ?? null : null;
   const shownCategories = selected ? categories.filter((c) => c.id === selected) : categories;
 
+  // When a category is focused the whole screen takes on its soft tint.
+  const screenBg = active ? active.soft : '#FBF7F2';
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top']}>
       <View className="flex-1 px-6">
         {/* Top bar */}
         <MotiView
@@ -86,25 +89,38 @@ export default function Home() {
           </View>
         </MotiView>
 
-        {/* Heading */}
+        {/* Heading — adopts the focused category's voice + accent */}
         <MotiView
-          from={{ opacity: 0, translateY: 14 }}
+          key={active ? active.id : 'all'}
+          from={{ opacity: 0, translateY: 10 }}
           animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 380, delay: 120 }}
+          transition={{ type: 'timing', duration: 340 }}
           className="mt-7 mb-7"
         >
-          <Text className="text-[12px] uppercase font-bold mb-2" style={{ letterSpacing: 1.6, color: '#FF5722' }}>
-            AtlaasGo · Ifrane
-          </Text>
           <Text
-            className="font-display text-[34px]"
-            style={{ fontWeight: '800', lineHeight: 36, letterSpacing: -1.2, color: '#1A1410' }}
+            className="text-[12px] uppercase font-bold mb-2"
+            style={{ letterSpacing: 1.6, color: active ? active.accent : '#FF5722' }}
           >
-            What are you{'\n'}
-            <Text style={{ color: '#FF5722' }}>craving</Text> today?
+            {active ? `AtlaasGo · ${active.label}` : 'AtlaasGo · Ifrane'}
           </Text>
+          {active ? (
+            <Text
+              className="font-display text-[34px]"
+              style={{ fontWeight: '800', lineHeight: 36, letterSpacing: -1.2, color: active.accent }}
+            >
+              {active.headline}
+            </Text>
+          ) : (
+            <Text
+              className="font-display text-[34px]"
+              style={{ fontWeight: '800', lineHeight: 36, letterSpacing: -1.2, color: '#1A1410' }}
+            >
+              What are you{'\n'}
+              <Text style={{ color: '#FF5722' }}>craving</Text> today?
+            </Text>
+          )}
           <Text className="mt-3 text-[14px]" style={{ color: '#7A6F66', lineHeight: 20 }}>
-            One ecosystem. Three ways in.
+            {active ? active.voice : 'One ecosystem. Three ways in.'}
           </Text>
         </MotiView>
 
@@ -114,10 +130,10 @@ export default function Home() {
             <Pressable onPress={() => setSelected(null)}>
               <View
                 className="flex-row items-center mb-3 self-start rounded-full px-3.5 py-2"
-                style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
+                style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: `${active?.accent ?? '#1A1410'}33` }}
               >
-                <ArrowLeft size={15} color="#1A1410" />
-                <Text className="ml-1.5 text-[13px] font-bold" style={{ color: '#1A1410' }}>
+                <ArrowLeft size={15} color={active?.accent ?? '#1A1410'} />
+                <Text className="ml-1.5 text-[13px] font-bold" style={{ color: active?.accent ?? '#1A1410' }}>
                   All categories
                 </Text>
               </View>
@@ -134,10 +150,10 @@ export default function Home() {
                   className="font-display text-[20px]"
                   style={{ fontWeight: '800', letterSpacing: -0.6, color: '#1A1410' }}
                 >
-                  {selected === 'food' ? 'Open in Ifrane' : selectedLabel}
+                  {active?.sectionTitle ?? 'Open in Ifrane'}
                 </Text>
                 {!restosLoading && selected === 'food' && (
-                  <Text className="text-[12px] font-bold" style={{ color: '#7A6F66' }}>
+                  <Text className="text-[12px] font-bold" style={{ color: active?.accent ?? '#7A6F66' }}>
                     {restaurants.length} live
                   </Text>
                 )}
@@ -146,13 +162,14 @@ export default function Home() {
               {selected !== 'food' ? (
                 <View
                   className="mt-4 rounded-3xl p-6"
-                  style={{ backgroundColor: '#FFF1EB', borderWidth: 1, borderColor: 'rgba(255,87,34,0.15)' }}
+                  style={{ backgroundColor: active?.soft, borderWidth: 1, borderColor: `${active?.accent}26` }}
                 >
-                  <Text className="font-display text-[16px]" style={{ fontWeight: '700', color: '#1A1410' }}>
-                    Coming soon
+                  <Text style={{ fontSize: 28, marginBottom: 6 }}>{active?.emoji}</Text>
+                  <Text className="font-display text-[17px]" style={{ fontWeight: '800', color: active?.accent }}>
+                    {active?.label} — coming soon
                   </Text>
                   <Text className="mt-1 text-[13px]" style={{ color: '#7A6F66', lineHeight: 18 }}>
-                    {selectedLabel} partners are launching in Ifrane shortly. Tap “All categories”, then Food, to order now.
+                    {active?.label} partners are launching in Ifrane shortly. Tap “All categories”, then Food, to order now.
                   </Text>
                 </View>
               ) : restosLoading ? (
@@ -182,7 +199,7 @@ export default function Home() {
                   >
                     <View
                       className="w-12 h-12 rounded-xl items-center justify-center"
-                      style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}
+                      style={{ backgroundColor: `${active?.accent ?? '#FF5722'}1A` }}
                     >
                       <Text style={{ fontSize: 24 }}>{r.emoji ?? '🍽️'}</Text>
                     </View>
@@ -198,7 +215,7 @@ export default function Home() {
                     </View>
                     {r.rating != null && (
                       <View className="flex-row items-center" style={{ gap: 3 }}>
-                        <Star size={13} color="#FF5722" fill="#FF5722" />
+                        <Star size={13} color={active?.accent ?? '#FF5722'} fill={active?.accent ?? '#FF5722'} />
                         <Text className="text-[13px] font-bold" style={{ color: '#1A1410' }}>
                           {r.rating}
                         </Text>

@@ -12,6 +12,12 @@ export type Category = {
   emoji: string;
   gradient: [string, string];
   partnerCount: number;
+  /** Distinctive personality, used when the category is focused. */
+  accent: string;        // solo accent color (buttons, highlights)
+  soft: string;          // soft tinted background for the focused screen
+  headline: string;      // focused-mode hero headline
+  voice: string;         // focused-mode sub-line / personality blurb
+  sectionTitle: string;  // label above the list when focused
 };
 
 // The Supabase order_status enum (matches the web app + DB).
