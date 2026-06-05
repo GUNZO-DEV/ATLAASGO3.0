@@ -71,7 +71,7 @@ export default function Home() {
               </View>
             </Pressable>
             <Pressable
-              onPress={() => router.push('/sign-in')}
+              onPress={() => router.push(user ? '/account' : '/sign-in')}
               accessibilityRole="button"
               accessibilityLabel={user ? 'Account' : 'Sign in'}
             >

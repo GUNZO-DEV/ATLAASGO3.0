@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Plus, ShoppingBag } from 'lucide-react-native';
+import { ArrowLeft, Heart, Plus, ShoppingBag } from 'lucide-react-native';
 import { PressableScale } from '../../components/primitives/PressableScale';
 import { useMenu } from '../../hooks/useMenu';
+import { useFavorites } from '../../hooks/useFavorites';
 import { useCart } from '../../lib/cart';
 import { supabase } from '../../lib/supabase';
 
@@ -14,6 +15,8 @@ export default function RestaurantScreen() {
   const { sections, loading, error } = useMenu(id);
   const { add, count, total } = useCart();
   const cartCount = count();
+  const { isFavorite, toggle } = useFavorites();
+  const faved = id ? isFavorite(id) : false;
 
   const [restaurant, setRestaurant] = useState<{ name: string; emoji: string | null } | null>(null);
 
@@ -51,7 +54,14 @@ export default function RestaurantScreen() {
               <ArrowLeft size={18} color="#1A1410" />
             </View>
           </PressableScale>
-          <View style={{ width: 40 }} />
+          <PressableScale onPress={() => id && toggle(id)}>
+            <View
+              className="w-10 h-10 rounded-full items-center justify-center bg-white"
+              style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
+            >
+              <Heart size={18} color="#E11D48" fill={faved ? '#E11D48' : 'transparent'} />
+            </View>
+          </PressableScale>
         </View>
 
         <View className="mt-6 mb-5 flex-row items-center">
