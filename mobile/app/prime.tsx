@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Crown, Check } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { PressableScale } from '../components/primitives/PressableScale';
 import { useAuth } from '../lib/auth';
+import { supabase } from '../lib/supabase';
 import { usePrime, PRIME_TIERS } from '../hooks/usePrime';
 
 const INK = '#1A1410';
@@ -13,7 +16,42 @@ const GOLD = '#C66B1F';
 export default function PrimeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { sub, loading } = usePrime();
+  const { sub, loading, refresh } = usePrime();
+  const [buyingTier, setBuyingTier] = useState<string | null>(null);
+
+  async function buyTier(tier: string) {
+    if (!user) {
+      router.push('/sign-in');
+      return;
+    }
+    setBuyingTier(tier);
+    try {
+      // Stripe-hosted Checkout (one-time payment), then activation by session id —
+      // same create-prime-checkout / activate-prime edge functions the web uses.
+      const { data, error } = await supabase.functions.invoke('create-prime-checkout', {
+        body: { tier, userId: user.id, customerEmail: user.email ?? undefined, siteUrl: 'https://atlaasgo.com' },
+      });
+      if (error || !data?.url || !data?.sessionId) throw new Error(error?.message ?? 'Could not start checkout');
+      await WebBrowser.openBrowserAsync(data.url as string);
+      // Browser dismissed — try to activate. Fails cleanly if payment wasn't completed.
+      const { data: act, error: actErr } = await supabase.functions.invoke('activate-prime', {
+        body: { sessionId: data.sessionId },
+      });
+      if (actErr || !act?.ok) {
+        Alert.alert(
+          'Payment not finished',
+          "If you completed the payment, your membership activates within a minute — pull back into this screen to refresh.",
+        );
+      } else {
+        await refresh();
+        Alert.alert('Welcome to Prime 👑', 'Your membership is active.');
+      }
+    } catch (e) {
+      Alert.alert('Could not start checkout', (e as Error).message);
+    } finally {
+      setBuyingTier(null);
+    }
+  }
 
   function Header() {
     return (
@@ -89,24 +127,18 @@ export default function PrimeScreen() {
                     </View>
                   ))}
                 </View>
-                <Pressable
-                  onPress={() => {
-                    if (!user) {
-                      router.push('/sign-in');
-                    } else {
-                      // Payment is wired separately (handled by the user).
-                      Alert.alert('Checkout', 'Prime checkout & payment is set up separately.');
-                    }
-                  }}
-                  disabled={current}
-                >
+                <Pressable onPress={() => buyTier(t.id)} disabled={current || buyingTier !== null}>
                   <View
                     className="rounded-2xl py-3.5 items-center mt-4"
-                    style={{ backgroundColor: current ? 'rgba(26,20,16,0.06)' : GOLD }}
+                    style={{ backgroundColor: current ? 'rgba(26,20,16,0.06)' : GOLD, opacity: buyingTier && buyingTier !== t.id ? 0.5 : 1 }}
                   >
-                    <Text className="font-bold text-[15px]" style={{ color: current ? MUTED : '#fff' }}>
-                      {current ? 'Current plan' : `Choose ${t.name}`}
-                    </Text>
+                    {buyingTier === t.id ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text className="font-bold text-[15px]" style={{ color: current ? MUTED : '#fff' }}>
+                        {current ? 'Current plan' : `Choose ${t.name}`}
+                      </Text>
+                    )}
                   </View>
                 </Pressable>
               </View>

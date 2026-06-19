@@ -45,8 +45,8 @@ Deno.serve(async (req) => {
   try {
     const { orderId, totalDh, customerEmail } = await req.json();
 
-    if (!orderId || !totalDh || totalDh <= 0) {
-      return json({ error: 'Missing or invalid orderId / totalDh' }, 400);
+    if (!orderId) {
+      return json({ error: 'Missing orderId' }, 400);
     }
 
     // Verify the order exists and hasn't already been paid
@@ -58,6 +58,14 @@ Deno.serve(async (req) => {
 
     if (orderErr || !order) {
       return json({ error: 'Order not found' }, 404);
+    }
+
+    // SECURITY: charge the amount stored on the order row, never the
+    // client-supplied totalDh. order.total_dh is the server's record of what
+    // is owed; trusting the request body would let a tampered client pair a
+    // real high-value orderId with an arbitrary low amount (or overcharge).
+    if (!order.total_dh || order.total_dh <= 0) {
+      return json({ error: 'Order has no payable amount' }, 400);
     }
 
     // If there's already a payment intent, reuse it (idempotent)
@@ -82,8 +90,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Convert DH to centimes (MAD: 1 DH = 100 centimes)
-    const amountCentimes = Math.round(totalDh * 100);
+    // Convert DH to centimes (MAD: 1 DH = 100 centimes) — from the trusted
+    // order row, not the request body.
+    const amountCentimes = Math.round(order.total_dh * 100);
+    // Defensive cross-check: if the client sent a total, it must match the
+    // order's total exactly, otherwise reject rather than silently charging.
+    if (totalDh != null && Math.round(totalDh * 100) !== amountCentimes) {
+      return json({ error: 'Amount mismatch with order total' }, 400);
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCentimes,

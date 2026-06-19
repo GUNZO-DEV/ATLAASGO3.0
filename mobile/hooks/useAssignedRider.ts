@@ -77,7 +77,7 @@ export function useAssignedRider(orderId: string | undefined) {
 
     // Refresh when the assignment changes (rider gets assigned mid-track).
     const channel = supabase
-      .channel(`assignment-${orderId}`)
+      .channel(`assignment-${orderId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'order_assignments', filter: `order_id=eq.${orderId}` },

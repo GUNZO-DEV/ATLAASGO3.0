@@ -7,6 +7,7 @@ import { PressableScale } from '../components/primitives/PressableScale';
 import { useAuth } from '../lib/auth';
 import { useWallet } from '../hooks/useWallet';
 import { supabase } from '../lib/supabase';
+import { payWithPaymentSheet } from '../lib/stripe';
 
 const INK = '#1A1410';
 const MUTED = '#7A6F66';
@@ -49,17 +50,17 @@ export default function WalletScreen() {
     if (!user) return;
     setTopupBusy(true);
     try {
-      // Creates a Stripe PaymentIntent via the wallet-topup edge function.
-      // On iOS we open the Stripe Checkout URL so the user pays in their
-      // browser and deep-links back — no Stripe native SDK rebuild needed.
-      await startTopup(amount, user.email ?? undefined, user.id);
-      setTopupOpen(false);
-      Alert.alert(
-        'Top-up initiated',
-        `A payment for ${amount} dh was started. Complete it in your browser and your balance will update automatically.`,
-      );
+      // wallet-topup edge function creates a Stripe PaymentIntent; the native
+      // PaymentSheet collects the card / Apple Pay / Google Pay payment, and
+      // the stripe-webhook credits the balance asynchronously.
+      const { clientSecret } = await startTopup(amount, user.email ?? undefined, user.id);
+      const paid = await payWithPaymentSheet(clientSecret, user.email ?? 'AtlaasGo customer');
+      if (paid) {
+        setTopupOpen(false);
+        Alert.alert('Payment received ✓', 'Your balance will update in a moment.');
+      }
     } catch (e) {
-      Alert.alert('Could not start top-up', (e as Error).message);
+      Alert.alert('Could not complete top-up', (e as Error).message);
     } finally {
       setTopupBusy(false);
     }

@@ -14,10 +14,11 @@
       "backgroundColor": "#FBF7F2"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.atlaasgo.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "AtlaasGo needs your location to deliver to your exact spot in Ifrane."
+        "NSLocationWhenInUseUsageDescription": "AtlaasGo needs your location to deliver to your exact spot in Ifrane.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -40,7 +41,14 @@
         {
           "locationAlwaysAndWhenInUsePermission": "AtlaasGo uses your location to coordinate delivery to your doorstep."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF5722"
+        }
+      ],
+      "@bacons/apple-targets"
     ]
   }
 }

@@ -6,8 +6,10 @@ import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { AuthProvider } from '../lib/auth';
 import { ClerkSupabaseBridge } from '../lib/ClerkSupabaseBridge';
+import { PushRegistrar } from '../components/PushRegistrar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { tokenCache } from '../lib/tokenCache';
+import { StripeProviderMaybe } from '../lib/stripe';
 
 const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
@@ -15,10 +17,12 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
+        <StripeProviderMaybe>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <AuthProvider>
               <ClerkSupabaseBridge />
+              <PushRegistrar />
               <StatusBar style="dark" />
               <Stack
                 screenOptions={{
@@ -30,6 +34,7 @@ export default function RootLayout() {
             </AuthProvider>
           </SafeAreaProvider>
         </GestureHandlerRootView>
+        </StripeProviderMaybe>
       </ClerkProvider>
     </ErrorBoundary>
   );

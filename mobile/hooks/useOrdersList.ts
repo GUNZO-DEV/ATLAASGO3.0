@@ -32,7 +32,7 @@ export function useOrdersList(max = 20) {
     load();
 
     const channel = supabase
-      .channel('orders-list')
+      .channel(`orders-list-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         load();
       })

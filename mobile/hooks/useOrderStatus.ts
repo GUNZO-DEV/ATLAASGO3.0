@@ -45,7 +45,10 @@ export function useOrderStatus(orderId: string | undefined) {
     load();
 
     const channel = supabase
-      .channel(`order-${orderId}`)
+      // Unique topic per mount — a fixed name collides with an already-
+      // subscribed channel on re-mount/Fast Refresh, throwing "cannot add
+      // postgres_changes callbacks after subscribe()".
+      .channel(`order-${orderId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },

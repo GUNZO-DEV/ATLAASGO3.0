@@ -1,11 +1,14 @@
+import { useEffect, useMemo, useState } from 'react';
 import { MotiView } from 'moti';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ArrowRight, Receipt } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Receipt, RotateCcw } from 'lucide-react-native';
 import { PressableScale } from '../components/primitives/PressableScale';
 import { useOrdersList } from '../hooks/useOrdersList';
 import { useAuth } from '../lib/auth';
+import { useCart } from '../lib/cart';
+import { supabase } from '../lib/supabase';
 import { STAGE_LABELS } from '../lib/theme';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -18,14 +21,104 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: '#B91C1C',
 };
 
+/** One line of an order's `items` jsonb, normalised for display + reorder. */
+type OrderItemLine = {
+  id: string;
+  name: string;
+  priceDh: number;
+  qty: number;
+  restaurantId: string;
+  restaurantName: string;
+};
+
+/**
+ * The web app snapshots cart items as {id, restaurantSlug, restaurantName,
+ * name, priceDh, qty}; older/other writers may use {id, name, price, qty}.
+ * Accept both, drop anything unusable.
+ */
+function normalizeItems(raw: unknown): OrderItemLine[] {
+  if (!Array.isArray(raw)) return [];
+  const lines: OrderItemLine[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const it = entry as Record<string, unknown>;
+    const name = typeof it.name === 'string' ? it.name.trim() : '';
+    if (!name) continue;
+    const priceDh = Math.round(Number(it.priceDh ?? it.price ?? 0)) || 0;
+    const qty = Math.max(1, Math.round(Number(it.qty ?? 1)) || 1);
+    const id = typeof it.id === 'string' && it.id ? it.id : name;
+    const restaurantId =
+      typeof it.restaurantId === 'string' && it.restaurantId
+        ? it.restaurantId
+        : typeof it.restaurantSlug === 'string' && it.restaurantSlug
+          ? it.restaurantSlug
+          : 'reorder';
+    const restaurantName =
+      typeof it.restaurantName === 'string' && it.restaurantName ? it.restaurantName : 'Restaurant';
+    lines.push({ id, name, priceDh, qty, restaurantId, restaurantName });
+  }
+  return lines;
+}
+
 /**
  * Customer order history. Orders are scoped by RLS to the signed-in user, so
- * each customer sees only their own. Tap an order to track it live.
+ * each customer sees only their own. Tap an order to track it live; expand
+ * "Details" for the line items; delivered orders can be re-ordered in one tap.
  */
 export default function OrdersScreen() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { orders, loading } = useOrdersList(30);
+  const { orders, loading, error } = useOrdersList(30);
+  const add = useCart((s) => s.add);
+
+  // The list hook's SELECT doesn't include the `items` jsonb, so fetch it in
+  // one batch for the visible ids (items never change after checkout).
+  const [itemsById, setItemsById] = useState<Record<string, OrderItemLine[]>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const orderIdsKey = useMemo(() => orders.map((o) => o.id).join(','), [orders]);
+
+  useEffect(() => {
+    if (!user || !orderIdsKey) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('id, items')
+        .in('id', orderIdsKey.split(','));
+      if (cancelled || !data) return;
+      const map: Record<string, OrderItemLine[]> = {};
+      for (const row of data as { id: string; items: unknown }[]) {
+        map[row.id] = normalizeItems(row.items);
+      }
+      setItemsById(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderIdsKey, user]);
+
+  function reorder(orderId: string) {
+    const lines = itemsById[orderId];
+    if (!lines || lines.length === 0) {
+      Alert.alert('Nothing to re-add', 'This order has no saved item details.');
+      return;
+    }
+    // add() keeps one-restaurant-per-cart semantics: the first item replaces a
+    // different restaurant's cart, same-restaurant items merge quantities.
+    for (const line of lines) {
+      add(
+        {
+          id: line.id,
+          restaurantId: line.restaurantId,
+          restaurantName: line.restaurantName,
+          name: line.name,
+          priceDh: line.priceDh,
+        },
+        line.qty,
+      );
+    }
+    router.push('/cart');
+  }
 
   function Header() {
     return (
@@ -105,6 +198,18 @@ export default function OrdersScreen() {
           <View className="py-12 items-center">
             <ActivityIndicator color="#FF5722" />
           </View>
+        ) : error && orders.length === 0 ? (
+          <View
+            className="rounded-3xl p-6 mt-2"
+            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(185,28,28,0.25)' }}
+          >
+            <Text className="font-display text-[16px]" style={{ fontWeight: '700', color: '#1A1410' }}>
+              Couldn’t load orders
+            </Text>
+            <Text className="mt-1 text-[13px]" style={{ color: '#7A6F66', lineHeight: 18 }}>
+              {error.message}
+            </Text>
+          </View>
         ) : orders.length === 0 ? (
           <View
             className="rounded-3xl p-6 mt-2"
@@ -129,6 +234,8 @@ export default function OrdersScreen() {
         ) : (
           orders.map((o, i) => {
             const color = STATUS_COLOR[o.status] ?? '#7A6F66';
+            const isOpen = !!expanded[o.id];
+            const lines = itemsById[o.id];
             return (
               <MotiView
                 key={o.id}
@@ -140,7 +247,7 @@ export default function OrdersScreen() {
               >
                 <Pressable
                   onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
-                  className="p-5"
+                  className="p-5 pb-4"
                 >
                   <View className="flex-row items-center justify-between mb-3">
                     <Text className="font-mono text-[11px]" style={{ color: '#7A6F66' }}>
@@ -173,6 +280,60 @@ export default function OrdersScreen() {
                     </View>
                   </View>
                 </Pressable>
+
+                {/* Footer: expand details + (delivered) order-again */}
+                <View
+                  className="flex-row items-center justify-between px-5 py-3"
+                  style={{ borderTopWidth: 1, borderTopColor: 'rgba(26,20,16,0.06)' }}
+                >
+                  <Pressable
+                    onPress={() => setExpanded((prev) => ({ ...prev, [o.id]: !prev[o.id] }))}
+                    hitSlop={8}
+                    className="flex-row items-center"
+                  >
+                    <Text className="text-[11px] font-bold uppercase mr-1" style={{ color: '#7A6F66', letterSpacing: 1 }}>
+                      Details
+                    </Text>
+                    {isOpen ? <ChevronUp size={14} color="#7A6F66" /> : <ChevronDown size={14} color="#7A6F66" />}
+                  </Pressable>
+                  {o.status === 'delivered' ? (
+                    <PressableScale onPress={() => reorder(o.id)}>
+                      <View
+                        accessibilityLabel="Order again"
+                        className="w-9 h-9 rounded-full items-center justify-center"
+                        style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}
+                      >
+                        <RotateCcw size={16} color="#FF5722" strokeWidth={2.5} />
+                      </View>
+                    </PressableScale>
+                  ) : null}
+                </View>
+
+                {/* Expanded line items */}
+                {isOpen ? (
+                  <View className="px-5 pb-4" style={{ gap: 7 }}>
+                    {lines === undefined ? (
+                      <View className="py-2 items-center">
+                        <ActivityIndicator size="small" color="#FF5722" />
+                      </View>
+                    ) : lines.length === 0 ? (
+                      <Text className="text-[13px]" style={{ color: '#7A6F66' }}>
+                        No item details saved for this order.
+                      </Text>
+                    ) : (
+                      lines.map((line, idx) => (
+                        <View key={`${line.id}-${idx}`} className="flex-row items-center justify-between">
+                          <Text className="text-[13px] flex-1 pr-3" style={{ color: '#1A1410' }} numberOfLines={1}>
+                            <Text style={{ fontWeight: '700' }}>{line.qty} ×</Text> {line.name}
+                          </Text>
+                          <Text className="text-[13px] font-bold" style={{ color: '#1A1410' }}>
+                            {line.priceDh * line.qty} dh
+                          </Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                ) : null}
               </MotiView>
             );
           })

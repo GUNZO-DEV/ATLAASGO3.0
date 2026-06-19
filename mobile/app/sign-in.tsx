@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useSignIn, useSignUp, useAuth as useClerkAuth } from '@clerk/clerk-expo';
-import { ArrowLeft, LogIn, UserPlus, MailCheck } from 'lucide-react-native';
+import { ArrowLeft, KeyRound, LogIn, UserPlus, MailCheck } from 'lucide-react-native';
 import { PressableScale } from '../components/primitives/PressableScale';
 
 /**
@@ -22,6 +22,12 @@ import { PressableScale } from '../components/primitives/PressableScale';
  * Sign-up uses Clerk's email-code verification flow:
  *   signUp.create → prepareEmailAddressVerification(email_code)
  *   → user enters 6-digit code → attemptEmailAddressVerification → setActive.
+ *
+ * Forgot password uses Clerk's reset-by-email-code flow:
+ *   signIn.create({ strategy: 'reset_password_email_code', identifier })
+ *   → user enters 6-digit code + new password
+ *   → signIn.attemptFirstFactor({ strategy: 'reset_password_email_code', code, password })
+ *   → setActive — signed in with the new password in one step.
  *
  * On a completed session (either path) the ClerkSupabaseBridge exchanges the
  * Clerk token for a Supabase session, and clerk-sync provisions the
@@ -57,6 +63,11 @@ export default function AccountScreen() {
   // Sign-up email-verification sub-state
   const [pendingCode, setPendingCode] = useState(false);
   const [code, setCode] = useState('');
+
+  // Forgot-password sub-state (mirrors the sign-up verification pattern)
+  const [pendingReset, setPendingReset] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   async function handleSignIn() {
     if (!signInLoaded || busy) return;
@@ -139,6 +150,65 @@ export default function AccountScreen() {
     }
   }
 
+  async function handleForgotPassword() {
+    if (!signInLoaded || busy) return;
+    if (!email.trim()) {
+      Alert.alert('Enter your email', 'Type your account email above, then tap “Forgot password?” again.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await signIn.create({ strategy: 'reset_password_email_code', identifier: email.trim() });
+      setResetCode('');
+      setNewPassword('');
+      setPendingReset(true);
+    } catch (e) {
+      Alert.alert('Could not start reset', clerkErr(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!signInLoaded || busy) return;
+    if (resetCode.trim().length < 6) {
+      Alert.alert('Enter the code', 'Type the 6-digit code we emailed you.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      Alert.alert('Pick a stronger password', 'Your new password needs at least 8 characters.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const attempt = await signIn.attemptFirstFactor({
+        strategy: 'reset_password_email_code',
+        code: resetCode.trim(),
+        password: newPassword,
+      });
+      if (attempt.status === 'complete') {
+        await setSignInActive({ session: attempt.createdSessionId });
+        router.replace('/');
+      } else {
+        Alert.alert('Almost there', 'Additional verification is required — try signing in again.');
+      }
+    } catch (e) {
+      Alert.alert('Reset failed', clerkErr(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendResetCode() {
+    if (!signInLoaded) return;
+    try {
+      await signIn.create({ strategy: 'reset_password_email_code', identifier: email.trim() });
+      Alert.alert('Code sent', 'We emailed you a fresh reset code.');
+    } catch (e) {
+      Alert.alert('Could not resend', clerkErr(e));
+    }
+  }
+
   const label = (t: string) => (
     <Text className="text-[11px] uppercase font-bold mb-1.5" style={{ letterSpacing: 0.6, color: MUTED }}>
       {t}
@@ -180,24 +250,78 @@ export default function AccountScreen() {
             <Text className="font-display text-[32px]" style={{ fontWeight: '800', letterSpacing: -1, color: INK }}>
               {isSignedIn
                 ? 'You’re signed in.'
-                : pendingCode
-                  ? 'Check your email.'
-                  : mode === 'signin'
-                    ? 'Welcome back.'
-                    : 'Create your account.'}
+                : pendingReset
+                  ? 'Reset your password.'
+                  : pendingCode
+                    ? 'Check your email.'
+                    : mode === 'signin'
+                      ? 'Welcome back.'
+                      : 'Create your account.'}
             </Text>
             <Text className="mt-2 text-[14px]" style={{ color: MUTED, lineHeight: 20 }}>
               {isSignedIn
                 ? 'Your session is active — orders are linked to your account.'
-                : pendingCode
-                  ? `We sent a 6-digit code to ${email.trim()}.`
-                  : mode === 'signin'
-                    ? 'Sign in to track orders, save addresses, and use your wallet.'
-                    : 'Join AtlaasGo — free delivery on your first order.'}
+                : pendingReset
+                  ? `We sent a 6-digit code to ${email.trim()}. Enter it below with your new password.`
+                  : pendingCode
+                    ? `We sent a 6-digit code to ${email.trim()}.`
+                    : mode === 'signin'
+                      ? 'Sign in to track orders, save addresses, and use your wallet.'
+                      : 'Join AtlaasGo — free delivery on your first order.'}
             </Text>
           </View>
 
-          {isSignedIn ? null : pendingCode ? (
+          {isSignedIn ? null : pendingReset ? (
+            /* ── Password reset step ─────────────────────────────────── */
+            <>
+              {label('Verification code')}
+              <TextInput
+                value={resetCode}
+                onChangeText={setResetCode}
+                keyboardType="number-pad"
+                placeholder="123456"
+                maxLength={6}
+                {...input}
+              />
+              {label('New password')}
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
+                {...input}
+              />
+              <Pressable
+                onPress={handleResetPassword}
+                disabled={busy}
+                className="rounded-2xl py-4 flex-row items-center justify-center"
+                style={{ backgroundColor: BRAND, opacity: busy ? 0.6 : 1 }}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <KeyRound size={16} color="#fff" />
+                    <Text className="text-white font-bold text-[15px] ml-2">Reset & sign in</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable onPress={resendResetCode} className="mt-4">
+                <Text className="text-[13px] text-center font-bold" style={{ color: BRAND }}>
+                  Resend code
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { setPendingReset(false); setResetCode(''); setNewPassword(''); }}
+                className="mt-3"
+              >
+                <Text className="text-[12px] text-center" style={{ color: MUTED }}>
+                  Back to sign in
+                </Text>
+              </Pressable>
+            </>
+          ) : pendingCode ? (
             /* ── Email verification step ─────────────────────────────── */
             <>
               {label('Verification code')}
@@ -292,6 +416,14 @@ export default function AccountScreen() {
                 placeholder={mode === 'signin' ? '••••••••' : 'At least 8 characters'}
                 {...input}
               />
+
+              {mode === 'signin' && (
+                <Pressable onPress={handleForgotPassword} className="self-end -mt-2 mb-2">
+                  <Text className="text-[13px] font-bold" style={{ color: BRAND }}>
+                    Forgot password?
+                  </Text>
+                </Pressable>
+              )}
 
               <Pressable
                 onPress={mode === 'signin' ? handleSignIn : handleSignUp}

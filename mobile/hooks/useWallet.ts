@@ -54,7 +54,7 @@ export function useWallet() {
     load();
 
     const channel = supabase
-      .channel('wallet')
+      .channel(`wallet-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wallet_transactions' }, () => load())
       .subscribe();

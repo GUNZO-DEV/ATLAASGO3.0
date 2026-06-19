@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 
@@ -41,28 +41,25 @@ export function usePrime() {
   const [sub, setSub] = useState<PrimeSub | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
+  const refresh = useCallback(async () => {
     if (!user) {
       setSub(null);
       setLoading(false);
       return;
     }
-    (async () => {
-      const { data } = await supabase
-        .from('prime_subscriptions')
-        .select('tier, is_active, expires_at')
-        .eq('is_active', true)
-        .maybeSingle();
-      if (cancelled) return;
-      const d = data as { tier: string; is_active: boolean; expires_at: string | null } | null;
-      setSub(d ? { tier: d.tier, isActive: d.is_active, expiresAt: d.expires_at } : null);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const { data } = await supabase
+      .from('prime_subscriptions')
+      .select('tier, is_active, expires_at')
+      .eq('is_active', true)
+      .maybeSingle();
+    const d = data as { tier: string; is_active: boolean; expires_at: string | null } | null;
+    setSub(d ? { tier: d.tier, isActive: d.is_active, expiresAt: d.expires_at } : null);
+    setLoading(false);
   }, [user]);
 
-  return { sub, loading };
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return { sub, loading, refresh };
 }

@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, Package, Tag, Wallet, MessageCircle, Bike, Star } from 'lucide-react-native';
+import { ArrowLeft, Bell, ChevronRight, Package, Tag, Wallet, MessageCircle, Bike, Star } from 'lucide-react-native';
 import { PressableScale } from '../components/primitives/PressableScale';
 import { useAuth } from '../lib/auth';
 import { useNotifications } from '../hooks/useNotifications';
@@ -91,8 +91,20 @@ export default function NotificationsScreen() {
           <View style={{ gap: 8 }}>
             {items.map((n) => {
               const { Icon, color } = iconFor(n.kind);
+              // Notifications about an order carry payload.orderId — tapping
+              // them opens live tracking (and still marks the row as read).
+              const orderId = n.payload?.orderId;
+              const linkedOrderId = typeof orderId === 'string' || typeof orderId === 'number' ? String(orderId) : null;
               return (
-                <Pressable key={n.id} onPress={() => !n.readAt && markRead(n.id)}>
+                <Pressable
+                  key={n.id}
+                  onPress={() => {
+                    if (!n.readAt) void markRead(n.id);
+                    if (linkedOrderId) {
+                      router.push({ pathname: '/order/[id]', params: { id: linkedOrderId } });
+                    }
+                  }}
+                >
                   <View
                     className="flex-row p-4 rounded-2xl"
                     style={{
@@ -113,6 +125,11 @@ export default function NotificationsScreen() {
                         <Text className="text-[13px] mt-0.5" style={{ color: MUTED, lineHeight: 18 }}>{n.body}</Text>
                       ) : null}
                     </View>
+                    {linkedOrderId ? (
+                      <View className="justify-center ml-2">
+                        <ChevronRight size={15} color={MUTED} />
+                      </View>
+                    ) : null}
                   </View>
                 </Pressable>
               );

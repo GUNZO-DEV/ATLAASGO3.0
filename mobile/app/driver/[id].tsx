@@ -1,34 +1,112 @@
+import { useEffect, useState } from 'react';
 import { MotiView } from 'moti';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ArrowRight, MapPin, Navigation, Phone } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Lock, MapPin, Navigation, Phone } from 'lucide-react-native';
 import { PressableScale } from '../../components/primitives/PressableScale';
 import { Pulse } from '../../components/primitives/Pulse';
 import { useOrderStatus } from '../../hooks/useOrderStatus';
-import { useAdvanceOrder } from '../../hooks/useAdvanceOrder';
+import { acceptAssignment, markPickedUp, markArriving, markDelivered, type ActionResult } from '../../lib/orderActions';
 import { useAuth } from '../../lib/auth';
+import { useRoles } from '../../hooks/useRoles';
+import { useBroadcastLocation } from '../../hooks/useBroadcastLocation';
+import { supabase } from '../../lib/supabase';
 import { ORDER_STAGES, type OrderStage } from '../../lib/types';
 import { STAGE_LABELS } from '../../lib/theme';
 
-const NEXT_STAGE_CTA: Record<OrderStage, string | null> = {
+// What the sticky CTA does at each stage. Accepting/claiming happens on the
+// dashboard, so on this screen a job is normally enRoute → … → delivered, but
+// we still handle ordered/preparing (admin-assigned, not yet accepted).
+const STAGE_CTA: Record<OrderStage, string> = {
   ordered: 'Accept order',
-  preparing: 'Heading out',
+  preparing: 'Accept order',
   enRoute: 'Picked up · out for delivery',
   outForDelivery: "I'm arriving",
-  arriving: null,
+  arriving: 'Mark delivered',
 };
 
 export default function DriverAssignment() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { user, loading: authLoading } = useAuth();
+  const { isRider, loading: rolesLoading } = useRoles();
   const { order, stage, loading } = useOrderStatus(user ? id : undefined);
-  const { advanceFrom, pending } = useAdvanceOrder(id);
+  const [pending, setPending] = useState(false);
 
-  const cta = NEXT_STAGE_CTA[stage];
+  // Customer contact — profiles.phone for order.customer_id, so the call
+  // button actually dials. Null phone → button disabled with a hint.
+  const [customer, setCustomer] = useState<{ name: string | null; phone: string | null } | null>(null);
+  const customerId = order?.customerId;
+  useEffect(() => {
+    if (!customerId || !user) {
+      setCustomer(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('display_name, phone')
+      .eq('id', customerId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const p = data as { display_name?: string | null; phone?: string | null } | null;
+        setCustomer({ name: p?.display_name ?? null, phone: p?.phone ?? null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, user]);
+
+  function handleCallCustomer() {
+    const phone = customer?.phone;
+    if (!phone) return;
+    // Keep digits and a leading + (e.g. "+212 6 12 34 56 78" → "+212612345678").
+    const tel = `tel:${phone.replace(/[^\d+]/g, '')}`;
+    Linking.openURL(tel).catch(() => {
+      Alert.alert('Could not start a call', `Dial the customer manually: ${phone}`);
+    });
+  }
+
+  const terminal = order?.status === 'delivered' || order?.status === 'cancelled';
+
+  // Broadcast the rider's live GPS while the delivery is active so the customer
+  // can track them on a map. Stops automatically once delivered/cancelled.
+  useBroadcastLocation(user?.id, !!user && isRider && !terminal);
+
   const stageIndex = ORDER_STAGES.indexOf(stage);
   const progressPct = ((stageIndex + 1) / ORDER_STAGES.length) * 100;
+
+  async function handleAdvance() {
+    if (!id || !user || pending) return;
+    setPending(true);
+    let res: ActionResult;
+    switch (stage) {
+      case 'ordered':
+      case 'preparing':
+        res = await acceptAssignment(id, user.id);
+        break;
+      case 'enRoute':
+        res = await markPickedUp(id, user.id);
+        break;
+      case 'outForDelivery':
+        res = await markArriving(id);
+        break;
+      case 'arriving':
+        res = await markDelivered(id, user.id);
+        break;
+      default:
+        res = { ok: true };
+    }
+    setPending(false);
+    if (!res.ok) {
+      Alert.alert('Could not update', res.error);
+      return;
+    }
+    // Delivered closes the assignment — head back to the dashboard.
+    if (stage === 'arriving') setTimeout(() => router.back(), 450);
+  }
 
   // Signed-out: a rider must be authenticated to load assigned orders
   // (RLS scopes orders to the assigned rider). Show a clear prompt instead
@@ -49,6 +127,28 @@ export default function DriverAssignment() {
           <PressableScale onPress={() => router.replace('/sign-in')}>
             <View style={{ backgroundColor: '#FF5722', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Sign in</Text>
+            </View>
+          </PressableScale>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Signed in but NOT an approved rider — block access to assignment management.
+  if (!authLoading && !rolesLoading && user && !isRider) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0E0A07' }} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Lock size={30} color="#FF8A65" />
+          <Text style={{ color: '#FBF7F2', fontWeight: '800', fontSize: 20, marginTop: 16, textAlign: 'center' }}>
+            Drivers only
+          </Text>
+          <Text style={{ color: '#7A6F66', fontSize: 14, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+            Only riders approved by the AtlaasGo team can manage deliveries.
+          </Text>
+          <PressableScale onPress={() => router.back()}>
+            <View style={{ backgroundColor: '#FF5722', borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Go back</Text>
             </View>
           </PressableScale>
         </View>
@@ -280,7 +380,7 @@ export default function DriverAssignment() {
             style={{ backgroundColor: '#FFB74D' }}
           >
             <Text className="font-display" style={{ color: '#1A1410', fontWeight: '800' }}>
-              {(order?.customerId ?? '?').charAt(0).toUpperCase()}
+              {(customer?.name ?? order?.customerId ?? '?').charAt(0).toUpperCase()}
             </Text>
           </View>
           <View className="ml-3 flex-1">
@@ -290,16 +390,23 @@ export default function DriverAssignment() {
             >
               Customer
             </Text>
-            <Text className="mt-0.5 font-display" style={{ color: '#FBF7F2', fontWeight: '700' }}>
-              {order?.customerId ?? '—'}
+            <Text
+              className="mt-0.5 font-display"
+              style={{ color: '#FBF7F2', fontWeight: '700' }}
+              numberOfLines={1}
+            >
+              {customer?.name || (order ? `#${order.customerId.slice(0, 6).toUpperCase()}` : '—')}
+            </Text>
+            <Text className="mt-0.5 text-[11px]" style={{ color: '#7A6F66' }} numberOfLines={1}>
+              {!order ? ' ' : customer?.phone ?? 'No phone on file — use order chat'}
             </Text>
           </View>
-          <PressableScale>
+          <PressableScale onPress={handleCallCustomer} disabled={!customer?.phone}>
             <View
               className="w-10 h-10 rounded-full items-center justify-center"
-              style={{ backgroundColor: '#FF5722' }}
+              style={{ backgroundColor: customer?.phone ? '#FF5722' : 'rgba(255,255,255,0.08)' }}
             >
-              <Phone size={16} color="#fff" />
+              <Phone size={16} color={customer?.phone ? '#fff' : '#7A6F66'} />
             </View>
           </PressableScale>
         </MotiView>
@@ -312,8 +419,8 @@ export default function DriverAssignment() {
         transition={{ type: 'timing', duration: 360, delay: 320 }}
         style={{ position: 'absolute', left: 24, right: 24, bottom: 32 }}
       >
-        {cta ? (
-          <PressableScale onPress={() => advanceFrom(stage)} disabled={pending}>
+        {!terminal ? (
+          <PressableScale onPress={handleAdvance} disabled={pending || loading}>
             <View
               className="rounded-full py-4 px-6 flex-row items-center justify-center"
               style={{
@@ -326,7 +433,7 @@ export default function DriverAssignment() {
               }}
             >
               <Text className="text-white font-bold text-[15px] mr-2" style={{ letterSpacing: 0.2 }}>
-                {pending ? 'Updating…' : cta}
+                {pending ? 'Updating…' : STAGE_CTA[stage]}
               </Text>
               <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
             </View>
@@ -334,10 +441,13 @@ export default function DriverAssignment() {
         ) : (
           <View
             className="rounded-full py-4 px-6 items-center justify-center"
-            style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+            style={{ backgroundColor: order?.status === 'delivered' ? 'rgba(52,211,153,0.18)' : 'rgba(255,255,255,0.08)' }}
           >
-            <Text className="text-white font-bold text-[14px]" style={{ letterSpacing: 0.2, opacity: 0.6 }}>
-              Order complete · awaiting handoff
+            <Text
+              className="font-bold text-[14px]"
+              style={{ letterSpacing: 0.2, color: order?.status === 'delivered' ? '#34D399' : '#FBF7F2', opacity: order?.status === 'delivered' ? 1 : 0.6 }}
+            >
+              {order?.status === 'delivered' ? 'Delivered ✓ · trip complete' : 'Order cancelled'}
             </Text>
           </View>
         )}

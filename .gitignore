@@ -4,3 +4,9 @@ dist
 *.local
 .env*.local
 .vite
+
+# Claude Code tooling / local installs (not application code)
+.agents/
+.claude/
+claude-mem/
+skills-lock.json
