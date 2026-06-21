@@ -294,8 +294,6 @@ export default function AccountScreen() {
   if (isRider) roleRows.push({ icon: Bike, title: 'Driver mode', sub: 'Your delivery assignments', href: '/driver', color: t.colors.fg });
   if (isMerchant) roleRows.push({ icon: Store, title: 'Restaurant POS', sub: 'Live orders & kitchen display', href: '/merchant', color: '#0891B2' });
   if (isAdmin) roleRows.push({ icon: Shield, title: 'Admin', sub: 'Orders, riders & applications', href: '/admin', color: '#7C3AED' });
-  if (!isRider) roleRows.push({ icon: Bike, title: 'Drive with us', sub: 'Apply to deliver in Ifrane', href: '/apply-rider', color: t.colors.fg });
-  if (!isMerchant) roleRows.push({ icon: Store, title: 'Partner with us', sub: 'Put your restaurant on AtlaasGo', href: '/apply-partner', color: '#0891B2' });
 
   const Row = ({ r }: { r: RowData }) => {
     const Icon = r.icon;

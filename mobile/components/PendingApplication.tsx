@@ -35,7 +35,6 @@ const COPY: Record<
     pitchTitle: string;
     pitchSub: string;
     pitchCta: string;
-    applyRoute: '/apply-rider' | '/apply-partner';
   }
 > = {
   rider: {
@@ -50,9 +49,8 @@ const COPY: Record<
       'SOS support · 24/7',
     ],
     pitchTitle: 'Become an AtlaasGo rider',
-    pitchSub: '60–90 dh/hour average, daily payouts, full SOS support. Apply in 60 seconds.',
-    pitchCta: 'Apply to ride',
-    applyRoute: '/apply-rider',
+    pitchSub: '60–90 dh/hour average, daily payouts, full SOS support. Get in touch to join.',
+    pitchCta: 'Email us to apply',
   },
   partner: {
     emoji: '🏪',
@@ -67,8 +65,7 @@ const COPY: Record<
     ],
     pitchTitle: 'Bring your restaurant to AtlaasGo',
     pitchSub: '14-day free trial. Tablet + POS included. We onboard you in under a week.',
-    pitchCta: 'Apply to partner',
-    applyRoute: '/apply-partner',
+    pitchCta: 'Email us to apply',
   },
 };
 
@@ -173,7 +170,7 @@ export function PendingApplication({ kind }: { kind: ApplicationKind }) {
             ))}
           </View>
 
-          <PressableScale onPress={() => router.push(copy.applyRoute)}>
+          <PressableScale onPress={() => Linking.openURL('mailto:support@atlaasgo.com?subject=AtlaasGo%20application')}>
             <View
               className="rounded-2xl py-4 items-center flex-row justify-center"
               style={{ backgroundColor: BRAND, marginTop: 24 }}
