@@ -28,7 +28,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Banknote, CreditCard } from 'lucide-react-native';
+import { Banknote, Clock, CreditCard } from 'lucide-react-native';
 import { LandmarkInput, MIN_LANDMARK_LENGTH } from '../components/LandmarkInput';
 import { useLocation } from '../hooks/useLocation';
 import { useCreateOrder } from '../hooks/useCreateOrder';
@@ -781,7 +781,7 @@ export default function Checkout() {
                     <CreditCard size={17} color={t.colors.bg} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Card / Apple Pay</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Credit / debit card</Text>
                     <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Secure payment via Stripe</Text>
                   </View>
                   {payMethod === 'card' && <ICheck size={18} color={t.colors.primary} />}
@@ -793,7 +793,7 @@ export default function Checkout() {
                   <CreditCard size={17} color={t.colors.bg} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Card / Apple Pay</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Credit / debit card</Text>
                   <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Arriving in the next update</Text>
                 </View>
               </View>
@@ -851,6 +851,18 @@ export default function Checkout() {
 
       {/* ── Sticky 3.0 gradient "Place order" ── */}
       <View style={[styles.sticky, { backgroundColor: t.colors.bg, borderColor: t.colors.line }]}>
+        {quote && (
+          <View style={styles.etaLine}>
+            <Clock size={13} color={t.colors.muted} />
+            <Text style={{ fontSize: 12, color: t.colors.muted }}>
+              Arrives in{' '}
+              <Text style={{ fontWeight: '800', color: t.colors.fg }}>
+                {quote.etaMinutes[0]}–{quote.etaMinutes[1]} min
+              </Text>
+              {selectedAddress?.label ? ` · to ${selectedAddress.label}` : ''}
+            </Text>
+          </View>
+        )}
         <Press onPress={handleSubmit} disabled={!!user && !canSubmit}>
           {canSubmit || !user ? (
             <LinearGradient
@@ -860,12 +872,20 @@ export default function Checkout() {
               style={[styles.placeBtn, t.shadows.glow]}
             >
               <PlaceLabel />
-              <IChevR size={18} color="#fff" strokeWidth={2.5} />
+              {submitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <IChevR size={18} color="#fff" strokeWidth={2.5} />
+              )}
             </LinearGradient>
           ) : (
             <View style={[styles.placeBtn, { backgroundColor: t.colors.muted }]}>
               <PlaceLabel />
-              <IChevR size={18} color="#fff" strokeWidth={2.5} />
+              {submitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <IChevR size={18} color="#fff" strokeWidth={2.5} />
+              )}
             </View>
           )}
         </Press>
@@ -971,6 +991,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
 
+  etaLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 },
   sticky: {
     position: 'absolute',
     left: 0,
