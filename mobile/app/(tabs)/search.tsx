@@ -56,7 +56,7 @@ export default function Search() {
   const query = q.trim();
 
   const { data: trending } = useAsync(() => agApi.catalog.trending(), []);
-  const { data: categories } = useAsync(() => agApi.catalog.categories('food'), []);
+  const { data: categories } = useAsync(() => agApi.catalog.categories('food', cityName), [cityName]);
   const { data: search, loading: searching } = useAsync(
     () => (query ? agApi.catalog.search(q, cityName) : Promise.resolve({ stores: [] as Store[], dishes: [] as DishHit[] })),
     [query, cityName],

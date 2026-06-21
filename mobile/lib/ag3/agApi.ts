@@ -440,9 +440,13 @@ export const agApi = {
   /* §3 catalog */
   catalog: {
     verticals: async (): Promise<Vertical[]> => VERTICALS,
-    categories: async (vertical: VerticalId = 'food'): Promise<Category[]> => {
-      // Derive cuisine chips from the live catalog for this vertical.
-      const { data } = await supabase.from('restaurants').select('cuisine, cuisine_tags, status').eq('status', 'live');
+    categories: async (vertical: VerticalId = 'food', city?: string): Promise<Category[]> => {
+      // Derive cuisine chips from the live catalog for this vertical, scoped to
+      // the selected city so a chip never filters the list to zero (e.g. a
+      // "Moroccan" chip in a city whose only place serves tacos).
+      let cq = supabase.from('restaurants').select('cuisine, cuisine_tags, status').eq('status', 'live');
+      if (city) cq = cq.ilike('city', city);
+      const { data } = await cq;
       const rows = (data ?? []) as Pick<RestaurantRow, 'cuisine' | 'cuisine_tags'>[];
       const acc = new Map<string, { label: string; emoji: string; n: number }>();
       for (const r of rows) {

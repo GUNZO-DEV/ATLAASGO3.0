@@ -126,7 +126,7 @@ export default function Home() {
   // Greeting + taxonomy (ported from src/app3 Home).
   const { data: me } = useAsync(() => agApi.me.get(), [user?.id]);
   const { data: verticals } = useAsync(() => agApi.catalog.verticals(), []);
-  const { data: foodCats } = useAsync(() => agApi.catalog.categories('food'), []);
+  const { data: foodCats } = useAsync(() => agApi.catalog.categories('food', city?.name), [city?.id]);
 
   const cityName = city?.name ?? '';
   // Bump a nonce on pull-to-refresh / focus poll so stores re-fetch.
