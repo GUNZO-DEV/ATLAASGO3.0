@@ -1,24 +1,35 @@
+// AtlaasGo 3.0 — Checkout / payment (the order-create + pay step).
+//
+// Native re-skin to the 3.0 design language (warm terracotta + amber on
+// cream/ink, sunset gradient header + CTA, rounded cards, dark Bill summary)
+// built on the ag3 foundation: useAg3Theme, components/ag3/icons,
+// components/ag3/primitives (Press, Rise). Dark-mode aware.
+//
+// LOGIC PRESERVED EXACTLY (presentation-only re-skin) ──────────────────────────
+//   • Saved-address selection (supabase addresses read, auto-select default,
+//     selectAddress, "use a new address instead").
+//   • Landmark + GPS capture (LandmarkInput / useLocation), with the saved-coords
+//     shortcut that skips the manual GPS requirement.
+//   • Phone-on-file validation (isValidMoroccanPhone) + savePhone (profiles).
+//   • Promo (usePromotions / redeemPromo) apply / remove.
+//   • Payment method cash / wallet / card (isStripeAvailable gating).
+//   • Stripe PaymentSheet flow (create-payment-intent → payWithPaymentSheet,
+//     cancelOrder on abandon/fail).
+//   • pay_order_with_wallet RPC (partial vs full coverage handling).
+//   • useCreateOrder + the server cart_quote pricing (quote state, the
+//     deliveryFee / priorityDh / weatherDh / tipAmount bill lines, the !!quote
+//     submit gate, tip / speed / handoff persistence).
+//   • expo-router params (category / speed / tipDh / handoff / addressId) and
+//     navigation (router.replace to /order/[id]).
+// None of the money math or order-create logic is touched.
 import { MotiView } from 'moti';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Banknote,
-  Check,
-  CreditCard,
-  Home,
-  MapPin,
-  Phone,
-  ShoppingBag,
-  Tag,
-  Wallet,
-  X,
-} from 'lucide-react-native';
+import { Banknote, CreditCard } from 'lucide-react-native';
 import { LandmarkInput, MIN_LANDMARK_LENGTH } from '../components/LandmarkInput';
-import { PressableScale } from '../components/primitives/PressableScale';
 import { useLocation } from '../hooks/useLocation';
 import { useCreateOrder } from '../hooks/useCreateOrder';
 import { usePromotions, redeemPromo } from '../hooks/usePromotions';
@@ -31,12 +42,20 @@ import { cancelOrder } from '../lib/orderActions';
 import type { CategoryKey, Coords } from '../lib/types';
 import { agApi, type Quote } from '../lib/ag3/agApi';
 
-const INK = '#1A1410';
-const MUTED = '#7A6F66';
-const BRAND = '#FF5722';
-const LINE = 'rgba(26,20,16,0.08)';
-const GREEN = '#059669';
-const AMBER = '#B45309';
+import { useAg3Theme, type Ag3Theme } from '../components/ag3/theme';
+import { Press, Rise } from '../components/ag3/primitives';
+import {
+  IBack,
+  IPin,
+  IHome,
+  IPhone,
+  ICheck,
+  IClose,
+  IWallet,
+  IBag,
+  IChevR,
+  IGift,
+} from '../components/ag3/icons';
 
 const MIN_ORDER_DH = 30; // Minimum order subtotal — same as web (src/pages/Cart.tsx)
 
@@ -64,15 +83,8 @@ type SavedAddress = {
   is_campus: boolean;
 };
 
-function SectionLabel({ children }: { children: string }) {
-  return (
-    <Text className="text-[11px] uppercase font-bold mb-2" style={{ letterSpacing: 1.4, color: MUTED }}>
-      {children}
-    </Text>
-  );
-}
-
 export default function Checkout() {
+  const t = useAg3Theme();
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string; speed?: string; tipDh?: string; handoff?: string; addressId?: string }>();
   const categoryKey = (params.category as CategoryKey) ?? 'food';
@@ -363,26 +375,22 @@ export default function Checkout() {
     clearCart();
   };
 
+  // ── 3.0 sunset header ──
   function Header() {
     return (
       <MotiView
         from={{ opacity: 0, translateX: -8 }}
         animate={{ opacity: 1, translateX: 0 }}
         transition={{ type: 'timing', duration: 240 }}
-        className="flex-row items-center justify-between pt-3"
+        style={styles.header}
       >
-        <PressableScale onPress={() => router.back()}>
-          <View
-            className="w-10 h-10 rounded-full items-center justify-center bg-white"
-            style={{ borderWidth: 1, borderColor: LINE }}
-          >
-            <ArrowLeft size={18} color={INK} />
+        <Press onPress={() => router.back()} scaleTo={0.9}>
+          <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
+            <IBack size={20} color={t.colors.fg} />
           </View>
-        </PressableScale>
-        <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 1.5, color: BRAND }}>
-          Step 2 of 3
-        </Text>
-        <View style={{ width: 40 }} />
+        </Press>
+        <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Payment</Text>
+        <View style={{ width: 42 }} />
       </MotiView>
     );
   }
@@ -390,61 +398,60 @@ export default function Checkout() {
   // ── Empty cart ──
   if (items.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <View className="flex-1 px-6">
-          <Header />
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 }}>
-            <ShoppingBag size={30} color={MUTED} />
-            <Text style={{ fontWeight: '800', fontSize: 20, color: INK, marginTop: 16 }}>
-              Nothing to check out
-            </Text>
-            <Text style={{ fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-              Your cart is empty. Add items from a restaurant to get started.
-            </Text>
-            <PressableScale onPress={() => router.replace('/')}>
-              <View style={{ backgroundColor: BRAND, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Browse restaurants</Text>
-              </View>
-            </PressableScale>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        <Header />
+        <View style={styles.emptyWrap}>
+          <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+            <IBag size={28} color={t.colors.muted} />
           </View>
+          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>
+            Nothing to check out
+          </Text>
+          <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
+            Your cart is empty. Add items from a spot to get started.
+          </Text>
+          <Press onPress={() => router.replace('/')}>
+            <LinearGradient
+              colors={t.gradients.sunset}
+              start={t.gradients.start}
+              end={t.gradients.end}
+              style={[styles.browseBtn, t.shadows.glow]}
+            >
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Browse spots</Text>
+            </LinearGradient>
+          </Press>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+      <Header />
+
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 150 }}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 168 }}
         showsVerticalScrollIndicator={false}
       >
-        <Header />
-
-        <MotiView
-          from={{ opacity: 0, translateY: 14 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 320, delay: 80 }}
-          className="mt-6"
-        >
-          <Text className="text-[12px] uppercase font-bold" style={{ letterSpacing: 1.6, color: MUTED }}>
-            {CATEGORY_LABELS[categoryKey]} delivery
+        <Rise>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginTop: 6 }]}>
+            {CATEGORY_LABELS[categoryKey].toUpperCase()} DELIVERY
           </Text>
-          <Text
-            className="font-display text-[28px] mt-1"
-            style={{ fontWeight: '800', letterSpacing: -0.8, color: INK, lineHeight: 32 }}
-          >
+          <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg, marginTop: 3, lineHeight: 31 }]}>
             Where exactly{'\n'}should we drop it?
           </Text>
-        </MotiView>
+        </Rise>
 
         {/* ── Signed-out note ── */}
         {!user && (
           <View
-            className="mt-5 rounded-2xl px-4 py-3"
-            style={{ backgroundColor: 'rgba(255,87,34,0.08)', borderWidth: 1, borderColor: 'rgba(255,87,34,0.3)', borderStyle: 'dashed' }}
+            style={[
+              styles.softNote,
+              { backgroundColor: 'rgba(255,87,34,0.08)', borderColor: 'rgba(255,87,34,0.3)', borderStyle: 'dashed' },
+            ]}
           >
-            <Text className="text-[12px]" style={{ color: MUTED, lineHeight: 18 }}>
+            <Text style={{ fontSize: 12, color: t.colors.fgSoft, lineHeight: 18 }}>
               You'll be asked to sign in before your order is placed.
             </Text>
           </View>
@@ -452,100 +459,103 @@ export default function Checkout() {
 
         {/* ── Saved addresses ── */}
         {user && (addrLoading ? (
-          <View className="mt-6 py-4 items-center">
-            <ActivityIndicator color={BRAND} />
+          <View style={{ marginTop: 22, paddingVertical: 16, alignItems: 'center' }}>
+            <ActivityIndicator color={t.colors.primary} />
           </View>
         ) : addresses.length > 0 ? (
-          <MotiView
-            from={{ opacity: 0, translateY: 18 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 360, delay: 120 }}
-            className="mt-6"
-          >
-            <SectionLabel>Saved addresses</SectionLabel>
-            <View style={{ gap: 8 }}>
+          <Rise style={{ marginTop: 22 }}>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>SAVED ADDRESSES</Text>
+            <View style={{ gap: 10 }}>
               {addresses.map((a) => {
                 const active = selectedAddressId === a.id;
                 return (
-                  <PressableScale key={a.id} onPress={() => selectAddress(a)}>
+                  <Press key={a.id} onPress={() => selectAddress(a)}>
                     <View
-                      className="flex-row items-center bg-white rounded-2xl p-4"
-                      style={{
-                        borderWidth: active ? 2 : 1,
-                        borderColor: active ? BRAND : 'rgba(26,20,16,0.07)',
-                        backgroundColor: active ? 'rgba(255,87,34,0.05)' : '#fff',
-                      }}
+                      style={[
+                        card(t),
+                        styles.addrCard,
+                        {
+                          borderColor: active ? t.colors.primary : t.colors.line2,
+                          borderWidth: active ? 1.5 : 1,
+                          backgroundColor: active ? 'rgba(255,87,34,0.06)' : t.colors.surface,
+                        },
+                      ]}
                     >
-                      <View
-                        className="w-9 h-9 rounded-full items-center justify-center"
-                        style={{ backgroundColor: active ? BRAND : 'rgba(26,20,16,0.06)' }}
-                      >
-                        {a.is_campus ? (
-                          <Home size={16} color={active ? '#fff' : INK} />
-                        ) : (
-                          <MapPin size={16} color={active ? '#fff' : INK} />
-                        )}
-                      </View>
-                      <View className="ml-3 flex-1">
-                        <Text className="text-[14px] font-bold" style={{ color: INK }} numberOfLines={1}>
+                      {active ? (
+                        <LinearGradient
+                          colors={t.gradients.sunset}
+                          start={t.gradients.start}
+                          end={t.gradients.end}
+                          style={[styles.addrIcon, t.shadows.glow]}
+                        >
+                          {a.is_campus ? <IHome size={17} color="#fff" /> : <IPin size={17} color="#fff" />}
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.addrIcon, { backgroundColor: t.colors.surface2 }]}>
+                          {a.is_campus ? <IHome size={17} color={t.colors.fg} /> : <IPin size={17} color={t.colors.fg} />}
+                        </View>
+                      )}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }} numberOfLines={1}>
                           {a.label ?? 'Address'}
                         </Text>
-                        <Text className="text-[12px] mt-0.5" style={{ color: MUTED }} numberOfLines={1}>
+                        <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>
                           {[a.line1, a.building, a.room ? `Rm ${a.room}` : null].filter(Boolean).join(' · ') ||
                             a.landmark ||
                             '—'}
                         </Text>
                       </View>
-                      {active && <Check size={16} color={BRAND} />}
+                      {active && <ICheck size={18} color={t.colors.primary} />}
                     </View>
-                  </PressableScale>
+                  </Press>
                 );
               })}
               {selectedAddressId && (
-                <PressableScale onPress={() => setSelectedAddressId(null)}>
-                  <Text className="text-[12px] font-bold px-1 py-1" style={{ color: BRAND }}>
+                <Press onPress={() => setSelectedAddressId(null)}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.primary, paddingHorizontal: 2, paddingVertical: 4 }}>
                     Use a new address instead
                   </Text>
-                </PressableScale>
+                </Press>
               )}
             </View>
-          </MotiView>
+          </Rise>
         ) : null)}
 
         {/* ── Landmark + GPS ── */}
-        <MotiView
-          from={{ opacity: 0, translateY: 18 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 360, delay: 160 }}
-          className="mt-6"
-        >
+        <Rise style={{ marginTop: 22 }}>
           {selectedAddress?.coords ? (
             <View>
-              <View className="flex-row items-center mb-2">
-                <MapPin size={14} color={BRAND} strokeWidth={2.5} />
-                <Text className="ml-1.5 text-[11px] uppercase font-bold" style={{ letterSpacing: 1.4, color: MUTED }}>
-                  Landmark · required
-                </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                <IPin size={14} color={t.colors.primary} strokeWidth={2.5} />
+                <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>LANDMARK · REQUIRED</Text>
               </View>
               <View
-                className="rounded-2xl"
-                style={{ borderWidth: 1.5, borderColor: landmarkValid || !landmark ? 'rgba(26,20,16,0.10)' : '#EF4444', backgroundColor: '#FBF7F2' }}
+                style={[
+                  styles.inputWrap,
+                  {
+                    borderColor: landmarkValid || !landmark ? t.colors.line : '#EF4444',
+                    backgroundColor: t.colors.surface2,
+                    borderWidth: 1.5,
+                  },
+                ]}
               >
                 <TextInput
                   value={landmark}
                   onChangeText={setLandmark}
                   placeholder='e.g. "Near the Grand Mosque"'
-                  placeholderTextColor="#9B8F84"
+                  placeholderTextColor={t.colors.muted}
                   multiline
-                  style={{ paddingHorizontal: 18, paddingVertical: 16, fontSize: 15, color: INK, minHeight: 64 }}
+                  style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: t.colors.fg, minHeight: 64 }}
                 />
               </View>
               <View
-                className="flex-row items-center mt-3 rounded-2xl px-4 py-3"
-                style={{ backgroundColor: 'rgba(5,150,105,0.08)', borderWidth: 1, borderColor: 'rgba(5,150,105,0.24)' }}
+                style={[
+                  styles.okStrip,
+                  { backgroundColor: 'rgba(47,163,107,0.10)', borderColor: 'rgba(47,163,107,0.24)' },
+                ]}
               >
-                <Check size={14} color={GREEN} />
-                <Text className="ml-2 text-[12px] font-bold flex-1" style={{ color: GREEN }}>
+                <ICheck size={14} color={t.colors.ok} />
+                <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
                   Using the saved GPS pin from “{selectedAddress.label ?? 'this address'}” — no need to capture.
                 </Text>
               </View>
@@ -559,242 +569,232 @@ export default function Checkout() {
               capturing={locStatus === 'requesting'}
             />
           )}
-        </MotiView>
+        </Rise>
 
         {locError && !selectedAddress?.coords && (
-          <Text className="mt-3 text-[12px]" style={{ color: '#EF4444' }}>
-            {locError}
-          </Text>
+          <Text style={{ marginTop: 12, fontSize: 12, color: '#EF4444' }}>{locError}</Text>
         )}
 
         {/* ── Phone on file ── */}
         {user && !profileLoading && !phoneOk && (
-          <MotiView
-            from={{ opacity: 0, translateY: 18 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 360, delay: 180 }}
-            className="mt-6 rounded-2xl p-4"
-            style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.20)' }}
-          >
-            <View className="flex-row items-center">
-              <Phone size={15} color={AMBER} />
-              <Text className="ml-2 text-[13px] font-bold flex-1" style={{ color: AMBER }}>
+          <Rise style={[styles.warnCard, { backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <IPhone size={15} color={t.colors.warn} />
+              <Text style={{ marginLeft: 8, fontSize: 13, fontWeight: '700', color: t.colors.warn, flex: 1 }}>
                 Add a phone number so your rider can reach you
               </Text>
             </View>
-            <View className="flex-row mt-3" style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
               <TextInput
                 value={phoneInput}
                 onChangeText={setPhoneInput}
                 keyboardType="phone-pad"
                 placeholder="+212612345678 or 0612345678"
-                placeholderTextColor="#A89E94"
+                placeholderTextColor={t.colors.muted}
                 style={{
                   flex: 1,
-                  backgroundColor: '#fff',
+                  backgroundColor: t.colors.surface,
                   borderWidth: 1,
-                  borderColor: 'rgba(26,20,16,0.10)',
+                  borderColor: t.colors.line,
                   borderRadius: 14,
                   paddingHorizontal: 14,
                   paddingVertical: 12,
                   fontSize: 14,
-                  color: INK,
+                  color: t.colors.fg,
                 }}
               />
-              <PressableScale onPress={savePhone} disabled={phoneSaving || !phoneInput.trim()}>
-                <View
-                  className="rounded-2xl items-center justify-center px-4"
-                  style={{ backgroundColor: BRAND, height: 46, opacity: phoneSaving || !phoneInput.trim() ? 0.6 : 1 }}
+              <Press onPress={savePhone} disabled={phoneSaving || !phoneInput.trim()}>
+                <LinearGradient
+                  colors={t.gradients.sunset}
+                  start={t.gradients.start}
+                  end={t.gradients.end}
+                  style={[styles.smallBtn, t.shadows.glow, { opacity: phoneSaving || !phoneInput.trim() ? 0.6 : 1 }]}
                 >
                   {phoneSaving ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Save</Text>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Save</Text>
                   )}
-                </View>
-              </PressableScale>
+                </LinearGradient>
+              </Press>
             </View>
-          </MotiView>
+          </Rise>
         )}
 
         {/* ── Driver notes (wired to orders.delivery_notes) ── */}
-        <MotiView
-          from={{ opacity: 0, translateY: 18 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 360, delay: 220 }}
-          className="mt-6"
-        >
-          <SectionLabel>Driver notes · optional</SectionLabel>
-          <View className="rounded-2xl bg-white" style={{ borderWidth: 1, borderColor: LINE }}>
+        <Rise style={{ marginTop: 22 }}>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>DRIVER NOTES · OPTIONAL</Text>
+          <View style={[card(t), styles.inputWrap]}>
             <TextInput
               value={notes}
               onChangeText={setNotes}
               placeholder="Gate code, floor, anything else"
-              placeholderTextColor="#9B8F84"
+              placeholderTextColor={t.colors.muted}
               multiline
-              style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: INK, minHeight: 56 }}
+              style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: t.colors.fg, minHeight: 56 }}
             />
           </View>
-        </MotiView>
+        </Rise>
 
         {/* ── Promo code ── */}
-        <MotiView
-          from={{ opacity: 0, translateY: 18 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 360, delay: 260 }}
-          className="mt-6"
-        >
-          <SectionLabel>Promo code</SectionLabel>
+        <Rise style={{ marginTop: 22 }}>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>PROMO CODE</Text>
           {promo.applied ? (
             <View
-              className="flex-row items-center rounded-2xl px-4 py-3"
-              style={{ backgroundColor: 'rgba(5,150,105,0.08)', borderWidth: 1, borderColor: 'rgba(5,150,105,0.24)' }}
+              style={[
+                styles.okStrip,
+                { marginTop: 0, backgroundColor: 'rgba(47,163,107,0.10)', borderColor: 'rgba(47,163,107,0.24)' },
+              ]}
             >
-              <Check size={14} color={GREEN} />
-              <Text className="ml-2 text-[13px] font-bold flex-1" style={{ color: GREEN }}>
+              <ICheck size={14} color={t.colors.ok} />
+              <Text style={{ marginLeft: 8, fontSize: 13, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
                 {promo.applied.code} applied · −{promo.applied.discountDh} dh
               </Text>
-              <PressableScale
+              <Press
                 onPress={() => {
                   promo.remove();
                   setPromoInput('');
                 }}
+                scaleTo={0.9}
               >
-                <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(26,20,16,0.06)' }}>
-                  <X size={14} color={INK} />
+                <View style={[styles.closeBtn, { backgroundColor: t.colors.surface2 }]}>
+                  <IClose size={14} color={t.colors.fg} />
                 </View>
-              </PressableScale>
+              </Press>
             </View>
           ) : (
-            <View className="flex-row" style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               <View
-                className="flex-1 flex-row items-center rounded-2xl bg-white px-3"
-                style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.10)' }}
+                style={[
+                  card(t),
+                  { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+                ]}
               >
-                <Tag size={14} color={MUTED} />
+                <IGift size={15} color={t.colors.muted} />
                 <TextInput
                   value={promoInput}
                   onChangeText={(v) => setPromoInput(v.toUpperCase())}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   placeholder="WELCOME50"
-                  placeholderTextColor="#A89E94"
-                  style={{ flex: 1, paddingHorizontal: 10, paddingVertical: 12, fontSize: 14, color: INK, letterSpacing: 1 }}
+                  placeholderTextColor={t.colors.muted}
+                  style={{ flex: 1, paddingHorizontal: 10, paddingVertical: 12, fontSize: 14, color: t.colors.fg, letterSpacing: 1 }}
                 />
               </View>
-              <PressableScale onPress={applyPromo} disabled={!promoInput.trim() || promo.checking}>
+              <Press onPress={applyPromo} disabled={!promoInput.trim() || promo.checking}>
                 <View
-                  className="rounded-2xl items-center justify-center px-5"
-                  style={{ backgroundColor: INK, height: 46, opacity: !promoInput.trim() || promo.checking ? 0.5 : 1 }}
+                  style={[
+                    styles.applyBtn,
+                    { backgroundColor: t.colors.fg, opacity: !promoInput.trim() || promo.checking ? 0.5 : 1 },
+                  ]}
                 >
                   {promo.checking ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={t.colors.bg} size="small" />
                   ) : (
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Apply</Text>
+                    <Text style={{ color: t.colors.bg, fontWeight: '800', fontSize: 13 }}>Apply</Text>
                   )}
                 </View>
-              </PressableScale>
+              </Press>
             </View>
           )}
           {promo.error && !promo.applied && (
-            <Text className="mt-2 text-[12px]" style={{ color: '#EF4444' }}>
-              {promo.error}
-            </Text>
+            <Text style={{ marginTop: 8, fontSize: 12, color: '#EF4444' }}>{promo.error}</Text>
           )}
-        </MotiView>
+        </Rise>
 
         {/* ── Payment method ── */}
-        <MotiView
-          from={{ opacity: 0, translateY: 18 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 360, delay: 300 }}
-          className="mt-6"
-        >
-          <SectionLabel>Pay with</SectionLabel>
-          <View style={{ gap: 8 }}>
+        <Rise style={{ marginTop: 22 }}>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>PAY WITH</Text>
+          <View style={{ gap: 10 }}>
             {/* Cash on delivery — default */}
-            <PressableScale onPress={() => setPayMethod('cash')}>
+            <Press onPress={() => setPayMethod('cash')}>
               <View
-                className="flex-row items-center rounded-2xl p-4"
-                style={{
-                  borderWidth: 2,
-                  borderColor: payMethod === 'cash' ? BRAND : 'rgba(26,20,16,0.07)',
-                  backgroundColor: payMethod === 'cash' ? 'rgba(255,87,34,0.06)' : '#fff',
-                }}
+                style={[
+                  card(t),
+                  styles.payOption,
+                  {
+                    borderColor: payMethod === 'cash' ? t.colors.primary : t.colors.line2,
+                    borderWidth: payMethod === 'cash' ? 1.5 : 1,
+                    backgroundColor: payMethod === 'cash' ? 'rgba(255,87,34,0.06)' : t.colors.surface,
+                  },
+                ]}
               >
-                <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: GREEN }}>
-                  <Banknote size={16} color="#fff" />
+                <View style={[styles.payIcon, { backgroundColor: t.colors.ok }]}>
+                  <Banknote size={17} color="#fff" />
                 </View>
-                <View className="ml-3 flex-1">
-                  <Text className="text-[14px] font-bold" style={{ color: INK }}>Cash on delivery</Text>
-                  <Text className="text-[11px] mt-0.5" style={{ color: MUTED }}>Pay the rider when it arrives</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Cash on delivery</Text>
+                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Pay the rider when it arrives</Text>
                 </View>
-                {payMethod === 'cash' && <Check size={16} color={BRAND} />}
+                {payMethod === 'cash' && <ICheck size={18} color={t.colors.primary} />}
               </View>
-            </PressableScale>
+            </Press>
 
             {/* Wallet credit — only when there's a balance */}
             {user && walletLoading ? (
-              <View className="py-2 items-center">
-                <ActivityIndicator color={BRAND} size="small" />
+              <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+                <ActivityIndicator color={t.colors.primary} size="small" />
               </View>
             ) : user && balanceDh > 0 ? (
-              <PressableScale onPress={() => setPayMethod('wallet')}>
+              <Press onPress={() => setPayMethod('wallet')}>
                 <View
-                  className="flex-row items-center rounded-2xl p-4"
-                  style={{
-                    borderWidth: 2,
-                    borderColor: payMethod === 'wallet' ? BRAND : 'rgba(26,20,16,0.07)',
-                    backgroundColor: payMethod === 'wallet' ? 'rgba(255,87,34,0.06)' : '#fff',
-                  }}
+                  style={[
+                    card(t),
+                    styles.payOption,
+                    {
+                      borderColor: payMethod === 'wallet' ? t.colors.primary : t.colors.line2,
+                      borderWidth: payMethod === 'wallet' ? 1.5 : 1,
+                      backgroundColor: payMethod === 'wallet' ? 'rgba(255,87,34,0.06)' : t.colors.surface,
+                    },
+                  ]}
                 >
-                  <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: '#635BFF' }}>
-                    <Wallet size={16} color="#fff" />
+                  <View style={[styles.payIcon, { backgroundColor: '#635BFF' }]}>
+                    <IWallet size={17} color="#fff" />
                   </View>
-                  <View className="ml-3 flex-1">
-                    <Text className="text-[14px] font-bold" style={{ color: INK }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>
                       Wallet credit{payMethod === 'wallet' && walletCredit > 0 ? ` · −${walletCredit} dh` : ''}
                     </Text>
-                    <Text className="text-[11px] mt-0.5" style={{ color: MUTED }}>Balance: {balanceDh} dh</Text>
+                    <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Balance: {balanceDh} dh</Text>
                   </View>
-                  {payMethod === 'wallet' && <Check size={16} color={BRAND} />}
+                  {payMethod === 'wallet' && <ICheck size={18} color={t.colors.primary} />}
                 </View>
-              </PressableScale>
+              </Press>
             ) : null}
 
             {/* Card — Stripe PaymentSheet when the native SDK is in the build,
                 otherwise a visibly disabled row (old builds keep working). */}
             {isStripeAvailable ? (
-              <PressableScale onPress={() => setPayMethod('card')}>
+              <Press onPress={() => setPayMethod('card')}>
                 <View
-                  className="flex-row items-center rounded-2xl p-4"
-                  style={{
-                    borderWidth: 2,
-                    borderColor: payMethod === 'card' ? BRAND : 'rgba(26,20,16,0.07)',
-                    backgroundColor: payMethod === 'card' ? 'rgba(255,87,34,0.06)' : '#fff',
-                  }}
+                  style={[
+                    card(t),
+                    styles.payOption,
+                    {
+                      borderColor: payMethod === 'card' ? t.colors.primary : t.colors.line2,
+                      borderWidth: payMethod === 'card' ? 1.5 : 1,
+                      backgroundColor: payMethod === 'card' ? 'rgba(255,87,34,0.06)' : t.colors.surface,
+                    },
+                  ]}
                 >
-                  <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: INK }}>
-                    <CreditCard size={16} color="#fff" />
+                  <View style={[styles.payIcon, { backgroundColor: t.colors.fg }]}>
+                    <CreditCard size={17} color={t.colors.bg} />
                   </View>
-                  <View className="ml-3 flex-1">
-                    <Text className="text-[14px] font-bold" style={{ color: INK }}>Card / Apple Pay</Text>
-                    <Text className="text-[11px] mt-0.5" style={{ color: MUTED }}>Secure payment via Stripe</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Card / Apple Pay</Text>
+                    <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Secure payment via Stripe</Text>
                   </View>
-                  {payMethod === 'card' && <Check size={16} color={BRAND} />}
+                  {payMethod === 'card' && <ICheck size={18} color={t.colors.primary} />}
                 </View>
-              </PressableScale>
+              </Press>
             ) : (
-              <View
-                className="flex-row items-center rounded-2xl p-4"
-                style={{ borderWidth: 2, borderColor: 'rgba(26,20,16,0.07)', backgroundColor: '#fff', opacity: 0.45 }}
-              >
-                <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: INK }}>
-                  <CreditCard size={16} color="#fff" />
+              <View style={[card(t), styles.payOption, { opacity: 0.45 }]}>
+                <View style={[styles.payIcon, { backgroundColor: t.colors.fg }]}>
+                  <CreditCard size={17} color={t.colors.bg} />
                 </View>
-                <View className="ml-3 flex-1">
-                  <Text className="text-[14px] font-bold" style={{ color: INK }}>Card / Apple Pay</Text>
-                  <Text className="text-[11px] mt-0.5" style={{ color: MUTED }}>Arriving in the next update</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Card / Apple Pay</Text>
+                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Arriving in the next update</Text>
                 </View>
               </View>
             )}
@@ -802,139 +802,191 @@ export default function Checkout() {
 
           {/* Partial wallet note */}
           {payMethod === 'wallet' && walletCredit > 0 && !fullyCoveredByWallet && (
-            <View
-              className="mt-3 rounded-2xl px-4 py-3"
-              style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.20)' }}
-            >
-              <Text className="text-[12px] font-bold" style={{ color: AMBER, lineHeight: 18 }}>
+            <View style={[styles.warnStrip, { backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.warn, lineHeight: 18 }}>
                 Wallet covers {walletCredit} dh — the remaining {finalTotal} dh is cash on delivery.
               </Text>
             </View>
           )}
-        </MotiView>
+        </Rise>
 
         {/* ── Min-order warning ── */}
         {!subtotalOk && (
-          <View
-            className="mt-5 rounded-2xl px-4 py-3"
-            style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.20)' }}
-          >
-            <Text className="text-[12px] font-bold" style={{ color: AMBER, lineHeight: 18 }}>
+          <View style={[styles.warnStrip, { marginTop: 18, backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.warn, lineHeight: 18 }}>
               Minimum order is {MIN_ORDER_DH} dh — add {MIN_ORDER_DH - subtotal} dh more to checkout.
             </Text>
           </View>
         )}
 
-        {/* ── Order summary ── */}
-        <MotiView
-          from={{ opacity: 0, translateY: 18 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 360, delay: 340 }}
-          className="mt-6 p-5 rounded-3xl"
-          style={{ backgroundColor: INK }}
-        >
-          <View className="flex-row justify-between mb-2">
-            <Text className="text-white/60 text-[12px] font-semibold">Subtotal</Text>
-            <Text className="text-white text-[13px] font-semibold">{subtotal} dh</Text>
-          </View>
-          <View className="flex-row justify-between mb-2">
-            <Text className="text-white/60 text-[12px] font-semibold">Delivery</Text>
-            <Text className="text-white text-[13px] font-semibold">
-              {deliveryFee === 0 ? 'Free' : `${deliveryFee} dh`}
-            </Text>
-          </View>
-          {priorityDh > 0 && (
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-white/60 text-[12px] font-semibold">Priority</Text>
-              <Text className="text-white text-[13px] font-semibold">{priorityDh} dh</Text>
-            </View>
-          )}
-          {weatherDh > 0 && (
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-white/60 text-[12px] font-semibold">Winter surcharge</Text>
-              <Text className="text-white text-[13px] font-semibold">{weatherDh} dh</Text>
-            </View>
-          )}
-          {tipAmount > 0 && (
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-white/60 text-[12px] font-semibold">Courier tip</Text>
-              <Text className="text-white text-[13px] font-semibold">{tipAmount} dh</Text>
-            </View>
-          )}
+        {/* ── Order summary — dark Bill card (3.0 tokens) ── */}
+        <Rise style={[styles.billCard, t.shadows.lift]}>
+          <LinearGradient
+            colors={t.isDark ? ['#231910', '#19120C'] : ['#211913', '#100B07']}
+            start={t.gradients.start}
+            end={t.gradients.end}
+            style={StyleSheet.absoluteFill}
+          />
+          <BillRow label="Subtotal" value={`${subtotal} dh`} />
+          <BillRow label="Delivery" value={deliveryFee === 0 ? 'Free' : `${deliveryFee} dh`} />
+          {priorityDh > 0 && <BillRow label="Priority" value={`${priorityDh} dh`} />}
+          {weatherDh > 0 && <BillRow label="Winter surcharge" value={`${weatherDh} dh`} />}
+          {tipAmount > 0 && <BillRow label="Courier tip" value={`${tipAmount} dh`} />}
           {promoDiscount > 0 && (
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-[12px] font-semibold" style={{ color: '#34D399' }}>
-                Promo · {promo.applied?.code}
-              </Text>
-              <Text className="text-[13px] font-semibold" style={{ color: '#34D399' }}>−{promoDiscount} dh</Text>
-            </View>
+            <BillRow label={`Promo · ${promo.applied?.code}`} value={`−${promoDiscount} dh`} accent="#3FD08A" />
           )}
-          {walletCredit > 0 && (
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-[12px] font-semibold" style={{ color: '#8E85FF' }}>Wallet credit</Text>
-              <Text className="text-[13px] font-semibold" style={{ color: '#8E85FF' }}>−{walletCredit} dh</Text>
-            </View>
-          )}
-          <View
-            className="flex-row justify-between pt-3 mt-2"
-            style={{ borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-          >
-            <Text className="text-white font-display text-[15px]" style={{ fontWeight: '800' }}>Total</Text>
-            <Text className="text-white font-display text-[18px]" style={{ fontWeight: '800', letterSpacing: -0.4 }}>
+          {walletCredit > 0 && <BillRow label="Wallet credit" value={`−${walletCredit} dh`} accent="#A99DFF" />}
+          <View style={styles.billTotalRow}>
+            <Text style={[styles.disp, { fontSize: 15, color: '#fff' }]}>Total</Text>
+            <Text style={[styles.disp, { fontSize: 19, color: '#fff', fontVariant: ['tabular-nums'] }]}>
               {finalTotal} dh
             </Text>
           </View>
-        </MotiView>
+        </Rise>
 
         {createError && (
-          <Text className="mt-3 text-[12px]" style={{ color: '#EF4444' }}>
-            {createError.message}
-          </Text>
+          <Text style={{ marginTop: 12, fontSize: 12, color: '#EF4444' }}>{createError.message}</Text>
         )}
       </ScrollView>
 
-      {/* Sticky submit */}
-      <MotiView
-        from={{ translateY: 80, opacity: 0 }}
-        animate={{ translateY: 0, opacity: 1 }}
-        transition={{ type: 'timing', duration: 360, delay: 320 }}
-        style={{ position: 'absolute', left: 24, right: 24, bottom: 32 }}
-      >
-        <PressableScale onPress={handleSubmit} disabled={!!user && !canSubmit}>
-          <View
-            className="rounded-full py-4 px-6 flex-row items-center justify-center"
-            style={{
-              backgroundColor: canSubmit || !user ? BRAND : '#9B8F84',
-              shadowColor: BRAND,
-              shadowOffset: { width: 0, height: 14 },
-              shadowOpacity: canSubmit ? 0.4 : 0,
-              shadowRadius: 24,
-              elevation: 10,
-            }}
-          >
-            <Text className="text-white font-bold text-[15px] mr-2" style={{ letterSpacing: 0.2 }}>
-              {submitting
-                ? 'Placing order…'
-                : !user
-                  ? 'Sign in to order'
-                  : !subtotalOk
-                    ? `Add ${MIN_ORDER_DH - subtotal} dh more`
-                    : !phoneOk
-                      ? 'Add your phone first'
-                      : !effectiveCoords
-                        ? 'Capture GPS first'
-                        : !landmarkValid
-                          ? 'Add a landmark'
-                          : !quote
-                            ? 'Pricing…'
-                            : fullyCoveredByWallet
-                              ? 'Place order · paid from wallet'
-                              : `Place order · ${finalTotal} dh${walletCredit > 0 ? ' cash' : ''}`}
-            </Text>
-            <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
-          </View>
-        </PressableScale>
-      </MotiView>
+      {/* ── Sticky 3.0 gradient "Place order" ── */}
+      <View style={[styles.sticky, { backgroundColor: t.colors.bg, borderColor: t.colors.line }]}>
+        <Press onPress={handleSubmit} disabled={!!user && !canSubmit}>
+          {canSubmit || !user ? (
+            <LinearGradient
+              colors={t.gradients.sunset}
+              start={t.gradients.start}
+              end={t.gradients.end}
+              style={[styles.placeBtn, t.shadows.glow]}
+            >
+              <PlaceLabel />
+              <IChevR size={18} color="#fff" strokeWidth={2.5} />
+            </LinearGradient>
+          ) : (
+            <View style={[styles.placeBtn, { backgroundColor: t.colors.muted }]}>
+              <PlaceLabel />
+              <IChevR size={18} color="#fff" strokeWidth={2.5} />
+            </View>
+          )}
+        </Press>
+      </View>
     </SafeAreaView>
   );
+
+  // Inline label so it can read the full submit gate without prop threading.
+  function PlaceLabel() {
+    return (
+      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15, marginRight: 6, letterSpacing: 0.2 }}>
+        {submitting
+          ? 'Placing order…'
+          : !user
+            ? 'Sign in to order'
+            : !subtotalOk
+              ? `Add ${MIN_ORDER_DH - subtotal} dh more`
+              : !phoneOk
+                ? 'Add your phone first'
+                : !effectiveCoords
+                  ? 'Capture GPS first'
+                  : !landmarkValid
+                    ? 'Add a landmark'
+                    : !quote
+                      ? 'Pricing…'
+                      : fullyCoveredByWallet
+                        ? 'Place order · paid from wallet'
+                        : `Place order · ${finalTotal} dh${walletCredit > 0 ? ' cash' : ''}`}
+      </Text>
+    );
+  }
 }
+
+/* ── dark Bill summary row ─────────────────────────────────────────────────── */
+function BillRow({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <View style={styles.billRow}>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: accent ?? 'rgba(255,255,255,0.62)' }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: accent ?? '#fff', fontVariant: ['tabular-nums'] }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/* ── shared card base (matches cart.tsx / account.tsx) ─────────────────────── */
+function card(t: Ag3Theme) {
+  return {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.md,
+    borderWidth: 1,
+    borderColor: t.colors.line2,
+    ...t.shadows.card,
+  } as const;
+}
+
+/* ── styles ────────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  disp: { fontWeight: '800', letterSpacing: -0.4 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700', marginBottom: 2 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  iconBtn: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  browseBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 },
+
+  softNote: { marginTop: 20, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
+
+  addrCard: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14 },
+  addrIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+
+  inputWrap: { borderRadius: 18, overflow: 'hidden' },
+  okStrip: { flexDirection: 'row', alignItems: 'center', marginTop: 12, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1 },
+
+  warnCard: { marginTop: 22, borderRadius: 20, padding: 14, borderWidth: 1 },
+  warnStrip: { marginTop: 12, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1 },
+  smallBtn: { borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, height: 46 },
+
+  closeBtn: { width: 32, height: 32, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  applyBtn: { borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, height: 46 },
+
+  payOption: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14 },
+  payIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+
+  billCard: { marginTop: 22, borderRadius: 26, padding: 20, overflow: 'hidden' },
+  billRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
+  billTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingTop: 13,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+
+  sticky: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 28,
+    borderTopWidth: 1,
+  },
+  placeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 22,
+  },
+});

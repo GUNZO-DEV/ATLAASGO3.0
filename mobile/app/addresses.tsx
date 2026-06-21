@@ -1,17 +1,47 @@
+// AtlaasGo 3.0 — Saved delivery addresses (campus-precise drop).
+//
+// Native re-skin of the prototype address-book, faithful to the 3.0 look
+// (warm terracotta + amber on cream/ink, sunset gradients, pin tiles, rounded
+// cards, gradient "Add address" CTA). Built on the ag3 foundation:
+//   theme.ts (useAg3Theme), icons.tsx, components/ag3/primitives (Press, Rise).
+//
+// DATA / PLUMBING PRESERVED ───────────────────────────────────────────────────
+//   • useAddresses() owns the live CRUD: add / update / remove / setDefault all
+//     hit the Supabase `addresses` table (RLS-scoped) and re-load. None of that
+//     is touched — only the presentation around it.
+//   • useLocation().capture() still drives the GPS pin (expo-location permission
+//     + getCurrentPositionAsync), gated by gpsStatus / surfaced via gpsError.
+//   • The add/edit form keeps every field (label, line1, landmark, building,
+//     room), the AUI campus toggle + 68-building quick-pick, and the landmark
+//     ≥3-char validation Alert. Submit still routes to update(editingId) vs
+//     add() exactly as before.
+//   • Auth gating (useAuth) → signed-out CTA to /sign-in is preserved.
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Check, GraduationCap, MapPin, Pencil, Plus, Trash2 } from 'lucide-react-native';
-import { PressableScale } from '../components/primitives/PressableScale';
+import { GraduationCap, Pencil, Trash2 } from 'lucide-react-native';
+
+import { useAg3Theme } from '../components/ag3/theme';
+import { IBack, IPin, IPlus, ICheck } from '../components/ag3/icons';
+import { Press, Rise } from '../components/ag3/primitives';
 import { useAuth } from '../lib/auth';
 import { useAddresses, type Address } from '../hooks/useAddresses';
 import { useLocation } from '../hooks/useLocation';
 import type { Coords } from '../lib/types';
 
-const INK = '#1A1410';
-const MUTED = '#7A6F66';
-const BRAND = '#FF5722';
+type Theme = ReturnType<typeof useAg3Theme>;
 
 // AUI quick-pick buildings — copied from the web Addresses page
 // (src/pages/Addresses.tsx): 60 numbered dorms + named campus spots.
@@ -35,6 +65,7 @@ const AUI_OTHER = [
 const AUI_BUILDINGS = [...AUI_DORMS, ...AUI_OTHER];
 
 export default function AddressesScreen() {
+  const t = useAg3Theme();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { addresses, loading, add, update, remove, setDefault } = useAddresses();
@@ -97,233 +128,383 @@ export default function AddressesScreen() {
     }
   }
 
-  function Header() {
-    return (
-      <View className="flex-row items-center justify-between pt-3 px-6">
-        <PressableScale onPress={() => router.back()}>
-          <View className="w-10 h-10 rounded-full items-center justify-center bg-white" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}>
-            <ArrowLeft size={18} color={INK} />
-          </View>
-        </PressableScale>
-        <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 1.5, color: BRAND }}>Addresses</Text>
-        <View style={{ width: 40 }} />
-      </View>
-    );
-  }
-
+  // ── Signed-out state ────────────────────────────────────────────────────────
   if (!authLoading && !user) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <Header />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <MapPin size={30} color={MUTED} />
-          <Text style={{ fontWeight: '800', fontSize: 20, color: INK, marginTop: 16 }}>Saved addresses</Text>
-          <Text style={{ fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        <Header t={t} onBack={() => router.back()} />
+        <View style={styles.emptyWrap}>
+          <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+            <IPin size={28} color={t.colors.muted} />
+          </View>
+          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>
+            Saved addresses
+          </Text>
+          <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
             Sign in to save home, the dorm, or the café you camp at.
           </Text>
-          <PressableScale onPress={() => router.push('/sign-in')}>
-            <View style={{ backgroundColor: BRAND, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 20 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Sign in</Text>
-            </View>
-          </PressableScale>
+          <Press onPress={() => router.push('/sign-in')}>
+            <LinearGradient
+              colors={t.gradients.sunset}
+              start={t.gradients.start}
+              end={t.gradients.end}
+              style={[styles.browseBtn, t.shadows.glow]}
+            >
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+            </LinearGradient>
+          </Press>
         </View>
       </SafeAreaView>
     );
   }
 
-  const inputStyle = {
-    backgroundColor: '#FBF7F2',
-    borderWidth: 1,
-    borderColor: 'rgba(26,20,16,0.10)',
-    color: INK,
-  } as const;
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-      <Header />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text className="mt-6 mb-4 font-display text-[28px]" style={{ fontWeight: '800', letterSpacing: -0.8, color: INK }}>
-          Delivery addresses
-        </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+      <Header t={t} onBack={() => router.back()} />
 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 48 }}
+      >
+        {/* eyebrow + title */}
+        <Rise>
+          <View style={[styles.pad, { marginTop: 6, marginBottom: 4 }]}>
+            <Text style={[styles.eyebrow, { color: t.colors.primary }]}>WHERE WE DROP</Text>
+            <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg }]}>Delivery addresses</Text>
+          </View>
+        </Rise>
+
+        {/* address list */}
         {loading ? (
-          <View className="py-8 items-center"><ActivityIndicator color={BRAND} /></View>
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator color={t.colors.primary} />
+          </View>
         ) : (
-          <View style={{ gap: 10 }}>
+          <Rise style={[styles.pad, { marginTop: 14, gap: 11 }]}>
             {addresses.map((a) => (
-              <View key={a.id} className="bg-white rounded-2xl p-4" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}>
-                <View className="flex-row items-center">
-                  <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}>
-                    {a.isCampus
-                      ? <GraduationCap size={16} color={BRAND} />
-                      : <MapPin size={16} color={BRAND} />}
-                  </View>
-                  <View className="ml-3 flex-1">
-                    <View className="flex-row items-center flex-wrap">
-                      <Text className="text-[15px] font-bold" style={{ color: INK }}>{a.label || 'Address'}</Text>
+              <View key={a.id} style={[card(t), { padding: 14 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+                  {/* pin tile — gradient for default, soft surface otherwise */}
+                  {a.isDefault ? (
+                    <LinearGradient
+                      colors={t.gradients.sunset}
+                      start={t.gradients.start}
+                      end={t.gradients.end}
+                      style={[styles.pinTile, t.shadows.glow]}
+                    >
+                      {a.isCampus ? <GraduationCap size={21} color="#fff" /> : <IPin size={21} color="#fff" />}
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.pinTile, { backgroundColor: 'rgba(255,87,34,0.10)' }]}>
+                      {a.isCampus
+                        ? <GraduationCap size={20} color={t.colors.primary} />
+                        : <IPin size={20} color={t.colors.primary} />}
+                    </View>
+                  )}
+
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: t.colors.fg }} numberOfLines={1}>
+                        {a.label || 'Address'}
+                      </Text>
                       {a.isDefault && (
-                        <View className="ml-2 rounded-full px-2 py-0.5" style={{ backgroundColor: 'rgba(5,150,105,0.12)' }}>
-                          <Text className="text-[10px] font-bold" style={{ color: '#059669' }}>DEFAULT</Text>
+                        <View style={[styles.badge, { backgroundColor: 'rgba(47,163,107,0.14)' }]}>
+                          <ICheck size={12} color={t.colors.ok} />
+                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.colors.ok }}>DEFAULT</Text>
                         </View>
                       )}
                       {a.isCampus && (
-                        <View className="ml-2 rounded-full px-2 py-0.5" style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}>
-                          <Text className="text-[10px] font-bold" style={{ color: BRAND }}>CAMPUS</Text>
+                        <View style={[styles.badge, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.colors.primary }}>CAMPUS</Text>
                         </View>
                       )}
                     </View>
-                    <Text className="text-[12px] mt-0.5" style={{ color: MUTED }} numberOfLines={1}>
+                    <Text style={{ fontSize: 12.5, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>
                       {[a.line1, a.landmark, a.building && `Bldg ${a.building}`, a.room && `Rm ${a.room}`].filter(Boolean).join(' · ')}
                     </Text>
                     {a.coords && (
-                      <Text className="text-[11px] mt-0.5" style={{ color: BRAND }}>
-                        GPS pin · {a.coords.lat.toFixed(5)}, {a.coords.lng.toFixed(5)}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                        <IPin size={11} color={t.colors.primary} />
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: t.colors.primary, fontVariant: ['tabular-nums'] }}>
+                          GPS · {a.coords.lat.toFixed(5)}, {a.coords.lng.toFixed(5)}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                  <PressableScale onPress={() => startEdit(a)}>
-                    <View className="w-9 h-9 items-center justify-center"><Pencil size={16} color={MUTED} /></View>
-                  </PressableScale>
-                  <PressableScale onPress={() => remove(a.id)}>
-                    <View className="w-9 h-9 items-center justify-center"><Trash2 size={16} color={MUTED} /></View>
-                  </PressableScale>
                 </View>
-                {!a.isDefault && (
-                  <Pressable onPress={() => setDefault(a.id)} className="mt-2 self-start">
-                    <View className="flex-row items-center rounded-full px-3 py-1.5" style={{ backgroundColor: '#FBF7F2', borderWidth: 1, borderColor: 'rgba(26,20,16,0.10)' }}>
-                      <Check size={12} color={MUTED} />
-                      <Text className="ml-1 text-[12px] font-bold" style={{ color: MUTED }}>Set as default</Text>
+
+                {/* row actions */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12 }}>
+                  {!a.isDefault && (
+                    <Pressable onPress={() => setDefault(a.id)}>
+                      <View style={[styles.actionPill, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+                        <ICheck size={13} color={t.colors.fgSoft} />
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.fgSoft }}>Set default</Text>
+                      </View>
+                    </Pressable>
+                  )}
+                  <View style={{ flex: 1 }} />
+                  <Pressable onPress={() => startEdit(a)} hitSlop={6}>
+                    <View style={[styles.iconChip, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+                      <Pencil size={16} color={t.colors.fgSoft} />
                     </View>
                   </Pressable>
-                )}
+                  <Pressable onPress={() => remove(a.id)} hitSlop={6}>
+                    <View style={[styles.iconChip, { backgroundColor: 'rgba(225,29,72,0.10)', borderColor: 'rgba(225,29,72,0.20)' }]}>
+                      <Trash2 size={16} color="#E0526D" />
+                    </View>
+                  </Pressable>
+                </View>
               </View>
             ))}
+
             {addresses.length === 0 && !formOpen && (
-              <Text className="text-[14px]" style={{ color: MUTED }}>No saved addresses yet — add your first delivery spot in under 20 seconds.</Text>
+              <View style={[card(t), { padding: 22, alignItems: 'center' }]}>
+                <View style={[styles.emptyIcon, { width: 54, height: 54, backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+                  <IPin size={24} color={t.colors.muted} />
+                </View>
+                <Text style={{ fontSize: 14, color: t.colors.fgSoft, textAlign: 'center', lineHeight: 20, marginTop: 14 }}>
+                  No saved addresses yet — add your first delivery spot in under 20 seconds.
+                </Text>
+              </View>
             )}
-          </View>
+          </Rise>
         )}
 
-        {/* Add / edit form */}
+        {/* ── add / edit form ── */}
         {formOpen ? (
-          <View className="mt-5 bg-white rounded-3xl p-5" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}>
-            <Text className="font-display text-[16px] mb-3" style={{ fontWeight: '800', color: INK }}>
-              {editingId ? 'Edit address' : 'New address'}
-            </Text>
-            <TextInput value={label} onChangeText={setLabel} placeholder="Label (Home · Dorm · Studio)" placeholderTextColor="#A89E94" className="rounded-2xl px-4 py-3 text-[15px] mb-3" style={inputStyle} />
-            <TextInput value={line1} onChangeText={setLine1} placeholder="Address (Avenue Mohammed V, Ifrane)" placeholderTextColor="#A89E94" className="rounded-2xl px-4 py-3 text-[15px] mb-3" style={inputStyle} />
-            <TextInput value={landmark} onChangeText={setLandmark} placeholder="Landmark (e.g. Near AUI gate)" placeholderTextColor="#A89E94" className="rounded-2xl px-4 py-3 text-[15px] mb-3" style={inputStyle} />
-            <View className="flex-row" style={{ gap: 10 }}>
-              <TextInput value={building} onChangeText={setBuilding} placeholder="Building" placeholderTextColor="#A89E94" className="flex-1 rounded-2xl px-4 py-3 text-[15px] mb-3" style={inputStyle} />
-              <TextInput value={room} onChangeText={setRoom} placeholder="Room" placeholderTextColor="#A89E94" className="flex-1 rounded-2xl px-4 py-3 text-[15px] mb-3" style={inputStyle} />
-            </View>
+          <Rise style={[styles.pad, { marginTop: 18 }]}>
+            <View style={[card(t), { padding: 18, borderRadius: t.radii.lg }]}>
+              <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg, marginBottom: 14 }]}>
+                {editingId ? 'Edit address' : 'New address'}
+              </Text>
 
-            {/* AUI campus toggle */}
-            <Pressable
-              onPress={() => {
-                const next = !isCampus;
-                setIsCampus(next);
-                if (next && !line1) setLine1('AUI Campus, Ifrane');
-              }}
-              className="flex-row items-center mb-3"
-            >
-              <View
-                className="w-6 h-6 rounded-lg items-center justify-center"
-                style={{
-                  backgroundColor: isCampus ? BRAND : '#FBF7F2',
-                  borderWidth: 1,
-                  borderColor: isCampus ? BRAND : 'rgba(26,20,16,0.15)',
-                }}
-              >
-                {isCampus && <Check size={14} color="#fff" strokeWidth={3} />}
+              <Field t={t} value={label} onChangeText={setLabel} placeholder="Label (Home · Dorm · Studio)" />
+              <Field t={t} value={line1} onChangeText={setLine1} placeholder="Address (Avenue Mohammed V, Ifrane)" />
+              <Field t={t} value={landmark} onChangeText={setLandmark} placeholder="Landmark (e.g. Near AUI gate)" />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Field t={t} value={building} onChangeText={setBuilding} placeholder="Building" style={{ flex: 1 }} />
+                <Field t={t} value={room} onChangeText={setRoom} placeholder="Room" style={{ flex: 1 }} />
               </View>
-              <Text className="ml-2.5 text-[14px] font-bold" style={{ color: INK }}>AUI campus delivery</Text>
-            </Pressable>
 
-            {/* Quick-pick chips (campus only) */}
-            {isCampus && (
-              <View className="mb-3">
-                <Text style={{ fontSize: 11, fontWeight: '700', color: MUTED, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 8 }}>
-                  Quick pick a building
+              {/* AUI campus toggle */}
+              <Pressable
+                onPress={() => {
+                  const next = !isCampus;
+                  setIsCampus(next);
+                  if (next && !line1) setLine1('AUI Campus, Ifrane');
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 6 }}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    {
+                      backgroundColor: isCampus ? t.colors.primary : t.colors.surface2,
+                      borderColor: isCampus ? t.colors.primary : t.colors.line,
+                    },
+                  ]}
+                >
+                  {isCampus && <ICheck size={14} color="#fff" strokeWidth={3} />}
+                </View>
+                <Text style={{ marginLeft: 11, fontSize: 14, fontWeight: '700', color: t.colors.fg }}>
+                  AUI campus delivery
                 </Text>
-                <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                  <View className="flex-row flex-wrap" style={{ gap: 6 }}>
-                    {AUI_BUILDINGS.map((b) => {
-                      const active = building === b.building;
-                      return (
-                        <Pressable
-                          key={b.building}
-                          onPress={() => {
-                            setBuilding(b.building);
-                            setLine1(b.line1);
-                            setLabel(b.label);
-                          }}
-                        >
-                          <View
-                            className="rounded-full px-3 py-1.5"
-                            style={{
-                              backgroundColor: active ? 'rgba(255,87,34,0.08)' : '#FBF7F2',
-                              borderWidth: active ? 1.5 : 1,
-                              borderColor: active ? BRAND : 'rgba(26,20,16,0.10)',
+              </Pressable>
+
+              {/* Quick-pick chips (campus only) */}
+              {isCampus && (
+                <View style={{ marginTop: 8, marginBottom: 6 }}>
+                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 9 }]}>QUICK PICK A BUILDING</Text>
+                  <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                      {AUI_BUILDINGS.map((b) => {
+                        const active = building === b.building;
+                        return (
+                          <Pressable
+                            key={b.building}
+                            onPress={() => {
+                              setBuilding(b.building);
+                              setLine1(b.line1);
+                              setLabel(b.label);
                             }}
                           >
-                            <Text className="text-[12px]" style={{ color: active ? BRAND : MUTED, fontWeight: active ? '700' : '500' }}>
-                              {b.label}
-                            </Text>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
-
-            {/* GPS pin capture */}
-            <View className="flex-row items-center rounded-2xl p-3.5 mb-1" style={{ backgroundColor: '#FFF1EB' }}>
-              <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: BRAND }}>
-                <MapPin size={16} color="#fff" />
-              </View>
-              <View className="ml-3 flex-1">
-                <Text style={{ fontSize: 11, fontWeight: '700', color: MUTED, letterSpacing: 1.1, textTransform: 'uppercase' }}>
-                  GPS pin
-                </Text>
-                <Text className="text-[14px] font-bold" style={{ color: INK }}>
-                  {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}` : 'Tap to capture'}
-                </Text>
-              </View>
-              <PressableScale onPress={capturePin}>
-                <View className="rounded-full px-4 py-2" style={{ backgroundColor: BRAND, opacity: gpsStatus === 'requesting' ? 0.6 : 1 }}>
-                  {gpsStatus === 'requesting'
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Text className="text-white font-bold text-[12px]">{pin ? 'Update' : 'Capture'}</Text>}
+                            <View
+                              style={{
+                                paddingHorizontal: 13,
+                                paddingVertical: 7,
+                                borderRadius: 999,
+                                backgroundColor: active ? 'rgba(255,87,34,0.10)' : t.colors.surface2,
+                                borderWidth: active ? 1.5 : 1,
+                                borderColor: active ? t.colors.primary : t.colors.line,
+                              }}
+                            >
+                              <Text style={{ fontSize: 12.5, color: active ? t.colors.primary : t.colors.fgSoft, fontWeight: active ? '700' : '600' }}>
+                                {b.label}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
                 </View>
-              </PressableScale>
-            </View>
-            {gpsError && (
-              <Text className="text-[12px] mb-1" style={{ color: '#E11D48' }}>{gpsError}</Text>
-            )}
+              )}
 
-            <Pressable onPress={submit} disabled={busy} className="mt-3">
-              <View className="rounded-2xl py-3.5 items-center" style={{ backgroundColor: BRAND, opacity: busy ? 0.6 : 1 }}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-[15px]">{editingId ? 'Save changes' : 'Save address'}</Text>}
+              {/* GPS pin capture */}
+              <View style={[styles.gpsRow, { backgroundColor: 'rgba(255,87,34,0.08)', borderColor: 'rgba(255,87,34,0.16)' }]}>
+                <LinearGradient
+                  colors={t.gradients.sunset}
+                  start={t.gradients.start}
+                  end={t.gradients.end}
+                  style={[styles.gpsTile, t.shadows.glow]}
+                >
+                  <IPin size={18} color="#fff" />
+                </LinearGradient>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 1 }]}>GPS PIN</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+                    {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}` : 'Tap to capture'}
+                  </Text>
+                </View>
+                <Press onPress={capturePin}>
+                  <View style={[styles.gpsBtn, { backgroundColor: t.colors.primary, opacity: gpsStatus === 'requesting' ? 0.6 : 1 }]}>
+                    {gpsStatus === 'requesting'
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12.5 }}>{pin ? 'Update' : 'Capture'}</Text>}
+                  </View>
+                </Press>
               </View>
-            </Pressable>
-            <Pressable onPress={resetForm} className="mt-3 items-center">
-              <Text className="text-[13px]" style={{ color: MUTED }}>Cancel</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <PressableScale onPress={startAdd}>
-            <View className="flex-row items-center justify-center mt-5 rounded-2xl py-3.5" style={{ borderWidth: 1.5, borderColor: BRAND, borderStyle: 'dashed' }}>
-              <Plus size={16} color={BRAND} />
-              <Text className="ml-2 text-[14px] font-bold" style={{ color: BRAND }}>
-                {addresses.length === 0 ? 'Add address' : 'Add another address'}
-              </Text>
+              {gpsError && (
+                <Text style={{ fontSize: 12, color: '#E0526D', marginTop: 6 }}>{gpsError}</Text>
+              )}
+
+              {/* save */}
+              <Press onPress={submit} disabled={busy} style={{ marginTop: 16 }}>
+                <LinearGradient
+                  colors={t.gradients.sunset}
+                  start={t.gradients.start}
+                  end={t.gradients.end}
+                  style={[styles.saveBtn, t.shadows.glow, { opacity: busy ? 0.7 : 1 }]}
+                >
+                  {busy
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{editingId ? 'Save changes' : 'Save address'}</Text>}
+                </LinearGradient>
+              </Press>
+              <Pressable onPress={resetForm} style={{ marginTop: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: t.colors.muted }}>Cancel</Text>
+              </Pressable>
             </View>
-          </PressableScale>
+          </Rise>
+        ) : (
+          <Rise style={[styles.pad, { marginTop: 18 }]}>
+            <Press onPress={startAdd}>
+              <LinearGradient
+                colors={t.gradients.sunset}
+                start={t.gradients.start}
+                end={t.gradients.end}
+                style={[styles.addBtn, t.shadows.glow]}
+              >
+                <IPlus size={18} color={t.colors.onPrimary} />
+                <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>
+                  {addresses.length === 0 ? 'Add address' : 'Add another address'}
+                </Text>
+              </LinearGradient>
+            </Press>
+          </Rise>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+/* ── sub-components ───────────────────────────────────────────────────────── */
+
+function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
+  return (
+    <MotiView
+      from={{ opacity: 0, translateX: -8 }}
+      animate={{ opacity: 1, translateX: 0 }}
+      transition={{ type: 'timing', duration: 240 }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 12 }}
+    >
+      <Press onPress={onBack} scaleTo={0.9}>
+        <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
+          <IBack size={20} color={t.colors.fg} />
+        </View>
+      </Press>
+      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Addresses</Text>
+    </MotiView>
+  );
+}
+
+function Field({
+  t,
+  value,
+  onChangeText,
+  placeholder,
+  style,
+}: {
+  t: Theme;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  style?: object;
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={t.colors.muted}
+      style={[
+        styles.input,
+        { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg },
+        style,
+      ]}
+    />
+  );
+}
+
+/* ── shared card base ─────────────────────────────────────────────────────── */
+function card(t: Theme) {
+  return {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.md,
+    borderWidth: 1,
+    borderColor: t.colors.line2,
+    ...t.shadows.card,
+  } as const;
+}
+
+/* ── styles ───────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  disp: { fontWeight: '800', letterSpacing: -0.4 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700' },
+  pad: { paddingHorizontal: 18 },
+
+  iconBtn: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  browseBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32, marginTop: 24 },
+
+  pinTile: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 },
+
+  actionPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
+  iconChip: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+
+  checkbox: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+
+  input: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 11 },
+
+  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1, marginTop: 6 },
+  gpsTile: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  gpsBtn: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center', justifyContent: 'center', minWidth: 74 },
+
+  saveBtn: { borderRadius: 16, paddingVertical: 15, alignItems: 'center' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 999, paddingVertical: 16 },
+});

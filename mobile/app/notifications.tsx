@@ -1,24 +1,53 @@
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+// AtlaasGo 3.0 — Notifications. Native re-skin of the notifications feed, wired
+// to the live ag3 foundation (useAg3Theme) and faithful to the 3.0 look (warm
+// terracotta + amber on cream/ink, sunset gradients, rounded cards, kind icons,
+// unread dot, relative time, empty state).
+//
+// DATA / PLUMBING PRESERVED ───────────────────────────────────────────────────
+//   • useNotifications() — the realtime, RLS-scoped feed (supabase channel +
+//     mark-as-read). items / unread / loading / markRead / markAllRead all keep
+//     their exact contract; the unread badge stays in lock-step.
+//   • useAuth() signed-out gate → /sign-in CTA (unchanged behaviour).
+//   • iconFor(kind) / timeAgo(iso) helpers preserved verbatim (only the icon set
+//     swapped to the ag3 I-names so the screen reads like the rest of 3.0).
+//   • Row tap: marks the row read if unread (markRead), and — when the
+//     notification carries payload.orderId — deep-links to live tracking
+//     (/order/[id]) via expo-router, exactly as before.
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, ChevronRight, Package, Tag, Wallet, MessageCircle, Bike, Star } from 'lucide-react-native';
-import { PressableScale } from '../components/primitives/PressableScale';
+
+import { useAg3Theme } from '../components/ag3/theme';
+import {
+  IBack,
+  IBell,
+  IChevR,
+  IReceipt,
+  IGift,
+  IWallet,
+  IMsg,
+  ITruck,
+  IStar,
+  type AgIcon,
+} from '../components/ag3/icons';
+import { Press, Rise } from '../components/ag3/primitives';
 import { useAuth } from '../lib/auth';
 import { useNotifications } from '../hooks/useNotifications';
 
-const INK = '#1A1410';
-const MUTED = '#7A6F66';
-const BRAND = '#FF5722';
+type Theme = ReturnType<typeof useAg3Theme>;
 
-function iconFor(kind: string) {
+// Per-kind icon + accent. Colours intentionally match the 3.0 palette family.
+function iconFor(kind: string): { Icon: AgIcon; color: string } {
   switch (kind) {
-    case 'order_status': return { Icon: Package, color: '#FF5722' };
-    case 'promo': return { Icon: Tag, color: '#C66B1F' };
-    case 'wallet': return { Icon: Wallet, color: '#059669' };
-    case 'chat_message': return { Icon: MessageCircle, color: '#2563EB' };
-    case 'rider_assignment': return { Icon: Bike, color: '#FF5722' };
-    case 'review_request': return { Icon: Star, color: '#C66B1F' };
-    default: return { Icon: Bell, color: MUTED };
+    case 'order_status': return { Icon: IReceipt, color: '#FF5722' };
+    case 'promo': return { Icon: IGift, color: '#C66B1F' };
+    case 'wallet': return { Icon: IWallet, color: '#2FA36B' };
+    case 'chat_message': return { Icon: IMsg, color: '#3E86C7' };
+    case 'rider_assignment': return { Icon: ITruck, color: '#FF5722' };
+    case 'review_request': return { Icon: IStar, color: '#C66B1F' };
+    default: return { Icon: IBell, color: '#8C7C6E' };
   }
 }
 
@@ -32,106 +61,122 @@ function timeAgo(iso: string): string {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const t = useAg3Theme();
   const { user, loading: authLoading } = useAuth();
   const { items, unread, loading, markRead, markAllRead } = useNotifications();
 
-  function Header() {
-    return (
-      <View className="flex-row items-center justify-between pt-3 px-6">
-        <PressableScale onPress={() => router.back()}>
-          <View className="w-10 h-10 rounded-full items-center justify-center bg-white" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}>
-            <ArrowLeft size={18} color={INK} />
-          </View>
-        </PressableScale>
-        <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 1.5, color: BRAND }}>Notifications</Text>
-        {unread > 0 ? (
-          <Pressable onPress={markAllRead}>
-            <Text className="text-[12px] font-bold" style={{ color: BRAND }}>Read all</Text>
-          </Pressable>
-        ) : (
-          <View style={{ width: 50 }} />
-        )}
-      </View>
-    );
-  }
-
+  // ── Signed-out state ──────────────────────────────────────────────────────
   if (!authLoading && !user) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <Header />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Bell size={30} color={MUTED} />
-          <Text style={{ fontWeight: '800', fontSize: 20, color: INK, marginTop: 16 }}>Notifications</Text>
-          <Text style={{ fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        <Header t={t} unread={0} onBack={() => router.back()} onReadAll={markAllRead} />
+        <View style={styles.emptyWrap}>
+          <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+            <IBell size={28} color={t.colors.muted} />
+          </View>
+          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>Notifications</Text>
+          <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
             Sign in to see order updates and promos.
           </Text>
-          <PressableScale onPress={() => router.push('/sign-in')}>
-            <View style={{ backgroundColor: BRAND, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Sign in</Text>
-            </View>
-          </PressableScale>
+          <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
+            <LinearGradient
+              colors={t.gradients.sunset}
+              start={t.gradients.start}
+              end={t.gradients.end}
+              style={[styles.signInBtn, t.shadows.glow]}
+            >
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+            </LinearGradient>
+          </Press>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-      <Header />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 18 }} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+      <Header t={t} unread={unread} onBack={() => router.back()} onReadAll={markAllRead} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 44 }}
+      >
         {loading ? (
-          <View className="py-10 items-center"><ActivityIndicator color={BRAND} /></View>
+          <View style={{ paddingTop: 60, alignItems: 'center' }}>
+            <ActivityIndicator color={t.colors.primary} />
+          </View>
         ) : items.length === 0 ? (
-          <View style={{ alignItems: 'center', paddingTop: 60 }}>
-            <Bell size={28} color={MUTED} />
-            <Text style={{ fontWeight: '700', fontSize: 16, color: INK, marginTop: 14 }}>You’re all caught up</Text>
-            <Text style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>Order updates will appear here.</Text>
+          <View style={styles.caughtUp}>
+            <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+              <IBell size={26} color={t.colors.muted} />
+            </View>
+            <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg, marginTop: 16 }]}>
+              You’re all caught up
+            </Text>
+            <Text style={{ fontSize: 13, color: t.colors.muted, marginTop: 6, textAlign: 'center' }}>
+              Order updates and promos will appear here.
+            </Text>
           </View>
         ) : (
-          <View style={{ gap: 8 }}>
-            {items.map((n) => {
+          <View style={{ gap: 10, marginTop: 6 }}>
+            {items.map((n, i) => {
               const { Icon, color } = iconFor(n.kind);
               // Notifications about an order carry payload.orderId — tapping
               // them opens live tracking (and still marks the row as read).
               const orderId = n.payload?.orderId;
-              const linkedOrderId = typeof orderId === 'string' || typeof orderId === 'number' ? String(orderId) : null;
+              const linkedOrderId =
+                typeof orderId === 'string' || typeof orderId === 'number' ? String(orderId) : null;
+              const unreadRow = !n.readAt;
               return (
-                <Pressable
-                  key={n.id}
-                  onPress={() => {
-                    if (!n.readAt) void markRead(n.id);
-                    if (linkedOrderId) {
-                      router.push({ pathname: '/order/[id]', params: { id: linkedOrderId } });
-                    }
-                  }}
-                >
-                  <View
-                    className="flex-row p-4 rounded-2xl"
-                    style={{
-                      backgroundColor: n.readAt ? '#fff' : '#FFF1EB',
-                      borderWidth: 1,
-                      borderColor: n.readAt ? 'rgba(26,20,16,0.07)' : 'rgba(255,87,34,0.18)',
+                <Rise key={n.id} delay={Math.min(i, 8) * 36}>
+                  <Press
+                    scaleTo={0.985}
+                    onPress={() => {
+                      if (!n.readAt) void markRead(n.id);
+                      if (linkedOrderId) {
+                        router.push({ pathname: '/order/[id]', params: { id: linkedOrderId } });
+                      }
                     }}
                   >
-                    <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: `${color}1A` }}>
-                      <Icon size={16} color={color} />
-                    </View>
-                    <View className="ml-3 flex-1">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-[14px] font-bold flex-1" style={{ color: INK }} numberOfLines={1}>{n.title}</Text>
-                        <Text className="text-[11px] ml-2" style={{ color: MUTED }}>{timeAgo(n.createdAt)}</Text>
+                    <View
+                      style={[
+                        card(t),
+                        styles.notif,
+                        unreadRow && {
+                          backgroundColor: t.isDark ? 'rgba(255,87,34,0.10)' : '#FFF1EB',
+                          borderColor: 'rgba(255,87,34,0.22)',
+                        },
+                      ]}
+                    >
+                      <View style={[styles.iconWrap, { backgroundColor: `${color}1A` }]}>
+                        <Icon size={18} color={color} />
                       </View>
-                      {n.body ? (
-                        <Text className="text-[13px] mt-0.5" style={{ color: MUTED, lineHeight: 18 }}>{n.body}</Text>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={styles.titleRow}>
+                          <Text
+                            style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg, flex: 1 }}
+                            numberOfLines={1}
+                          >
+                            {n.title}
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: t.colors.muted, marginLeft: 8 }}>
+                            {timeAgo(n.createdAt)}
+                          </Text>
+                        </View>
+                        {n.body ? (
+                          <Text style={{ fontSize: 13, color: t.colors.fgSoft, lineHeight: 18, marginTop: 3 }}>
+                            {n.body}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {unreadRow ? (
+                        <View style={[styles.unreadDot, { backgroundColor: t.colors.primary }]} />
+                      ) : linkedOrderId ? (
+                        <IChevR size={18} color={t.colors.muted} />
                       ) : null}
                     </View>
-                    {linkedOrderId ? (
-                      <View className="justify-center ml-2">
-                        <ChevronRight size={15} color={MUTED} />
-                      </View>
-                    ) : null}
-                  </View>
-                </Pressable>
+                  </Press>
+                </Rise>
               );
             })}
           </View>
@@ -140,3 +185,74 @@ export default function NotificationsScreen() {
     </SafeAreaView>
   );
 }
+
+/* ── header ───────────────────────────────────────────────────────────────── */
+function Header({
+  t,
+  unread,
+  onBack,
+  onReadAll,
+}: {
+  t: Theme;
+  unread: number;
+  onBack: () => void;
+  onReadAll: () => void;
+}) {
+  return (
+    <MotiView
+      from={{ opacity: 0, translateX: -8 }}
+      animate={{ opacity: 1, translateX: 0 }}
+      transition={{ type: 'timing', duration: 240 }}
+      style={styles.header}
+    >
+      <Press onPress={onBack} scaleTo={0.9}>
+        <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
+          <IBack size={20} color={t.colors.fg} />
+        </View>
+      </Press>
+
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={[styles.disp, { fontSize: 20, color: t.colors.fg }]}>Notifications</Text>
+        {unread > 0 ? (
+          <Text style={{ fontSize: 12, color: t.colors.primary, fontWeight: '700', marginTop: 1 }}>
+            {unread} unread
+          </Text>
+        ) : null}
+      </View>
+
+      {unread > 0 ? (
+        <Pressable onPress={onReadAll} hitSlop={8}>
+          <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>Read all</Text>
+        </Pressable>
+      ) : null}
+    </MotiView>
+  );
+}
+
+/* ── shared card base ─────────────────────────────────────────────────────── */
+function card(t: Theme) {
+  return {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.md,
+    borderWidth: 1,
+    borderColor: t.colors.line2,
+    ...t.shadows.card,
+  } as const;
+}
+
+/* ── styles ───────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  disp: { fontWeight: '800', letterSpacing: -0.4 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 6, paddingBottom: 12 },
+  iconBtn: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+
+  notif: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: 14, paddingVertical: 14 },
+  iconWrap: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center' },
+  unreadDot: { width: 9, height: 9, borderRadius: 999, marginLeft: 4 },
+
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 },
+  caughtUp: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingTop: 90 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  signInBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30 },
+});

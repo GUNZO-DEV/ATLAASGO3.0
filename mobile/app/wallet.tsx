@@ -1,29 +1,88 @@
+// AtlaasGo 3.0 — Wallet. Native re-skin to the 3.0 design language
+// (cream/ink + terracotta, sunset gradient hero, rounded cards, moti Rise/Press,
+// ag3 BottomSheet for top-up). The wallet purple accent is used for the wallet
+// glyph in the hero, per spec.
+//
+// DATA / PLUMBING PRESERVED ───────────────────────────────────────────────────
+//   • Balance + ledger come from useWallet() unchanged ({ balanceDh, txs,
+//     loading }); the hook keeps its RLS-scoped reads + realtime subscription.
+//   • Top-up is the SAME Stripe flow: startTopup() invokes the `wallet-topup`
+//     edge function (creates a PaymentIntent), payWithPaymentSheet() collects
+//     card / Apple Pay / Google Pay, and the stripe-webhook credits the balance
+//     asynchronously — realtime then refreshes txs/balance. handleTopup keeps
+//     the 20–2 000 dh validation, the presets, the busy state and every Alert.
+//   • Auth gating via useAuth() ({ user, loading: authLoading }) is unchanged,
+//     signed-out CTA still routes to /sign-in.
+// Only the presentation changed — no behavior, no SDK calls, no params touched.
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ArrowDownLeft, ArrowUpRight, Plus, Wallet as WalletIcon, X } from 'lucide-react-native';
-import { PressableScale } from '../components/primitives/PressableScale';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
+
 import { useAuth } from '../lib/auth';
 import { useWallet } from '../hooks/useWallet';
 import { supabase } from '../lib/supabase';
 import { payWithPaymentSheet } from '../lib/stripe';
 
-const INK = '#1A1410';
-const MUTED = '#7A6F66';
-const BRAND = '#FF5722';
+import { useAg3Theme, type Ag3Theme } from '../components/ag3/theme';
+import { BottomSheet, Press, Rise } from '../components/ag3/primitives';
+import {
+  IBack,
+  IWallet,
+  IPlus,
+  IGift,
+  IReceipt,
+  ITruck,
+  IBolt,
+} from '../components/ag3/icons';
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
+
+// Wallet purple accent — allowed for the wallet glyph (per 3.0 spec).
+const WALLET_PURPLE = '#9C6ADE';
+
+const TOPUP_PRESETS = [20, 50, 100, 200];
 
 function txLabel(kind: string): string {
   switch (kind) {
-    case 'topup': return 'Top-up';
-    case 'order_payment': return 'Order payment';
-    case 'refund': return 'Refund';
-    case 'referral': return 'Referral bonus';
-    default: return kind.replace(/_/g, ' ');
+    case 'topup':
+      return 'Top-up';
+    case 'order_payment':
+      return 'Order payment';
+    case 'refund':
+      return 'Refund';
+    case 'referral':
+      return 'Referral bonus';
+    default:
+      return kind.replace(/_/g, ' ');
   }
 }
 
-const TOPUP_PRESETS = [20, 50, 100, 200];
+// Map transaction kinds → a glyph so the ledger reads at a glance.
+function txIcon(kind: string, credit: boolean) {
+  switch (kind) {
+    case 'topup':
+      return IPlus;
+    case 'order_payment':
+      return ITruck;
+    case 'refund':
+      return ArrowDownLeft;
+    case 'referral':
+      return IGift;
+    default:
+      return credit ? ArrowDownLeft : ArrowUpRight;
+  }
+}
 
 async function startTopup(amountDh: number, userEmail: string | undefined, userId: string) {
   const { data, error } = await supabase.functions.invoke('wallet-topup', {
@@ -34,6 +93,7 @@ async function startTopup(amountDh: number, userEmail: string | undefined, userI
 }
 
 export default function WalletScreen() {
+  const t = useAg3Theme();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { balanceDh, txs, loading } = useWallet();
@@ -66,152 +126,273 @@ export default function WalletScreen() {
     }
   }
 
-  function Header() {
-    return (
-      <View className="flex-row items-center justify-between pt-3 px-6">
-        <PressableScale onPress={() => router.back()}>
-          <View className="w-10 h-10 rounded-full items-center justify-center bg-white" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}>
-            <ArrowLeft size={18} color={INK} />
-          </View>
-        </PressableScale>
-        <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 1.5, color: BRAND }}>Wallet</Text>
-        <View style={{ width: 40 }} />
-      </View>
-    );
-  }
-
+  // ── signed-out state ──────────────────────────────────────────────────────
   if (!authLoading && !user) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <Header />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <WalletIcon size={30} color={MUTED} />
-          <Text style={{ fontWeight: '800', fontSize: 20, color: INK, marginTop: 16 }}>Your wallet</Text>
-          <Text style={{ fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        <Header t={t} onBack={() => router.back()} />
+        <View style={styles.emptyWrap}>
+          <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+            <IWallet size={28} color={WALLET_PURPLE} />
+          </View>
+          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>Your wallet</Text>
+          <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
             Sign in to see your balance and top up.
           </Text>
-          <PressableScale onPress={() => router.push('/sign-in')}>
-            <View style={{ backgroundColor: BRAND, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Sign in</Text>
-            </View>
-          </PressableScale>
+          <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
+            <LinearGradient
+              colors={t.gradients.sunset}
+              start={t.gradients.start}
+              end={t.gradients.end}
+              style={[styles.signInBtn, t.shadows.glow]}
+            >
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+            </LinearGradient>
+          </Press>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-      <Header />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        {/* Balance card */}
-        <View className="mt-6 rounded-3xl p-6" style={{ backgroundColor: INK }}>
-          <Text className="text-[12px] uppercase font-bold" style={{ letterSpacing: 1.4, color: 'rgba(255,255,255,0.55)' }}>
-            Available balance
-          </Text>
-          <Text className="font-display mt-2" style={{ color: '#fff', fontWeight: '800', fontSize: 40, letterSpacing: -1.5 }}>
-            {balanceDh} <Text style={{ fontSize: 22, color: '#FF8A65' }}>dh</Text>
-          </Text>
-          <PressableScale onPress={() => setTopupOpen(true)}>
-            <View className="flex-row items-center self-start mt-4 rounded-full px-4 py-2.5" style={{ backgroundColor: BRAND }}>
-              <Plus size={15} color="#fff" strokeWidth={2.5} />
-              <Text className="ml-1.5 text-white font-bold text-[13px]">Top up</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+      <Header t={t} onBack={() => router.back()} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 44 }}
+      >
+        {/* ── gradient balance hero ── */}
+        <Rise>
+          <LinearGradient
+            colors={t.gradients.warm}
+            start={t.gradients.start}
+            end={t.gradients.end}
+            style={[styles.hero, t.shadows.glow]}
+          >
+            {/* soft top-right sheen */}
+            <View pointerEvents="none" style={styles.heroSheen} />
+
+            <View style={styles.heroTopRow}>
+              <Text style={styles.heroEyebrow}>AVAILABLE BALANCE</Text>
+              <View style={styles.heroGlyph}>
+                <IWallet size={18} color={WALLET_PURPLE} />
+              </View>
             </View>
-          </PressableScale>
-        </View>
 
-        <Text className="mt-7 mb-3 font-display text-[18px]" style={{ fontWeight: '800', color: INK }}>
-          Activity
-        </Text>
+            <Text style={styles.heroBalance}>
+              {balanceDh}
+              <Text style={styles.heroBalanceUnit}> dh</Text>
+            </Text>
 
-        {loading ? (
-          <View className="py-10 items-center"><ActivityIndicator color={BRAND} /></View>
-        ) : txs.length === 0 ? (
-          <Text className="text-[14px]" style={{ color: MUTED }}>No transactions yet.</Text>
-        ) : (
-          <View style={{ gap: 8 }}>
-            {txs.map((t) => {
-              const credit = t.amountDh >= 0;
-              return (
-                <View
-                  key={t.id}
-                  className="flex-row items-center bg-white rounded-2xl p-4"
-                  style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}
-                >
-                  <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: credit ? 'rgba(5,150,105,0.12)' : 'rgba(225,29,72,0.10)' }}>
-                    {credit ? <ArrowDownLeft size={16} color="#059669" /> : <ArrowUpRight size={16} color="#E11D48" />}
-                  </View>
-                  <View className="ml-3 flex-1">
-                    <Text className="text-[14px] font-bold" style={{ color: INK }} numberOfLines={1}>{txLabel(t.kind)}</Text>
-                    <Text className="text-[12px] mt-0.5" style={{ color: MUTED }}>{new Date(t.createdAt).toLocaleDateString()}</Text>
-                  </View>
-                  <Text className="text-[15px] font-bold" style={{ color: credit ? '#059669' : INK }}>
-                    {credit ? '+' : ''}{t.amountDh} dh
-                  </Text>
-                </View>
-              );
-            })}
+            <Press onPress={() => setTopupOpen(true)} style={{ alignSelf: 'flex-start', marginTop: 18 }}>
+              <View style={styles.heroTopupBtn}>
+                <IPlus size={16} color={t.colors.primary} strokeWidth={2.6} />
+                <Text style={{ marginLeft: 6, color: t.colors.primary, fontWeight: '800', fontSize: 13.5 }}>
+                  Top up
+                </Text>
+              </View>
+            </Press>
+          </LinearGradient>
+        </Rise>
+
+        {/* ── activity ── */}
+        <Rise delay={60} style={{ marginTop: 24 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+            <IReceipt size={15} color={t.colors.primary} />
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>Activity</Text>
           </View>
-        )}
-      </ScrollView>
 
-      {/* Top-up modal */}
-      <Modal visible={topupOpen} transparent animationType="slide" onRequestClose={() => setTopupOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ backgroundColor: '#FBF7F2', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28, paddingBottom: 48 }}>
-            <View className="flex-row items-center justify-between mb-6">
-              <Text style={{ fontWeight: '800', fontSize: 22, color: INK, letterSpacing: -0.5 }}>Top up wallet</Text>
-              <PressableScale onPress={() => setTopupOpen(false)}>
-                <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(26,20,16,0.07)' }}>
-                  <X size={16} color={INK} />
-                </View>
-              </PressableScale>
+          {loading ? (
+            <View style={[card(t), { paddingVertical: 36, alignItems: 'center' }]}>
+              <ActivityIndicator color={t.colors.primary} />
             </View>
-
-            {/* Preset amounts */}
-            <View className="flex-row mb-5" style={{ gap: 10 }}>
-              {TOPUP_PRESETS.map((preset) => (
-                <Pressable key={preset} onPress={() => setTopupAmount(String(preset))} style={{ flex: 1 }}>
-                  <View
-                    className="py-3 rounded-2xl items-center"
-                    style={{
-                      backgroundColor: topupAmount === String(preset) ? BRAND : '#fff',
-                      borderWidth: 1,
-                      borderColor: topupAmount === String(preset) ? BRAND : 'rgba(26,20,16,0.10)',
-                    }}
-                  >
-                    <Text style={{ fontWeight: '700', fontSize: 14, color: topupAmount === String(preset) ? '#fff' : INK }}>
-                      {preset} dh
+          ) : txs.length === 0 ? (
+            <View style={[card(t), styles.emptyLedger]}>
+              <View style={[styles.emptyLedgerIcon, { backgroundColor: t.colors.surface2 }]}>
+                <IReceipt size={22} color={t.colors.muted} />
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg, marginTop: 12 }}>
+                No transactions yet
+              </Text>
+              <Text style={{ fontSize: 12.5, color: t.colors.muted, marginTop: 3, textAlign: 'center' }}>
+                Top up your wallet to get started.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {txs.map((tx) => {
+                const credit = tx.amountDh >= 0;
+                const Icon = txIcon(tx.kind, credit);
+                return (
+                  <View key={tx.id} style={[card(t), styles.txRow]}>
+                    <View
+                      style={[
+                        styles.txIcon,
+                        { backgroundColor: credit ? 'rgba(47,163,107,0.13)' : 'rgba(224,82,109,0.11)' },
+                      ]}
+                    >
+                      <Icon size={18} color={credit ? t.colors.ok : '#E0526D'} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ fontSize: 14.5, fontWeight: '700', color: t.colors.fg }} numberOfLines={1}>
+                        {txLabel(tx.kind)}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>
+                        {new Date(tx.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        fontWeight: '800',
+                        fontVariant: ['tabular-nums'],
+                        color: credit ? t.colors.ok : t.colors.fg,
+                      }}
+                    >
+                      {credit ? '+' : ''}
+                      {tx.amountDh} dh
                     </Text>
                   </View>
-                </Pressable>
-              ))}
+                );
+              })}
             </View>
+          )}
+        </Rise>
+      </ScrollView>
 
-            {/* Custom amount */}
-            <Text style={{ fontSize: 11, fontWeight: '700', color: MUTED, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>
-              Or enter amount (20–2 000 dh)
-            </Text>
-            <TextInput
-              value={topupAmount}
-              onChangeText={setTopupAmount}
-              keyboardType="number-pad"
-              placeholder="Amount in dh"
-              placeholderTextColor="#A89E94"
-              style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(26,20,16,0.10)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: INK, marginBottom: 20 }}
-            />
-
-            <Pressable onPress={handleTopup} disabled={topupBusy}>
-              <View className="rounded-2xl py-4 items-center" style={{ backgroundColor: BRAND, opacity: topupBusy ? 0.6 : 1 }}>
-                {topupBusy
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Pay {topupAmount ? `${topupAmount} dh` : '—'}</Text>
-                }
-              </View>
-            </Pressable>
-          </View>
+      {/* ── top-up sheet (ag3 BottomSheet) ── */}
+      <BottomSheet visible={topupOpen} onClose={() => setTopupOpen(false)} title="Top up wallet">
+        {/* preset amounts */}
+        <View style={{ flexDirection: 'row', gap: 9, marginBottom: 16 }}>
+          {TOPUP_PRESETS.map((preset) => {
+            const active = topupAmount === String(preset);
+            return (
+              <Press key={preset} onPress={() => setTopupAmount(String(preset))} style={{ flex: 1 }}>
+                <View
+                  style={[
+                    card(t),
+                    styles.presetPill,
+                    { borderColor: active ? t.colors.primary : t.colors.line2, borderWidth: 1.5 },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontWeight: '800',
+                      fontSize: 14,
+                      fontVariant: ['tabular-nums'],
+                      color: active ? t.colors.primary : t.colors.fg,
+                    }}
+                  >
+                    {preset} dh
+                  </Text>
+                </View>
+              </Press>
+            );
+          })}
         </View>
-      </Modal>
+
+        {/* custom amount */}
+        <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Or enter amount (20–2 000 dh)</Text>
+        <TextInput
+          value={topupAmount}
+          onChangeText={setTopupAmount}
+          keyboardType="number-pad"
+          placeholder="Amount in dh"
+          placeholderTextColor={t.colors.muted}
+          style={[
+            styles.input,
+            { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg },
+          ]}
+        />
+
+        <Press onPress={handleTopup} disabled={topupBusy} style={{ marginTop: 18 }}>
+          <LinearGradient
+            colors={t.gradients.sunset}
+            start={t.gradients.start}
+            end={t.gradients.end}
+            style={[styles.payBtn, t.shadows.glow, { opacity: topupBusy ? 0.7 : 1 }]}
+          >
+            {topupBusy ? (
+              <ActivityIndicator color={t.colors.onPrimary} />
+            ) : (
+              <>
+                <IBolt size={16} color={t.colors.onPrimary} fill={t.colors.onPrimary} strokeWidth={0} />
+                <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15.5 }}>
+                  Pay {topupAmount ? `${topupAmount} dh` : '—'}
+                </Text>
+              </>
+            )}
+          </LinearGradient>
+        </Press>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
+
+/* ── sub-components ───────────────────────────────────────────────────────── */
+
+function Header({ t, onBack }: { t: Ag3Theme; onBack: () => void }) {
+  return (
+    <MotiView
+      from={{ opacity: 0, translateX: -8 }}
+      animate={{ opacity: 1, translateX: 0 }}
+      transition={{ type: 'timing', duration: 240 }}
+      style={styles.header}
+    >
+      <Press onPress={onBack} scaleTo={0.9}>
+        <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
+          <IBack size={20} color={t.colors.fg} />
+        </View>
+      </Press>
+      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Wallet</Text>
+    </MotiView>
+  );
+}
+
+/* ── shared card base ─────────────────────────────────────────────────────── */
+function card(t: Ag3Theme) {
+  return {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.md,
+    borderWidth: 1,
+    borderColor: t.colors.line2,
+    ...t.shadows.card,
+  } as const;
+}
+
+/* ── styles ───────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  disp: { fontWeight: '800', letterSpacing: -0.4 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700', marginBottom: 2 },
+
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 12 },
+  iconBtn: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+
+  // hero
+  hero: { borderRadius: 26, padding: 22, paddingTop: 20, overflow: 'hidden' },
+  heroSheen: { position: 'absolute', top: -40, right: -30, width: 150, height: 150, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)' },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroEyebrow: { fontSize: 11, letterSpacing: 1.6, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
+  heroGlyph: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.92)' },
+  heroBalance: { color: '#fff', fontWeight: '800', fontSize: 44, letterSpacing: -1.6, marginTop: 14 },
+  heroBalanceUnit: { fontSize: 22, color: 'rgba(255,255,255,0.9)', fontWeight: '700', letterSpacing: 0 },
+  heroTopupBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+
+  // ledger
+  txRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: 14, paddingVertical: 13 },
+  txIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  emptyLedger: { alignItems: 'center', paddingVertical: 30, paddingHorizontal: 24 },
+  emptyLedgerIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+
+  // signed-out
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  signInBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center' },
+
+  // top-up sheet
+  presetPill: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  fieldLabel: { fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: '700', marginBottom: 8 },
+  input: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
+  payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, paddingVertical: 16 },
+});

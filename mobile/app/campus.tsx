@@ -1,26 +1,51 @@
+// AtlaasGo 3.0 — Campus / dorm group-order surface (AUI · Ifrane).
+//
+// Native re-skin of the AUIER campus courier screen, brought onto the ag3 3.0
+// design language (warm terracotta + amber on cream/ink, sunset LinearGradient
+// header + tiles, rounded cards, moti Rise/Press, sticky bottom CTA) — matching
+// cart.tsx / account.tsx.
+//
+// DATA / LOGIC PRESERVED ──────────────────────────────────────────────────────
+//   • useAuth() gate (authLoading / signed-out CTA → /sign-in).
+//   • useCreateOrder().create(...) called with the EXACT same payload: one flat-
+//     priced "campus drop" line item (FIXED_PRICE_DH), building + room folded
+//     into the landmark, DELIVERY_FEE_DH courier fee, AUI_COORDS, isCampus flag.
+//   • canSubmit validation (what >= 3 chars && building chosen && !submitting).
+//   • Submitted success state + redirectTimer → router.replace(`/order/${id}`).
+//   • AUI_BUILDINGS catalogue, QUICK_PICKS, fixed pricing constants — unchanged.
+// Only the presentation changed. Campus-only framing (the AUIER badge / "free
+// campus delivery" line) is gated on city.campus, resolved via agApi.cities.get
+// the same way cart.tsx does (no CityProvider is mounted at the root).
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import {
-  ArrowLeft,
-  ArrowRight,
-  Building2,
-  Check,
-  ChevronDown,
-  GraduationCap,
-  MapPin,
-  Search,
-  X,
-  Zap,
-} from 'lucide-react-native';
-import { PressableScale } from '../components/primitives/PressableScale';
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
+import { useRouter } from 'expo-router';
+
+import { useAg3Theme, type Ag3Theme } from '../components/ag3/theme';
+import {
+  IBack,
+  IBolt,
+  ICheck,
+  IChevD,
+  IPin,
+  ISearch,
+  IClock,
+} from '../components/ag3/icons';
+import { Press, Rise, BottomSheet } from '../components/ag3/primitives';
 import { useAuth } from '../lib/auth';
 import { useCreateOrder } from '../hooks/useCreateOrder';
-
-const INK = '#1A1410';
-const MUTED = '#7A6F66';
-const BRAND = '#FF5722';
+import { agApi } from '../lib/ag3/agApi';
+import { useAsync } from '../lib/ag3/useAsync';
 
 // AUI building list — copied from the web Campus page (src/pages/Campus.tsx).
 const AUI_BUILDINGS: Record<string, string[]> = {
@@ -82,10 +107,19 @@ const FIXED_PRICE_DH = 15;
 const DELIVERY_FEE_DH = 20;
 const AUI_COORDS = { lat: 33.535, lng: -5.1106 }; // AUI default
 
+// The campus courier is AUI / Ifrane-centric — gate the campus framing on the
+// city flag, resolved directly from agApi (CityProvider isn't mounted at root).
+const CITY_ID = 'ifrane';
+
 export default function CampusScreen() {
+  const t = useAg3Theme();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { create, submitting, error } = useCreateOrder();
+
+  // ── city (campus gating) — same source as cart.tsx ──
+  const { data: city } = useAsync(() => agApi.cities.get(CITY_ID), []);
+  const isCampus = city ? !!city.campus : true; // default to campus framing for AUI
 
   const [what, setWhat] = useState('');
   const [building, setBuilding] = useState('');
@@ -135,271 +169,396 @@ export default function CampusScreen() {
     }
   }
 
-  function Header() {
-    return (
-      <View className="flex-row items-center justify-between pt-3 px-6">
-        <PressableScale onPress={() => router.back()}>
-          <View className="w-10 h-10 rounded-full items-center justify-center bg-white" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}>
-            <ArrowLeft size={18} color={INK} />
-          </View>
-        </PressableScale>
-        <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 1.5, color: BRAND }}>Campus</Text>
-        <View style={{ width: 40 }} />
-      </View>
-    );
-  }
+  // ── shared header (sunset eyebrow + back) ──
+  const header = (
+    <MotiView
+      from={{ opacity: 0, translateX: -8 }}
+      animate={{ opacity: 1, translateX: 0 }}
+      transition={{ type: 'timing', duration: 240 }}
+      style={styles.header}
+    >
+      <Press onPress={() => router.back()} scaleTo={0.9}>
+        <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
+          <IBack size={20} color={t.colors.fg} />
+        </View>
+      </Press>
+      <Text style={[styles.eyebrow, { color: t.colors.primary }]}>CAMPUS</Text>
+      <View style={{ width: 42 }} />
+    </MotiView>
+  );
 
+  // ── auth loading ──
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <Header />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={BRAND} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        {header}
+        <View style={styles.center}>
+          <ActivityIndicator color={t.colors.primary} />
         </View>
       </SafeAreaView>
     );
   }
 
+  // ── signed-out CTA ──
   if (!user) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <Header />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <GraduationCap size={30} color={MUTED} />
-          <Text style={{ fontWeight: '800', fontSize: 20, color: INK, marginTop: 16 }}>AUI campus courier</Text>
-          <Text style={{ fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        {header}
+        <View style={[styles.center, { padding: 32 }]}>
+          <LinearGradient
+            colors={t.gradients.sunset}
+            start={t.gradients.start}
+            end={t.gradients.end}
+            style={[styles.bigTile, t.shadows.glow]}
+          >
+            <Text style={{ fontSize: 34 }}>🎓</Text>
+          </LinearGradient>
+          <Text style={[styles.disp, { fontSize: 22, color: t.colors.fg, marginTop: 18 }]}>
+            AUI campus courier
+          </Text>
+          <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
             Sign in to get anything in Ifrane delivered to your building.
           </Text>
-          <PressableScale onPress={() => router.push('/sign-in')}>
-            <View style={{ backgroundColor: BRAND, borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Sign in</Text>
-            </View>
-          </PressableScale>
+          <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
+            <LinearGradient
+              colors={t.gradients.sunset}
+              start={t.gradients.start}
+              end={t.gradients.end}
+              style={[styles.signInBtn, t.shadows.glow]}
+            >
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+            </LinearGradient>
+          </Press>
         </View>
       </SafeAreaView>
     );
   }
 
+  // ── submitted success ──
   if (submitted) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-        <Header />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <View className="w-16 h-16 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(5,150,105,0.12)' }}>
-            <Check size={28} color="#059669" strokeWidth={3} />
-          </View>
-          <Text style={{ fontWeight: '900', fontSize: 24, color: INK, marginTop: 18, letterSpacing: -0.6 }}>On its way</Text>
-          <Text style={{ fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Your rider is heading to <Text style={{ fontWeight: '700', color: INK }}>{building}</Text>{room.trim() ? `, Room ${room.trim()}` : ''}.
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        {header}
+        <View style={[styles.center, { padding: 32 }]}>
+          <MotiView
+            from={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 13, stiffness: 180 }}
+          >
+            <View style={[styles.okBubble, { backgroundColor: 'rgba(47,163,107,0.14)' }]}>
+              <ICheck size={32} color={t.colors.ok} strokeWidth={3} />
+            </View>
+          </MotiView>
+          <Text style={[styles.disp, { fontSize: 26, color: t.colors.fg, marginTop: 20 }]}>On its way</Text>
+          <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 21, marginTop: 8 }}>
+            Your rider is heading to <Text style={{ fontWeight: '800', color: t.colors.fg }}>{building}</Text>
+            {room.trim() ? `, Room ${room.trim()}` : ''}.
           </Text>
-          <Text style={{ fontSize: 13, color: MUTED, marginTop: 10 }}>Redirecting to live tracking…</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 }}>
+            <ActivityIndicator size="small" color={t.colors.muted} />
+            <Text style={{ fontSize: 13, color: t.colors.muted }}>Redirecting to live tracking…</Text>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
-  const fieldLabel = {
-    fontSize: 11,
-    fontWeight: '700' as const,
-    color: MUTED,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase' as const,
-    marginBottom: 6,
-  };
-
-  const inputStyle = {
-    backgroundColor: '#FBF7F2',
-    borderWidth: 1,
-    borderColor: 'rgba(26,20,16,0.10)',
-    color: INK,
-  } as const;
+  const ctaLabel = !building
+    ? 'Select a building first'
+    : what.trim().length < 3
+      ? 'Describe what you need'
+      : `Request delivery · ${FIXED_PRICE_DH} dh flat`;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-      <Header />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 48 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {/* Hero */}
-        <View className="flex-row items-center self-start mt-6 rounded-full px-3 py-1.5" style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}>
-          <Zap size={12} color={BRAND} />
-          <Text className="ml-1.5 text-[11px] uppercase font-bold" style={{ letterSpacing: 1.2, color: BRAND }}>
-            AUIER — Free campus delivery
-          </Text>
-        </View>
-        <Text className="mt-3 font-display" style={{ fontWeight: '900', fontSize: 34, color: INK, letterSpacing: -1, lineHeight: 38 }}>
-          What do you{'\n'}<Text style={{ color: BRAND }}>need?</Text>
-        </Text>
-        <Text className="mt-2 text-[14px]" style={{ color: MUTED, lineHeight: 20 }}>
-          Anything in Ifrane, delivered to your building. Flat {FIXED_PRICE_DH} dh. No surprises.
-        </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+      {header}
 
-        {/* Form card */}
-        <View className="mt-6 bg-white rounded-3xl p-5" style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}>
-          {/* What do you need */}
-          <View className="flex-row items-center mb-1.5">
-            <Search size={13} color={MUTED} />
-            <Text style={[fieldLabel, { marginBottom: 0, marginLeft: 6 }]}>What do you need?</Text>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 168 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── hero ── */}
+        <Rise>
+          {isCampus && (
+            <View style={[styles.heroBadge, { backgroundColor: 'rgba(255,87,34,0.10)' }]}>
+              <IBolt size={12} color={t.colors.primary} />
+              <Text style={[styles.heroBadgeTxt, { color: t.colors.primary }]}>
+                AUIER — Free campus delivery
+              </Text>
+            </View>
+          )}
+          <Text style={[styles.hero, { color: t.colors.fg }]}>
+            What do you{'\n'}
+            <Text style={{ color: t.colors.primary }}>need?</Text>
+          </Text>
+          <Text style={{ marginTop: 8, fontSize: 14, color: t.colors.muted, lineHeight: 20 }}>
+            Anything in Ifrane, delivered to your building. Flat {FIXED_PRICE_DH} dh. No surprises.
+          </Text>
+        </Rise>
+
+        {/* ── form card ── */}
+        <Rise delay={60}>
+          <View style={[card(t), { padding: 18, marginTop: 22 }]}>
+            {/* what do you need */}
+            <View style={styles.labelRow}>
+              <ISearch size={13} color={t.colors.muted} />
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>What do you need?</Text>
+            </View>
+            <TextInput
+              value={what}
+              onChangeText={setWhat}
+              multiline
+              numberOfLines={3}
+              placeholder="e.g. Café Hassan tagine kefta + mint tea, or Snack Atlas brochette plate, or anything you want brought from town…"
+              placeholderTextColor={t.colors.muted}
+              style={[
+                styles.input,
+                { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg, minHeight: 86, textAlignVertical: 'top', paddingTop: 12 },
+              ]}
+            />
+            <View style={styles.chipWrap}>
+              {QUICK_PICKS.map((s) => {
+                const active = what === s;
+                return (
+                  <Press key={s} onPress={() => setWhat(s)} scaleTo={0.95}>
+                    <View
+                      style={[
+                        styles.quickChip,
+                        {
+                          backgroundColor: active ? 'rgba(255,87,34,0.10)' : t.colors.surface2,
+                          borderColor: active ? t.colors.primary : t.colors.line,
+                        },
+                      ]}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: active ? '700' : '500', color: active ? t.colors.primary : t.colors.fgSoft }}>
+                        {s}
+                      </Text>
+                    </View>
+                  </Press>
+                );
+              })}
+            </View>
+
+            {/* building selector */}
+            <View style={[styles.labelRow, { marginTop: 18 }]}>
+              <IPin size={13} color={t.colors.muted} />
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Building / Location</Text>
+            </View>
+            <Press onPress={() => setPickerOpen(true)} scaleTo={0.985}>
+              <View
+                style={[
+                  styles.selectRow,
+                  { backgroundColor: t.colors.surface2, borderColor: building ? t.colors.primary : t.colors.line },
+                ]}
+              >
+                <Text
+                  style={{ flex: 1, fontSize: 15, fontWeight: building ? '700' : '400', color: building ? t.colors.fg : t.colors.muted }}
+                  numberOfLines={1}
+                >
+                  {building || '— Select your building —'}
+                </Text>
+                <IChevD size={16} color={t.colors.muted} />
+              </View>
+            </Press>
+
+            {/* room number */}
+            <View style={[styles.labelRow, { marginTop: 18 }]}>
+              <IPin size={13} color={t.colors.muted} />
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Room / Suite / Floor (optional)</Text>
+            </View>
+            <TextInput
+              value={room}
+              onChangeText={setRoom}
+              placeholder="e.g. 204, Suite 3B, Ground floor lobby"
+              placeholderTextColor={t.colors.muted}
+              style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
+            />
+
+            {/* rider notes */}
+            <View style={[styles.labelRow, { marginTop: 18 }]}>
+              <Text style={[styles.fieldLabel, { color: t.colors.muted, marginLeft: 0 }]}>
+                Notes for the rider (optional)
+              </Text>
+            </View>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="e.g. I'm outside the main gate, leave at the door, call first"
+              placeholderTextColor={t.colors.muted}
+              style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
+            />
+
+            {/* fixed price strip */}
+            <View style={[styles.priceStrip, { backgroundColor: 'rgba(255,87,34,0.08)', borderColor: 'rgba(255,87,34,0.18)' }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: t.colors.fg }}>Fixed campus delivery fee</Text>
+                <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 1 }}>No minimum order · Any item in Ifrane</Text>
+              </View>
+              <Text style={[styles.disp, { fontSize: 22, color: t.colors.primary, fontVariant: ['tabular-nums'] }]}>
+                {FIXED_PRICE_DH} dh
+              </Text>
+            </View>
+
+            {error && (
+              <Text style={{ fontSize: 13, marginTop: 12, color: '#E0526D' }}>{error.message}</Text>
+            )}
           </View>
-          <TextInput
-            value={what}
-            onChangeText={setWhat}
-            multiline
-            numberOfLines={3}
-            placeholder="e.g. Café Hassan tagine kefta + mint tea, or Snack Atlas brochette plate, or anything you want brought from town…"
-            placeholderTextColor="#A89E94"
-            className="rounded-2xl px-4 py-3 text-[15px]"
-            style={[inputStyle, { minHeight: 84, textAlignVertical: 'top' }]}
-          />
-          <View className="flex-row flex-wrap mt-2.5 mb-4" style={{ gap: 6 }}>
-            {QUICK_PICKS.map((s) => (
-              <Pressable key={s} onPress={() => setWhat(s)}>
-                <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: '#FBF7F2', borderWidth: 1, borderColor: 'rgba(26,20,16,0.10)' }}>
-                  <Text className="text-[12px]" style={{ color: MUTED, fontWeight: '500' }}>{s}</Text>
+        </Rise>
+
+        {/* ── how it works ── */}
+        <Rise delay={120}>
+          <View style={styles.stepsRow}>
+            {['Describe what you want', 'Choose your building', 'Rider heads to you'].map((step, i) => (
+              <View key={step} style={styles.stepItem}>
+                <View style={[styles.stepNum, { backgroundColor: 'rgba(255,87,34,0.10)' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: t.colors.primary }}>{i + 1}</Text>
                 </View>
-              </Pressable>
+                <Text style={{ marginLeft: 7, fontSize: 11, fontWeight: '600', color: t.colors.muted, flex: 1 }}>
+                  {step}
+                </Text>
+              </View>
             ))}
           </View>
-
-          {/* Building selector */}
-          <View className="flex-row items-center mb-1.5">
-            <Building2 size={13} color={MUTED} />
-            <Text style={[fieldLabel, { marginBottom: 0, marginLeft: 6 }]}>Building / Location</Text>
-          </View>
-          <Pressable onPress={() => setPickerOpen(true)}>
-            <View className="flex-row items-center rounded-2xl px-4 py-3.5 mb-4" style={inputStyle}>
-              <Text className="flex-1 text-[15px]" style={{ color: building ? INK : '#A89E94', fontWeight: building ? '600' : '400' }} numberOfLines={1}>
-                {building || '— Select your building —'}
-              </Text>
-              <ChevronDown size={16} color={MUTED} />
-            </View>
-          </Pressable>
-
-          {/* Room number */}
-          <View className="flex-row items-center mb-1.5">
-            <MapPin size={13} color={MUTED} />
-            <Text style={[fieldLabel, { marginBottom: 0, marginLeft: 6 }]}>Room / Suite / Floor (optional)</Text>
-          </View>
-          <TextInput
-            value={room}
-            onChangeText={setRoom}
-            placeholder="e.g. 204, Suite 3B, Ground floor lobby"
-            placeholderTextColor="#A89E94"
-            className="rounded-2xl px-4 py-3 text-[15px] mb-4"
-            style={inputStyle}
-          />
-
-          {/* Rider notes */}
-          <Text style={fieldLabel}>Notes for the rider (optional)</Text>
-          <TextInput
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="e.g. I'm outside the main gate, leave at the door, call first"
-            placeholderTextColor="#A89E94"
-            className="rounded-2xl px-4 py-3 text-[15px] mb-4"
-            style={inputStyle}
-          />
-
-          {/* Fixed price strip */}
-          <View className="flex-row items-center rounded-2xl p-4" style={{ backgroundColor: '#FFF1EB' }}>
-            <View className="flex-1">
-              <Text className="text-[13px] font-bold" style={{ color: INK }}>Fixed campus delivery fee</Text>
-              <Text className="text-[12px] mt-0.5" style={{ color: MUTED }}>No minimum order · Any item in Ifrane</Text>
-            </View>
-            <Text style={{ fontWeight: '900', fontSize: 22, color: BRAND, letterSpacing: -0.5 }}>{FIXED_PRICE_DH} dh</Text>
-          </View>
-
-          {error && (
-            <Text className="text-[13px] mt-3" style={{ color: '#E11D48' }}>{error.message}</Text>
-          )}
-
-          {/* CTA */}
-          <Pressable onPress={handleSubmit} disabled={!canSubmit} className="mt-4">
-            <View className="flex-row items-center justify-center rounded-2xl py-4" style={{ backgroundColor: BRAND, opacity: canSubmit ? 1 : 0.45 }}>
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Text className="text-white font-bold text-[15px]">
-                    {!building
-                      ? 'Select a building first'
-                      : what.trim().length < 3
-                        ? 'Describe what you need'
-                        : `Request delivery · ${FIXED_PRICE_DH} dh flat`}
-                  </Text>
-                  <ArrowRight size={17} color="#fff" style={{ marginLeft: 8 }} />
-                </>
-              )}
-            </View>
-          </Pressable>
-          <Text className="text-[11px] text-center mt-3" style={{ color: MUTED }}>
-            Rider heads to your building within 15–30 min · Pay cash or wallet on delivery
-          </Text>
-        </View>
-
-        {/* How it works strip */}
-        <View className="flex-row items-center justify-between mt-6 px-1">
-          {['Describe what you want', 'Choose your building', 'Rider heads to you'].map((step, i) => (
-            <View key={step} className="flex-row items-center" style={{ flex: 1 }}>
-              <View className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,87,34,0.10)' }}>
-                <Text className="text-[11px] font-bold" style={{ color: BRAND }}>{i + 1}</Text>
-              </View>
-              <Text className="ml-1.5 text-[11px] flex-1" style={{ color: MUTED, fontWeight: '600' }}>{step}</Text>
-            </View>
-          ))}
-        </View>
+        </Rise>
       </ScrollView>
 
-      {/* Building picker modal */}
-      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <View style={{ backgroundColor: '#FBF7F2', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 36, maxHeight: '75%' }}>
-            <View className="flex-row items-center justify-between mb-4">
-              <Text style={{ fontWeight: '800', fontSize: 20, color: INK, letterSpacing: -0.5 }}>Building / Location</Text>
-              <PressableScale onPress={() => setPickerOpen(false)}>
-                <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(26,20,16,0.07)' }}>
-                  <X size={16} color={INK} />
-                </View>
-              </PressableScale>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {Object.entries(AUI_BUILDINGS).map(([group, buildings]) => (
-                <View key={group} className="mb-4">
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: MUTED, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 8 }}>
-                    {group}
-                  </Text>
-                  <View style={{ gap: 6 }}>
-                    {buildings.map((b) => {
-                      const active = building === b;
-                      return (
-                        <Pressable
-                          key={b}
-                          onPress={() => {
-                            setBuilding(b);
-                            setPickerOpen(false);
-                          }}
-                        >
-                          <View
-                            className="flex-row items-center rounded-2xl px-4 py-3"
-                            style={{
-                              backgroundColor: active ? 'rgba(255,87,34,0.08)' : '#fff',
-                              borderWidth: active ? 1.5 : 1,
-                              borderColor: active ? BRAND : 'rgba(26,20,16,0.08)',
-                            }}
-                          >
-                            <Text className="flex-1 text-[14px]" style={{ color: active ? BRAND : INK, fontWeight: active ? '700' : '500' }}>
-                              {b}
-                            </Text>
-                            {active && <Check size={15} color={BRAND} strokeWidth={3} />}
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+      {/* ── sticky request CTA ── */}
+      <View style={[styles.sticky, { backgroundColor: t.colors.bg, borderColor: t.colors.line }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, justifyContent: 'center', marginBottom: 9 }}>
+          <IClock size={14} color={t.colors.muted} />
+          <Text style={{ fontSize: 12, color: t.colors.muted }}>
+            Rider heads to you in <Text style={{ fontWeight: '800', color: t.colors.fg }}>15–30 min</Text> · pay cash or wallet
+          </Text>
         </View>
-      </Modal>
+        <Press onPress={handleSubmit} disabled={!canSubmit}>
+          <LinearGradient
+            colors={t.gradients.sunset}
+            start={t.gradients.start}
+            end={t.gradients.end}
+            style={[styles.placeBtn, t.shadows.glow, { opacity: canSubmit ? 1 : 0.45 }]}
+          >
+            {submitting ? (
+              <ActivityIndicator color={t.colors.onPrimary} />
+            ) : (
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15.5 }}>{ctaLabel}</Text>
+            )}
+          </LinearGradient>
+        </Press>
+      </View>
+
+      {/* ── building picker (3.0 BottomSheet) ── */}
+      <BottomSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title="Building / Location">
+        {Object.entries(AUI_BUILDINGS).map(([group, buildings]) => (
+          <View key={group} style={{ marginBottom: 16 }}>
+            <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 8 }]}>{group}</Text>
+            <View style={{ gap: 8 }}>
+              {buildings.map((b) => {
+                const active = building === b;
+                return (
+                  <Press
+                    key={b}
+                    onPress={() => {
+                      setBuilding(b);
+                      setPickerOpen(false);
+                    }}
+                    scaleTo={0.98}
+                  >
+                    <View
+                      style={[
+                        styles.pickRow,
+                        {
+                          backgroundColor: active ? 'rgba(255,87,34,0.08)' : t.colors.surface,
+                          borderColor: active ? t.colors.primary : t.colors.line,
+                          borderWidth: active ? 1.5 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: active ? '700' : '500', color: active ? t.colors.primary : t.colors.fg }}>
+                        {b}
+                      </Text>
+                      {active && <ICheck size={16} color={t.colors.primary} strokeWidth={3} />}
+                    </View>
+                  </Press>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </BottomSheet>
     </SafeAreaView>
   );
 }
+
+/* ── shared card base ─────────────────────────────────────────────────────── */
+function card(t: Ag3Theme) {
+  return {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radii.lg,
+    borderWidth: 1,
+    borderColor: t.colors.line2,
+    ...t.shadows.card,
+  } as const;
+}
+
+/* ── styles ───────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  disp: { fontWeight: '800', letterSpacing: -0.4 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700' },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  iconBtn: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  bigTile: { width: 70, height: 70, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  okBubble: { width: 72, height: 72, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  signInBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center' },
+
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 18,
+  },
+  heroBadgeTxt: { fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: '800' },
+  hero: { marginTop: 12, fontWeight: '900', fontSize: 34, letterSpacing: -1, lineHeight: 38 },
+
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  fieldLabel: { fontSize: 11, letterSpacing: 0.9, textTransform: 'uppercase', fontWeight: '700' },
+  input: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  quickChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+
+  selectRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 14 },
+
+  priceStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 15,
+    marginTop: 18,
+  },
+
+  stepsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, paddingHorizontal: 2 },
+  stepItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  stepNum: { width: 24, height: 24, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+
+  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 28, borderTopWidth: 1 },
+  placeBtn: { borderRadius: 999, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+
+  pickRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 15, paddingVertical: 13 },
+});
