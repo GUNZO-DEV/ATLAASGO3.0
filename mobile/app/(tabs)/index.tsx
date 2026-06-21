@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -67,6 +68,13 @@ import {
 } from '../../components/ag3/icons';
 
 const CITY_STORAGE_KEY = 'ag3-city';
+
+// The three vertical tiles must divide the row evenly. Press applies its style to
+// an inner MotiView (not the Pressable), so flex:1 there never sizes the
+// touchable — the tiles size to content, overflow, and clip Pharmacy off the
+// right edge (untappable on a real phone). An explicit width keeps all three on
+// screen. Width = screen − (18×2 padding) − (11×2 gaps), divided by 3.
+const VERT_W = (Dimensions.get('window').width - 58) / 3;
 
 /* verticals carry no tile class — map one gradient tile per vertical id */
 const VERTICAL_TILE: Record<string, ReturnType<typeof tileFor>> = {
@@ -321,7 +329,7 @@ export default function Home() {
                   setCat('all');
                 }}
                 scaleTo={0.97}
-                style={{ flex: 1 }}
+                style={{ width: VERT_W }}
               >
                 <View
                   style={[
