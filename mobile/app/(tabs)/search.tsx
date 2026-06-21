@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,6 +33,9 @@ import { ISearch, IFire, IClose, IClock } from '../../components/ag3/icons';
 const CRAVING_TILES = ['tile-b', 'tile-a', 'tile-c', 'tile-d', 'tile-e', 'tile-f'] as const;
 const RECENT_KEY = 'ag3-recent-searches';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Two-column craving grid: screen − (20pad × 2) − 12 gap, halved. Absolute so it
+// resolves correctly through the Press → MotiView wrapper (percentages don't).
+const CRAVE_W = (Dimensions.get('window').width - 52) / 2;
 
 export default function Search() {
   const router = useRouter();
@@ -206,12 +210,12 @@ export default function Search() {
                 {cravings.map((c, i) => {
                   const colors = t.tileGradients[CRAVING_TILES[i % CRAVING_TILES.length]];
                   return (
-                    <Press key={c.id} onPress={() => setQ(c.label)} scaleTo={0.97} style={styles.cravingCell}>
+                    <Press key={c.id} onPress={() => setQ(c.label)} scaleTo={0.97} style={[styles.cravingCell, { width: CRAVE_W }]}>
                       <View style={[styles.cravingTile, t.shadows.card]}>
                         <LinearGradient colors={colors} start={t.gradients.start} end={t.gradients.end} style={StyleSheet.absoluteFill} />
                         <View pointerEvents="none" style={styles.cravingSheen} />
                         <Text pointerEvents="none" style={styles.cravingEmoji}>{c.emoji}</Text>
-                        <Text style={styles.cravingLabel}>{c.label}</Text>
+                        <Text numberOfLines={1} style={styles.cravingLabel}>{c.label}</Text>
                       </View>
                     </Press>
                   );
@@ -315,12 +319,12 @@ const styles = StyleSheet.create({
 
   dishRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 18, borderWidth: 1 },
 
-  cravingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  cravingCell: { width: '47.5%', flexGrow: 1 },
+  cravingGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+  cravingCell: { width: '48%' },
   cravingTile: { height: 84, borderRadius: 20, overflow: 'hidden', justifyContent: 'flex-end', padding: 13 },
-  cravingSheen: { position: 'absolute', top: -16, right: -16, width: 120, height: 90, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.20)' },
-  cravingEmoji: { position: 'absolute', right: -2, bottom: -10, fontSize: 50, lineHeight: 58, opacity: 0.9, transform: [{ rotate: '-10deg' }] },
-  cravingLabel: { position: 'relative', zIndex: 2, fontWeight: '800', color: '#fff', fontSize: 16, letterSpacing: -0.3, textShadowColor: 'rgba(0,0,0,0.34)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
+  cravingSheen: { position: 'absolute', top: -16, right: -16, width: 120, height: 90, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)' },
+  cravingEmoji: { position: 'absolute', right: -2, bottom: -6, fontSize: 46, lineHeight: 52, opacity: 0.9, transform: [{ rotate: '-10deg' }] },
+  cravingLabel: { position: 'relative', zIndex: 2, fontWeight: '800', color: '#fff', fontSize: 16, letterSpacing: -0.3, paddingRight: 40, textShadowColor: 'rgba(0,0,0,0.34)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
 
   emptyCard: { borderRadius: 26, borderWidth: 1, padding: 26, alignItems: 'center' },
 });
