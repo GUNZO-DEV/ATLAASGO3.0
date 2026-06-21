@@ -6,8 +6,24 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+
+/**
+ * Re-apply the realtime auth token. The realtime websocket authenticates with
+ * its own copy of the JWT; if it isn't refreshed after a token rotation or an
+ * app foreground, `postgres_changes` silently stop arriving (the user's "I have
+ * to close and reopen the app to see new orders" complaint). Always guarded —
+ * a realtime hiccup must never break auth or crash the provider.
+ */
+function applyRealtimeAuth(token: string | null | undefined) {
+  try {
+    void supabase.realtime.setAuth(token ?? null);
+  } catch {
+    /* realtime not critical — focus-polling + pull-to-refresh still cover us */
+  }
+}
 
 /**
  * Mobile auth — manages the Supabase session, mirroring the web app's model.
@@ -44,15 +60,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       setSession(data.session ?? null);
+      // Prime the realtime socket with the restored session's token.
+      applyRealtimeAuth(data.session?.access_token);
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
       setSession(s);
+      // Keep the realtime socket's JWT in lock-step with auth (sign-in,
+      // sign-out, and silent token refresh all flow through here).
+      applyRealtimeAuth(s?.access_token);
       setLoading(false);
     });
+
+    // When the app returns to the foreground the websocket may have been
+    // dropped while backgrounded; re-applying the current token forces it to
+    // reconnect/re-authenticate so postgres_changes resume immediately.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) applyRealtimeAuth(data.session.access_token);
+      });
+    });
+
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
+      appStateSub.remove();
     };
   }, []);
 
@@ -74,6 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refresh_token: body.refresh_token,
       });
       if (error) return { ok: false, error: error.message };
+      // Authenticate the realtime socket with the freshly minted token so live
+      // subscriptions work the moment the user signs in.
+      applyRealtimeAuth(body.access_token);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : 'network error' };

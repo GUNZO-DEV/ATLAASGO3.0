@@ -29,6 +29,7 @@ import { supabase } from '../lib/supabase';
 import { isStripeAvailable, payWithPaymentSheet } from '../lib/stripe';
 import { cancelOrder } from '../lib/orderActions';
 import type { CategoryKey, Coords } from '../lib/types';
+import { agApi, type Quote } from '../lib/ag3/agApi';
 
 const INK = '#1A1410';
 const MUTED = '#7A6F66';
@@ -73,16 +74,21 @@ function SectionLabel({ children }: { children: string }) {
 
 export default function Checkout() {
   const router = useRouter();
-  const { category } = useLocalSearchParams<{ category?: string }>();
-  const categoryKey = (category as CategoryKey) ?? 'food';
+  const params = useLocalSearchParams<{ category?: string; speed?: string; tipDh?: string; handoff?: string; addressId?: string }>();
+  const categoryKey = (params.category as CategoryKey) ?? 'food';
+  // 3.0 cart selections carried over so the charge matches the displayed quote.
+  const speed: 'standard' | 'priority' = params.speed === 'priority' ? 'priority' : 'standard';
+  const tipDh = Math.max(0, parseInt(params.tipDh ?? '0', 10) || 0);
+  const handoff: 'door' | 'hand' | 'lounge' =
+    params.handoff === 'hand' ? 'hand' : params.handoff === 'lounge' ? 'lounge' : 'door';
 
-  // Real totals come from the cart store (same fee model as the web app).
+  // Line items + subtotal from the live cart store; the fee breakdown (delivery,
+  // priority, winter surcharge, tip) now comes from the server cart_quote — the
+  // SAME source the 3.0 cart screen shows, so charged == displayed.
   const items = useCart((s) => s.items);
   const isCampusOrder = useCart((s) => s.isCampusOrder);
   const clearCart = useCart((s) => s.clear);
   const subtotal = useCart((s) => s.subtotal());
-  const deliveryFee = useCart((s) => s.deliveryFee());
-  const serviceFee = useCart((s) => s.serviceFee());
 
   const { user } = useAuth();
   const [landmark, setLandmark] = useState('');
@@ -158,9 +164,37 @@ export default function Checkout() {
   const phoneOk = !!phoneOnFile && phoneOnFile.length >= 8;
   const subtotalOk = subtotal >= MIN_ORDER_DH;
 
-  // ── Money (integer dirhams) — mirrors the web cart math exactly ──
+  // ── Server-priced bill (cart_quote): the SAME quote the 3.0 cart shows, so
+  // the amount charged equals the amount displayed. Re-fetched here for
+  // authority — never trust a client-passed total. ──
+  const storeId = items[0]?.restaurantId ?? null;
+  const quoteItems = items.map((i) => ({ itemId: i.id, qty: i.qty }));
+  const itemsKey = quoteItems.map((q) => `${q.itemId}:${q.qty}`).join(',');
+  const [quote, setQuote] = useState<Quote | null>(null);
+  useEffect(() => {
+    if (!storeId || quoteItems.length === 0) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    agApi.cart
+      .quote({ storeId, items: quoteItems, speed, tipDh, addressId: selectedAddress?.id })
+      .then((q) => !cancelled && setQuote(q))
+      .catch(() => !cancelled && setQuote(null));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, itemsKey, speed, tipDh, selectedAddress?.id]);
+
+  // ── Money (integer dirhams) — server quote is the source of truth ──
+  const deliveryFee = quote?.deliveryFeeDh ?? 0;
+  const priorityDh = quote?.priorityDh ?? 0;
+  const weatherDh = quote?.weatherSurchargeDh ?? 0;
+  const tipAmount = quote?.tipDh ?? tipDh;
   const promoDiscount = promo.applied?.discountDh ?? 0;
-  const totalBeforeWallet = Math.max(0, subtotal + deliveryFee + serviceFee - promoDiscount);
+  const grossTotal = quote ? quote.totalDh : subtotal + deliveryFee + priorityDh + weatherDh + tipAmount;
+  const totalBeforeWallet = Math.max(0, grossTotal - promoDiscount);
   const walletCredit = payMethod === 'wallet' ? Math.min(balanceDh, totalBeforeWallet) : 0;
   const finalTotal = Math.max(0, totalBeforeWallet - walletCredit);
   const fullyCoveredByWallet = walletCredit > 0 && finalTotal === 0;
@@ -172,6 +206,7 @@ export default function Checkout() {
     phoneOk &&
     landmarkValid &&
     !!effectiveCoords &&
+    !!quote &&
     !submitting;
 
   async function savePhone() {
@@ -225,6 +260,10 @@ export default function Checkout() {
       Alert.alert('Landmark required', 'Add a quick landmark so your driver finds you.');
       return;
     }
+    if (!quote) {
+      Alert.alert('One moment', "We're still calculating your total — try again in a second.");
+      return;
+    }
 
     const orderId = await create({
       customerId: user.id,
@@ -241,7 +280,7 @@ export default function Checkout() {
       })),
       subtotalDh: subtotal,
       deliveryFeeDh: deliveryFee,
-      serviceFeeDh: serviceFee,
+      serviceFeeDh: priorityDh + weatherDh,
       totalDh: finalTotal,
       deliveryNotes: notes.trim() || undefined,
       // Wallet only counts as the payment method when it covers everything;
@@ -250,6 +289,9 @@ export default function Checkout() {
       promotionCode: promo.applied?.code ?? null,
       addressId: selectedAddress?.id ?? null,
       isCampus: isCampusOrder,
+      tipDh: tipAmount,
+      deliverySpeed: speed,
+      handoff,
     });
     if (!orderId) {
       Alert.alert('Could not place order', createError?.message ?? 'Please try again in a moment.');
@@ -797,12 +839,28 @@ export default function Checkout() {
           </View>
           <View className="flex-row justify-between mb-2">
             <Text className="text-white/60 text-[12px] font-semibold">Delivery</Text>
-            <Text className="text-white text-[13px] font-semibold">{deliveryFee} dh</Text>
+            <Text className="text-white text-[13px] font-semibold">
+              {deliveryFee === 0 ? 'Free' : `${deliveryFee} dh`}
+            </Text>
           </View>
-          <View className="flex-row justify-between mb-2">
-            <Text className="text-white/60 text-[12px] font-semibold">Service fee</Text>
-            <Text className="text-white text-[13px] font-semibold">{serviceFee} dh</Text>
-          </View>
+          {priorityDh > 0 && (
+            <View className="flex-row justify-between mb-2">
+              <Text className="text-white/60 text-[12px] font-semibold">Priority</Text>
+              <Text className="text-white text-[13px] font-semibold">{priorityDh} dh</Text>
+            </View>
+          )}
+          {weatherDh > 0 && (
+            <View className="flex-row justify-between mb-2">
+              <Text className="text-white/60 text-[12px] font-semibold">Winter surcharge</Text>
+              <Text className="text-white text-[13px] font-semibold">{weatherDh} dh</Text>
+            </View>
+          )}
+          {tipAmount > 0 && (
+            <View className="flex-row justify-between mb-2">
+              <Text className="text-white/60 text-[12px] font-semibold">Courier tip</Text>
+              <Text className="text-white text-[13px] font-semibold">{tipAmount} dh</Text>
+            </View>
+          )}
           {promoDiscount > 0 && (
             <View className="flex-row justify-between mb-2">
               <Text className="text-[12px] font-semibold" style={{ color: '#34D399' }}>
@@ -867,9 +925,11 @@ export default function Checkout() {
                         ? 'Capture GPS first'
                         : !landmarkValid
                           ? 'Add a landmark'
-                          : fullyCoveredByWallet
-                            ? 'Place order · paid from wallet'
-                            : `Place order · ${finalTotal} dh${walletCredit > 0 ? ' cash' : ''}`}
+                          : !quote
+                            ? 'Pricing…'
+                            : fullyCoveredByWallet
+                              ? 'Place order · paid from wallet'
+                              : `Place order · ${finalTotal} dh${walletCredit > 0 ? ' cash' : ''}`}
             </Text>
             <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
           </View>

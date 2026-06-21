@@ -29,7 +29,10 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,6 +52,25 @@
         }
       ],
       "@bacons/apple-targets"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.atlaasgo.app.widget",
+                  "targetName": "AtlaasGoWidget"
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "cd78dbac-5b5d-4e8e-a51a-1d86f93f5ff2"
+      }
+    },
+    "owner": "atlaasgo"
   }
 }

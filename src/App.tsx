@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
 import Nav from './components/Nav';
 import Footer from './components/Footer';
@@ -29,6 +29,9 @@ const ApplyPartner = lazy(() => import('./pages/ApplyPartner'));
 const Campus = lazy(() => import('./pages/Campus'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+
+/* ── AtlaasGo 3.0 re-skin (self-contained mobile app shell) ──────── */
+const App3 = lazy(() => import('./app3/App3'));
 
 function PageLoader() {
   return (
@@ -61,14 +64,18 @@ export default function App() {
     return () => io.disconnect();
   }, []);
 
+  const { pathname } = useLocation();
+  const isApp3 = pathname.startsWith('/app');
+
   return (
     <>
-      <a href="#main" className="skip-link">Skip to content</a>
-      <Nav />
+      {!isApp3 && <a href="#main" className="skip-link">Skip to content</a>}
+      {!isApp3 && <Nav />}
       <main id="main" tabIndex={-1}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/app" element={<App3 />} />
             <Route path="/order" element={<Order />} />
             <Route path="/r/:slug" element={<RestaurantPage />} />
             <Route path="/cart" element={<CartPage />} />
@@ -92,8 +99,8 @@ export default function App() {
           </Routes>
         </Suspense>
       </main>
-      <Footer />
-      <MobileTabBar />
+      {!isApp3 && <Footer />}
+      {!isApp3 && <MobileTabBar />}
       <InstallToast />
     </>
   );

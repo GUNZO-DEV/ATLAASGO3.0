@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { mapOrderRow, ORDER_STAGES, type Order, type OrderRow, type OrderStage } from '../lib/types';
 
@@ -15,6 +15,32 @@ export function useOrderStatus(orderId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Loader is a useCallback so the screen can re-run it for pull-to-refresh and
+  // focus polling when the realtime UPDATE stream is asleep.
+  const refresh = useCallback(async () => {
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
+    const { data, error: err } = await supabase
+      .from('orders')
+      .select(SELECT)
+      .eq('id', orderId)
+      .maybeSingle();
+    if (err) {
+      setError(new Error(err.message));
+    } else if (data) {
+      setError(null);
+      const mapped = mapOrderRow(data as OrderRow);
+      setOrder(mapped);
+      // Only drive the timeline for stages it knows about.
+      if ((ORDER_STAGES as readonly string[]).includes(mapped.status)) {
+        setStage(mapped.status as OrderStage);
+      }
+    }
+    setLoading(false);
+  }, [orderId]);
+
   useEffect(() => {
     if (!orderId) {
       setLoading(false);
@@ -22,27 +48,10 @@ export function useOrderStatus(orderId: string | undefined) {
     }
     let cancelled = false;
 
-    async function load() {
-      const { data, error: err } = await supabase
-        .from('orders')
-        .select(SELECT)
-        .eq('id', orderId)
-        .maybeSingle();
+    void (async () => {
+      await refresh();
       if (cancelled) return;
-      if (err) {
-        setError(new Error(err.message));
-      } else if (data) {
-        const mapped = mapOrderRow(data as OrderRow);
-        setOrder(mapped);
-        // Only drive the timeline for stages it knows about.
-        if ((ORDER_STAGES as readonly string[]).includes(mapped.status)) {
-          setStage(mapped.status as OrderStage);
-        }
-      }
-      setLoading(false);
-    }
-
-    load();
+    })();
 
     const channel = supabase
       // Unique topic per mount — a fixed name collides with an already-
@@ -67,9 +76,9 @@ export function useOrderStatus(orderId: string | undefined) {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [orderId]);
+  }, [orderId, refresh]);
 
-  return { order, stage, setStage, loading, error };
+  return { order, stage, setStage, loading, error, refresh };
 }
 
 /** Demo driver — advances through the stages on a timer when no real order is wired up. */

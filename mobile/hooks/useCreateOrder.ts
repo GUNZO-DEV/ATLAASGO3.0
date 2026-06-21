@@ -44,7 +44,21 @@ export type CreateOrderInput = {
   /** Saved-address id when the customer picked one. */
   addressId?: string | null;
   isCampus?: boolean;
+  /** Courier tip (integer dh), already included in totalDh. */
+  tipDh?: number;
+  /** Delivery speed chosen on the 3.0 cart screen. */
+  deliverySpeed?: 'standard' | 'priority';
+  /** Handoff preference: door / hand / lounge. */
+  handoff?: 'door' | 'hand' | 'lounge';
+  /**
+   * City the order belongs to (powers the city filter on the lists). When
+   * omitted we resolve it from the chosen restaurant's `city`, falling back to
+   * 'Ifrane' — the DB column default — so every order carries a city.
+   */
+  city?: string | null;
 };
+
+const DEFAULT_CITY = 'Ifrane';
 
 export function useCreateOrder() {
   const [submitting, setSubmitting] = useState(false);
@@ -61,6 +75,23 @@ export function useCreateOrder() {
 
       const coords = { lat: input.coords.lat, lng: input.coords.lng };
 
+      // Resolve the order's city. Prefer an explicit value; otherwise look it
+      // up from the chosen restaurant (the cart's first line carries its id).
+      // Always fall back to 'Ifrane' so the city filter never sees a null.
+      let city = (input.city ?? '').trim() || null;
+      if (!city) {
+        const restaurantId = input.items?.[0]?.restaurantId;
+        if (restaurantId) {
+          const { data: resto } = await supabase
+            .from('restaurants')
+            .select('city')
+            .eq('id', restaurantId)
+            .maybeSingle();
+          city = ((resto?.city as string | null) ?? '').trim() || null;
+        }
+      }
+      if (!city) city = DEFAULT_CITY;
+
       const { data, error: err } = await supabase
         .from('orders')
         .insert({
@@ -68,6 +99,7 @@ export function useCreateOrder() {
           status: 'ordered',
           landmark,
           coords,
+          city,
           driver_payload: {
             headerLandmark: landmark,
             coords,
@@ -83,6 +115,9 @@ export function useCreateOrder() {
           promotion_code: input.promotionCode ?? null,
           address_id: input.addressId ?? null,
           is_campus: input.isCampus ?? false,
+          tip_dh: input.tipDh ?? 0,
+          delivery_speed: input.deliverySpeed ?? 'standard',
+          handoff: input.handoff ?? 'door',
         })
         .select('id')
         .single();

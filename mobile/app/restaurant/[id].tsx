@@ -1,142 +1,472 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// AtlaasGo 3.0 — Restaurant menu screen (native re-skin).
+//
+// Faithful native reproduction of the 3.0 prototype (screen-restaurant2.jsx):
+//   floating emoji hero · overlapping info card · sticky cuisine tabs · menu
+//   rows with 96px tiles · item BottomSheet (meta + Make-it-yours + qty stepper)
+//   · favourite heart · sticky View-cart bar.
+//
+// Data is wired through the ag3 foundation (agApi.catalog.store / .menu via
+// useAsync, agApi.me.setFavourite). Native plumbing is PRESERVED:
+//   - route param `id` (useLocalSearchParams). Callers (Home, Favorites, Search)
+//     push a real restaurant UUID; agApi resolves UUID-or-slug via storeKey().
+//   - the existing zustand lib/cart store is the SINGLE source of truth for the
+//     cart, exactly as the re-skinned app/cart.tsx + app/index.tsx expect (they
+//     read lib/cart, not the ag3 cart). Adding here drives the working
+//     /cart → Stripe checkout / wallet / order-create flow untouched. The
+//     View-cart bar reads that store. We follow the sibling screens' pattern of
+//     NOT mounting Ag3CartProvider/CityProvider (not mounted in _layout.tsx).
+import { useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Heart, Plus, ShoppingBag } from 'lucide-react-native';
-import { PressableScale } from '../../components/primitives/PressableScale';
-import { useMenu } from '../../hooks/useMenu';
-import { useFavorites } from '../../hooks/useFavorites';
+
+import { agApi, type MenuItem, type MenuSection, type Store } from '../../lib/ag3/agApi';
+import { useAsync } from '../../lib/ag3/useAsync';
+import { useAg3Theme, gradients } from '../../components/ag3/theme';
+import {
+  BottomSheet,
+  Press,
+  PhotoTile,
+  Price,
+  foodEm,
+  tileFor,
+  etaLabel,
+  feeLabel,
+} from '../../components/ag3/primitives';
+import {
+  IBack,
+  IHeart,
+  IStar,
+  IClock,
+  IPin,
+  IPlus,
+  ITruck,
+  ICheck,
+  IClose,
+  IBag,
+} from '../../components/ag3/icons';
 import { useCart } from '../../lib/cart';
-import { supabase } from '../../lib/supabase';
 
-export default function RestaurantScreen() {
-  const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const { sections, loading, error } = useMenu(id);
-  const { add, count, total } = useCart();
-  const cartCount = count();
-  const { isFavorite, toggle } = useFavorites();
-  const faved = id ? isFavorite(id) : false;
+/* ── item sheet — kcal/rx/packSize meta + qty stepper + Add ─────────────────── */
+function ItemSheet({
+  item,
+  store,
+  visible,
+  onClose,
+  onAdd,
+}: {
+  item: MenuItem | null;
+  store: Store;
+  visible: boolean;
+  onClose: () => void;
+  onAdd: (it: MenuItem, qty: number, optionIds: string[]) => void;
+}) {
+  const t = useAg3Theme();
+  const [qty, setQty] = useState(1);
+  const [opts, setOpts] = useState<Record<string, boolean>>({});
 
-  const [restaurant, setRestaurant] = useState<{ name: string; emoji: string | null } | null>(null);
+  // Reset the stepper/options whenever a new item opens.
+  const lastId = useRef<string | null>(null);
+  if (item && item.id !== lastId.current) {
+    lastId.current = item.id;
+    if (qty !== 1) setQty(1);
+    if (Object.keys(opts).length) setOpts({});
+  }
 
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-    supabase
-      .from('restaurants')
-      .select('name, emoji')
-      .eq('id', id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) setRestaurant(data as { name: string; emoji: string | null } | null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  if (!item) return <BottomSheet visible={false} onClose={onClose}>{null}</BottomSheet>;
 
-  const restaurantName = restaurant?.name ?? 'Menu';
+  const extras = item.options ?? [];
+  const hasOptions = extras.length > 0;
+  const extra = extras.reduce((s, e) => s + (opts[e.id] ? e.priceDh : 0), 0);
+  const total = (item.priceDh + extra) * qty;
+  const meta = item.kcal ? `${item.kcal} kcal · made to order` : item.packSize ?? '';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FBF7F2' }} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: cartCount > 0 ? 120 : 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View className="flex-row items-center justify-between pt-3">
-          <PressableScale onPress={() => router.back()}>
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center bg-white"
-              style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
-            >
-              <ArrowLeft size={18} color="#1A1410" />
-            </View>
-          </PressableScale>
-          <PressableScale onPress={() => id && toggle(id)}>
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center bg-white"
-              style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.08)' }}
-            >
-              <Heart size={18} color="#E11D48" fill={faved ? '#E11D48' : 'transparent'} />
-            </View>
-          </PressableScale>
-        </View>
+    <BottomSheet visible={visible} onClose={onClose} title={undefined} height="90%">
+      {/* hero tile inside the sheet */}
+      <View style={{ marginHorizontal: -18, marginTop: -10 }}>
+        <PhotoTile tile={tileFor(item.id)} em={foodEm(item.id)} float radius={0} style={{ height: 178 }}>
+          <Pressable onPress={onClose} hitSlop={8} style={[styles.sheetIconBtn, { backgroundColor: 'rgba(255,255,255,0.92)' }]}>
+            <IClose size={19} color="#1A1410" />
+          </Pressable>
+        </PhotoTile>
+      </View>
 
-        <View className="mt-6 mb-5 flex-row items-center">
-          <Text style={{ fontSize: 40, marginRight: 12 }}>{restaurant?.emoji ?? '🍽️'}</Text>
-          <View className="flex-1">
-            <Text
-              className="font-display text-[26px]"
-              style={{ fontWeight: '800', letterSpacing: -0.8, color: '#1A1410', lineHeight: 30 }}
-              numberOfLines={2}
-            >
-              {restaurantName}
+      <View style={{ paddingTop: 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <Text style={[styles.disp, { fontSize: 22, color: t.colors.fg, flex: 1 }]}>{item.name}</Text>
+          <Price v={item.priceDh} big />
+        </View>
+        {item.description ? (
+          <Text style={{ color: t.colors.fgSoft, fontSize: 14, lineHeight: 21, marginTop: 8 }}>{item.description}</Text>
+        ) : null}
+        {meta ? (
+          <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2, fontVariant: ['tabular-nums'] }}>{meta}</Text>
+        ) : null}
+
+        {hasOptions ? (
+          <>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginTop: 20, marginBottom: 10 }]}>Make it yours</Text>
+            <View style={{ gap: 8 }}>
+              {extras.map((e) => {
+                const on = !!opts[e.id];
+                return (
+                  <Pressable
+                    key={e.id}
+                    onPress={() => setOpts((o) => ({ ...o, [e.id]: !o[e.id] }))}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: 13,
+                      borderRadius: t.radii.md,
+                      borderWidth: 1.5,
+                      borderColor: on ? t.colors.primary : t.colors.line,
+                      backgroundColor: on ? 'rgba(255,87,34,0.10)' : t.colors.surface,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 7,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1.5,
+                        borderColor: on ? t.colors.primary : t.colors.line,
+                        backgroundColor: on ? t.colors.primary : 'transparent',
+                      }}
+                    >
+                      {on ? <ICheck size={15} color="#fff" strokeWidth={3} /> : null}
+                    </View>
+                    <Text style={{ flex: 1, fontWeight: '600', fontSize: 14, color: t.colors.fg }}>{e.label}</Text>
+                    <Text style={{ fontSize: 12.5, color: t.colors.muted, fontVariant: ['tabular-nums'] }}>
+                      {e.priceDh ? `+${e.priceDh} dh` : 'Free'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : item.rx || store.vertical === 'pharmacy' ? (
+          <View style={[styles.noteCard, { backgroundColor: 'rgba(62,134,199,0.09)', borderColor: 'rgba(62,134,199,0.2)' }]}>
+            <ICheck size={18} color={t.colors.snow} strokeWidth={2.5} />
+            <Text style={{ flex: 1, fontSize: 12.5, color: t.colors.fgSoft, lineHeight: 18 }}>
+              Always read the label. A licensed pharmacist is available in-app for advice on any order.
             </Text>
           </View>
+        ) : (
+          <View style={[styles.noteCard, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+            <ICheck size={18} color={t.colors.ok} strokeWidth={2.5} />
+            <Text style={{ flex: 1, fontSize: 12.5, color: t.colors.fgSoft, lineHeight: 18 }}>
+              In stock · picked fresh and packed with care for your drop.
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* sticky add bar */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20 }}>
+        <View style={[styles.step, { borderColor: t.colors.line, backgroundColor: t.colors.surface }]}>
+          <Pressable onPress={() => setQty((q) => Math.max(1, q - 1))} hitSlop={6} style={styles.stepBtn}>
+            <Text style={[styles.stepGlyph, { color: t.colors.fg }]}>–</Text>
+          </Pressable>
+          <Text style={[styles.stepN, { color: t.colors.fg }]}>{qty}</Text>
+          <Pressable onPress={() => setQty((q) => q + 1)} hitSlop={6} style={styles.stepBtn}>
+            <Text style={[styles.stepGlyph, { color: t.colors.fg }]}>+</Text>
+          </Pressable>
+        </View>
+        <Press
+          onPress={() => onAdd(item, qty, extras.filter((e) => opts[e.id]).map((e) => e.id))}
+          style={{ flex: 1 }}
+          scaleTo={0.97}
+        >
+          <LinearGradient
+            colors={gradients.sunset}
+            start={gradients.start}
+            end={gradients.end}
+            style={[styles.addBtn, t.shadows.glow]}
+          >
+            <Text style={styles.addBtnTxt}>
+              Add · <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '800' }}>{total} dh</Text>
+            </Text>
+          </LinearGradient>
+        </Press>
+      </View>
+    </BottomSheet>
+  );
+}
+
+/* ── single menu row — text left, 96px tile + plus badge right ──────────────── */
+function MenuRow({ item, onPress }: { item: MenuItem; onPress: () => void }) {
+  const t = useAg3Theme();
+  return (
+    <Press onPress={onPress} style={{ width: '100%' }} scaleTo={0.985}>
+      <View style={{ flexDirection: 'row', gap: 13, paddingVertical: 14, alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text style={[styles.disp, { fontWeight: '800', fontSize: 15.5, color: t.colors.fg }]}>{item.name}</Text>
+            {item.tag ? (
+              <View style={[styles.softBadge, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: t.colors.primary }}>{item.tag}</Text>
+              </View>
+            ) : null}
+          </View>
+          {item.description ? (
+            <Text style={{ fontSize: 13, color: t.colors.muted, lineHeight: 19, marginTop: 5, marginBottom: 8, maxWidth: 230 }} numberOfLines={3}>
+              {item.description}
+            </Text>
+          ) : (
+            <View style={{ height: 8 }} />
+          )}
+          <Price v={item.priceDh} />
+        </View>
+        <View style={{ position: 'relative' }}>
+          <PhotoTile tile={tileFor(item.id)} em={foodEm(item.id)} radius={18} style={{ width: 96, height: 96 }} />
+          <View style={[styles.plusBadge, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }, t.shadows.card]}>
+            <IPlus size={20} color={t.colors.primary} strokeWidth={2.5} />
+          </View>
+        </View>
+      </View>
+    </Press>
+  );
+}
+
+/* ── screen ─────────────────────────────────────────────────────────────────── */
+export default function RestaurantScreen() {
+  const t = useAg3Theme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { id: rawId } = useLocalSearchParams<{ id?: string }>();
+  const id = rawId ?? '';
+
+  const { data: store, loading } = useAsync(() => agApi.catalog.store(id), [id]);
+  const { data: menu } = useAsync(() => agApi.catalog.menu(id), [id]);
+  const sections: MenuSection[] = useMemo(() => menu ?? [], [menu]);
+
+  // PRESERVED native plumbing: the existing zustand cart drives /cart → Stripe
+  // checkout / wallet / order-create. It is the single source of truth for the
+  // View-cart bar count/total (app/cart.tsx reads the same store).
+  const legacyCart = useCart();
+  const cartCount = legacyCart.count();
+  const cartTotal = legacyCart.subtotal();
+
+  const [sheetItem, setSheetItem] = useState<MenuItem | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [fav, setFav] = useState(false);
+  const favSeeded = useRef(false);
+  const [activeSec, setActiveSec] = useState(0);
+
+  // seed favourite from the live store once it loads
+  if (store && !favSeeded.current) {
+    favSeeded.current = true;
+    if (store.isFavourite !== fav) setFav(store.isFavourite);
+  }
+
+  const scrollRef = useRef<ScrollView>(null);
+  const secOffsets = useRef<number[]>([]);
+
+  function jumpTo(i: number) {
+    setActiveSec(i);
+    const y = secOffsets.current[i];
+    if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+  }
+
+  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const y = e.nativeEvent.contentOffset.y + 60;
+    let idx = 0;
+    for (let i = 0; i < secOffsets.current.length; i++) {
+      if (secOffsets.current[i] != null && secOffsets.current[i] <= y) idx = i;
+    }
+    if (idx !== activeSec) setActiveSec(idx);
+  }
+
+  function toggleFav() {
+    if (!store) return;
+    const next = !fav;
+    setFav(next);
+    agApi.me.setFavourite(store.id, next).catch(() => setFav(!next));
+  }
+
+  function addItem(it: MenuItem, qty: number, optionIds: string[]) {
+    if (!store) return;
+    const extra = (it.options ?? []).filter((o) => optionIds.includes(o.id)).reduce((s, o) => s + o.priceDh, 0);
+    const unitDh = it.priceDh + extra;
+    // PRESERVED: write into the zustand cart that /cart + checkout + order-create
+    // read. restaurantId uses the route `id` so a single-store cart keys cleanly.
+    legacyCart.add(
+      {
+        id: it.id,
+        restaurantId: id,
+        restaurantName: store.name,
+        name: it.name,
+        desc: it.description || undefined,
+        priceDh: unitDh,
+      },
+      qty,
+    );
+    setSheetOpen(false);
+    setSheetItem(null);
+  }
+
+  const em = store?.emoji || foodEm(id);
+  const tile = tileFor(store?.id || id);
+
+  /* loading shell */
+  if (loading && !store) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!store) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Text style={[styles.disp, { fontSize: 19, color: t.colors.fg }]}>Restaurant unavailable</Text>
+          <Text style={{ color: t.colors.muted, marginTop: 8, textAlign: 'center' }}>
+            We couldn’t load this place right now.
+          </Text>
+          <Pressable onPress={() => router.back()} style={{ marginTop: 20 }}>
+            <Text style={{ color: t.colors.primary, fontWeight: '700' }}>Go back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const metrics = [
+    { ic: <IStar size={17} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />, top: String(store.rating || '—'), sub: `${store.reviews} reviews` },
+    { ic: <IClock size={17} color={t.colors.primary} />, top: `${etaLabel(store)}m`, sub: 'delivery' },
+    { ic: <ITruck size={17} color={t.colors.ok} />, top: feeLabel(store), sub: 'fee' },
+    { ic: <IPin size={17} color={t.colors.fgSoft} />, top: store.distanceKm ? `${store.distanceKm} km` : '—', sub: 'away' },
+  ];
+
+  return (
+    <View style={{ flex: 1, backgroundColor: t.colors.bg }}>
+      <ScrollView
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: cartCount ? 120 : 32 }}
+        stickyHeaderIndices={[1]}
+      >
+        {/* ── hero + info card (index 0) ──────────────────────────────────── */}
+        <View>
+          <PhotoTile
+            tile={tile}
+            em={em}
+            float
+            radius={0}
+            style={{ height: 226 + insets.top, paddingTop: insets.top + 14, paddingHorizontal: 16, paddingBottom: 16, alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', zIndex: 3 }}>
+              <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.heroIconBtn, { backgroundColor: 'rgba(255,255,255,0.92)' }]}>
+                <IBack size={20} color="#1A1410" />
+              </Pressable>
+              <Pressable onPress={toggleFav} hitSlop={8} style={[styles.heroIconBtn, { backgroundColor: 'rgba(255,255,255,0.92)' }]}>
+                <IHeart size={20} color={t.colors.primary} fill={fav ? t.colors.primary : 'transparent'} />
+              </Pressable>
+            </View>
+          </PhotoTile>
+
+          {/* info card overlapping the hero */}
+          <View style={{ paddingHorizontal: 18, marginTop: -38, zIndex: 2 }}>
+            <MotiView
+              from={{ opacity: 0, translateY: 12 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: 'timing', duration: 420 }}
+              style={[styles.infoCard, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }, t.shadows.card]}
+            >
+              {store.tags[0] ? <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{store.tags[0]}</Text> : null}
+              <Text style={[styles.disp, { fontSize: 25, color: t.colors.fg, marginTop: 6, marginBottom: 10, letterSpacing: -0.6 }]}>
+                {store.name}
+              </Text>
+              {store.blurb ? (
+                <Text style={{ color: t.colors.fgSoft, fontSize: 13.5, lineHeight: 20, marginBottom: 15 }}>{store.blurb}</Text>
+              ) : null}
+              <View style={{ flexDirection: 'row' }}>
+                {metrics.map((m, i) => (
+                  <View key={i} style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? StyleSheet.hairlineWidth : 0, borderLeftColor: t.colors.line }}>
+                    <View style={{ marginBottom: 4 }}>{m.ic}</View>
+                    <Text style={[styles.disp, { fontWeight: '800', fontSize: 15, color: t.colors.fg }]}>{m.top}</Text>
+                    <Text style={{ fontSize: 10.5, color: t.colors.muted, marginTop: 1 }}>{m.sub}</Text>
+                  </View>
+                ))}
+              </View>
+            </MotiView>
+          </View>
+
+          {store.promo ? (
+            <View style={{ paddingHorizontal: 18, marginTop: 14 }}>
+              <View style={[styles.promoStrip, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: t.colors.primary }}>🎁 {store.promo} · auto-applied at checkout</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
-        {loading ? (
-          <View className="py-12 items-center">
-            <ActivityIndicator color="#FF5722" />
-          </View>
-        ) : error ? (
-          <Text className="text-[13px]" style={{ color: '#B91C1C' }}>
-            Couldn’t load the menu: {error}
-          </Text>
-        ) : sections.length === 0 ? (
-          <Text className="text-[14px]" style={{ color: '#7A6F66' }}>
-            This restaurant hasn’t published a menu yet.
+        {/* ── sticky cuisine tabs (index 1) ───────────────────────────────── */}
+        <View style={{ backgroundColor: t.colors.bg, paddingTop: 14, paddingBottom: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 18 }}>
+            {sections.map((s, i) => {
+              const on = activeSec === i;
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => jumpTo(i)}
+                  style={{
+                    paddingHorizontal: 15,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    backgroundColor: on ? t.colors.fg : t.colors.surface,
+                    borderColor: on ? t.colors.fg : t.colors.line,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: on ? t.colors.bg : t.colors.fgSoft }}>{s.title}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* ── menu sections (index 2+) ────────────────────────────────────── */}
+        {sections.length === 0 ? (
+          <Text style={{ paddingHorizontal: 18, paddingVertical: 32, color: t.colors.muted, fontSize: 14 }}>
+            This place hasn’t published a menu yet.
           </Text>
         ) : (
-          sections.map((section) => (
-            <View key={section.categoryId} className="mb-6">
-              <Text
-                className="text-[12px] uppercase font-bold mb-3"
-                style={{ letterSpacing: 1.4, color: '#FF5722' }}
-              >
-                {section.categoryName}
-              </Text>
-              <View style={{ gap: 10 }}>
-                {section.items.map((item) => (
-                  <View
-                    key={item.id}
-                    className="flex-row items-center bg-white rounded-2xl p-4"
-                    style={{ borderWidth: 1, borderColor: 'rgba(26,20,16,0.07)' }}
-                  >
-                    <View className="flex-1 pr-3">
-                      <Text className="text-[15px] font-bold" style={{ color: '#1A1410' }} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      {item.description ? (
-                        <Text className="text-[12px] mt-0.5" style={{ color: '#7A6F66' }} numberOfLines={2}>
-                          {item.description}
-                        </Text>
-                      ) : null}
-                      <Text className="text-[13px] font-bold mt-1.5" style={{ color: '#1A1410' }}>
-                        {item.priceDh} dh
-                      </Text>
-                    </View>
-                    <PressableScale
-                      onPress={() =>
-                        add({
-                          id: item.id,
-                          restaurantId: id!,
-                          restaurantName,
-                          name: item.name,
-                          desc: item.description ?? undefined,
-                          priceDh: item.priceDh,
-                        })
-                      }
-                    >
-                      <View
-                        className="w-9 h-9 rounded-full items-center justify-center"
-                        style={{ backgroundColor: '#FF5722' }}
-                      >
-                        <Plus size={18} color="#fff" strokeWidth={2.5} />
-                      </View>
-                    </PressableScale>
+          sections.map((sec, si) => (
+            <View
+              key={si}
+              onLayout={(e) => {
+                secOffsets.current[si] = e.nativeEvent.layout.y;
+              }}
+              style={{ paddingHorizontal: 18, marginTop: si === 0 ? 4 : 18 }}
+            >
+              <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg }]}>{sec.title}</Text>
+              <View style={{ marginTop: 2 }}>
+                {sec.items.map((it, ii) => (
+                  <View key={it.id}>
+                    <MenuRow item={it} onPress={() => { setSheetItem(it); setSheetOpen(true); }} />
+                    {ii < sec.items.length - 1 ? <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: t.colors.line }} /> : null}
                   </View>
                 ))}
               </View>
@@ -145,32 +475,59 @@ export default function RestaurantScreen() {
         )}
       </ScrollView>
 
-      {/* Sticky cart bar */}
-      {cartCount > 0 && (
-        <View style={{ position: 'absolute', left: 24, right: 24, bottom: 32 }}>
-          <Pressable onPress={() => router.push('/cart')}>
-            <View
-              className="rounded-full py-4 px-6 flex-row items-center justify-between"
-              style={{
-                backgroundColor: '#FF5722',
-                shadowColor: '#FF5722',
-                shadowOffset: { width: 0, height: 14 },
-                shadowOpacity: 0.4,
-                shadowRadius: 24,
-                elevation: 12,
-              }}
-            >
-              <View className="flex-row items-center">
-                <ShoppingBag size={17} color="#fff" />
-                <Text className="text-white font-bold text-[15px] ml-2">
-                  {cartCount} {cartCount === 1 ? 'item' : 'items'}
-                </Text>
+      {/* ── sticky View-cart bar (zustand cart = source of truth) ──────────── */}
+      {cartCount > 0 ? (
+        <MotiView
+          from={{ opacity: 0, translateY: 24 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 240 }}
+          style={{ position: 'absolute', left: 18, right: 18, bottom: insets.bottom ? insets.bottom + 8 : 24 }}
+        >
+          <Press onPress={() => router.push('/cart')} scaleTo={0.98}>
+            <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={[styles.cartBar, t.shadows.glow]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                <View style={styles.cartCountPill}>
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, fontVariant: ['tabular-nums'] }}>{cartCount}</Text>
+                </View>
+                <IBag size={17} color="#fff" />
+                <Text style={styles.cartBarTxt}>View cart</Text>
               </View>
-              <Text className="text-white font-bold text-[15px]">View cart · {total()} dh</Text>
-            </View>
-          </Pressable>
-        </View>
-      )}
-    </SafeAreaView>
+              <Text style={[styles.cartBarTxt, { fontVariant: ['tabular-nums'] }]}>{cartTotal} dh</Text>
+            </LinearGradient>
+          </Press>
+        </MotiView>
+      ) : null}
+
+      {/* ── item bottom sheet ──────────────────────────────────────────────── */}
+      <ItemSheet
+        item={sheetItem}
+        store={store}
+        visible={sheetOpen}
+        onClose={() => { setSheetOpen(false); setSheetItem(null); }}
+        onAdd={addItem}
+      />
+    </View>
   );
 }
+
+/* ── styles ──────────────────────────────────────────────────────────────── */
+const styles = StyleSheet.create({
+  disp: { fontWeight: '800', letterSpacing: -0.4 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700' },
+  heroIconBtn: { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  sheetIconBtn: { position: 'absolute', top: 14, right: 14, width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center', zIndex: 3 },
+  infoCard: { borderRadius: 26, borderWidth: 1, padding: 18 },
+  promoStrip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, alignSelf: 'flex-start' },
+  softBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  plusBadge: { position: 'absolute', bottom: -10, right: -8, width: 38, height: 38, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  noteCard: { flexDirection: 'row', gap: 10, marginTop: 18, padding: 13, borderRadius: 20, borderWidth: 1, alignItems: 'flex-start' },
+  step: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, borderWidth: 1, paddingHorizontal: 4, height: 48 },
+  stepBtn: { width: 38, height: 40, alignItems: 'center', justifyContent: 'center' },
+  stepGlyph: { fontSize: 22, fontWeight: '600', lineHeight: 24 },
+  stepN: { fontSize: 16, fontWeight: '800', minWidth: 22, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  addBtn: { height: 52, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  addBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15.5 },
+  cartBar: { height: 56, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
+  cartCountPill: { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2, minWidth: 26, alignItems: 'center' },
+  cartBarTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+});

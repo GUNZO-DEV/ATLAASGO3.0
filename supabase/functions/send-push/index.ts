@@ -28,9 +28,20 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  // Trusted server callers only.
+  // Trusted callers only: accept the project service-role key OR the dedicated
+  // push relay secret stored in Vault (so the DB push trigger can authenticate
+  // without ever holding the service-role key).
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
-  if (!token || token !== SERVICE_KEY) return json({ error: 'Unauthorized' }, 401);
+  let relay = '';
+  try {
+    const { data: relaySecret } = await admin.rpc('current_push_relay_secret');
+    relay = (relaySecret as string) ?? '';
+  } catch {
+    relay = '';
+  }
+  if (!token || (token !== SERVICE_KEY && (relay === '' || token !== relay))) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
 
   try {
     const { userId, title, body, data } = await req.json();

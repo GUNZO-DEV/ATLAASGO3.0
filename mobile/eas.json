@@ -1,26 +1,42 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": ">= 20.0.0",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": {
-        "simulator": true
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://toywtnupchfywhtdhxvj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_yqfMeVNVqYqUQeslx8wldg_ban04d4V",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYXRsYWFzZ28uY29tJA",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51S2OXdJz6x94DaUCq9hsGca3FW7oXYIr04eKCMyr0V8alra7QyU2j3umEgR3k2K264suGnBGRflXuQsPXAmVeUOL00SWsN51IV",
+        "EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY": "AIzaSyDdrDS-0d6Rj8IrOf9xcxeak5pk-rXwob4"
       }
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview",
-      "ios": {
-        "simulator": false
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://toywtnupchfywhtdhxvj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_yqfMeVNVqYqUQeslx8wldg_ban04d4V",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYXRsYWFzZ28uY29tJA",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51S2OXdJz6x94DaUCq9hsGca3FW7oXYIr04eKCMyr0V8alra7QyU2j3umEgR3k2K264suGnBGRflXuQsPXAmVeUOL00SWsN51IV",
+        "EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY": "AIzaSyDdrDS-0d6Rj8IrOf9xcxeak5pk-rXwob4"
       }
     },
     "production": {
-      "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://toywtnupchfywhtdhxvj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_yqfMeVNVqYqUQeslx8wldg_ban04d4V",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYXRsYWFzZ28uY29tJA",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51S2OXdJz6x94DaUCq9hsGca3FW7oXYIr04eKCMyr0V8alra7QyU2j3umEgR3k2K264suGnBGRflXuQsPXAmVeUOL00SWsN51IV",
+        "EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY": "AIzaSyDdrDS-0d6Rj8IrOf9xcxeak5pk-rXwob4"
+      }
     }
   },
   "submit": {

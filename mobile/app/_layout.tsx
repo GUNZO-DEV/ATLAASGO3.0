@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { AuthProvider } from '../lib/auth';
+import { CityProvider } from '../lib/ag3/CityContext';
+import { Ag3CartProvider } from '../lib/ag3/cart';
 import { ClerkSupabaseBridge } from '../lib/ClerkSupabaseBridge';
 import { PushRegistrar } from '../components/PushRegistrar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -21,16 +23,25 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <AuthProvider>
-              <ClerkSupabaseBridge />
-              <PushRegistrar />
-              <StatusBar style="dark" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: '#FBF7F2' },
-                  animation: 'slide_from_right',
-                }}
-              />
+              <CityProvider>
+                <Ag3CartProvider>
+                  <ClerkSupabaseBridge />
+                  <PushRegistrar />
+                  <StatusBar style="dark" />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: '#FBF7F2' },
+                      animation: 'slide_from_right',
+                    }}
+                  >
+                    {/* (tabs) group = Home/Search/Orders/Profile bottom nav.
+                        Restaurant / cart / order / checkout etc. are auto-
+                        registered as root stack screens (full-screen, no tabs). */}
+                    <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+                  </Stack>
+                </Ag3CartProvider>
+              </CityProvider>
             </AuthProvider>
           </SafeAreaProvider>
         </GestureHandlerRootView>

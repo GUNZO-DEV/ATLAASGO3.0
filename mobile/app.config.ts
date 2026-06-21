@@ -18,7 +18,7 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 export default ({ config }: ConfigContext): ExpoConfig => {
   const androidMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY ?? '';
   const googleServicesFile =
-    process.env.GOOGLE_SERVICES_JSON ?? (config.android as any)?.googleServicesFile;
+    process.env.GOOGLE_SERVICES_JSON ?? (config.android as any)?.googleServicesFile ?? './google-services.json';
 
   return {
     ...config,

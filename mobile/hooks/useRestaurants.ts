@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -16,6 +16,7 @@ export type Restaurant = {
   rating: number | null;
   time_min: number | null;
   fee_dh: number | null;
+  city: string | null;
   coords: { lat: number; lng: number } | null;
 };
 
@@ -24,26 +25,34 @@ export function useRestaurants() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Inner loader is a useCallback so screens can re-run it for pull-to-refresh
+  // and focus-aware polling (the app's guaranteed fallback when the realtime
+  // socket is asleep).
+  const load = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from('restaurants')
+      .select('id, slug, name, cuisine, emoji, rating, time_min, fee_dh, city, coords')
+      .eq('status', 'live')
+      .order('name');
+    if (err) {
+      setError(err.message);
+    } else {
+      setError(null);
+      setRestaurants((data ?? []) as Restaurant[]);
+    }
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error: err } = await supabase
-        .from('restaurants')
-        .select('id, slug, name, cuisine, emoji, rating, time_min, fee_dh, coords')
-        .eq('status', 'live')
-        .order('name');
+      await load();
       if (cancelled) return;
-      if (err) {
-        setError(err.message);
-      } else {
-        setRestaurants((data ?? []) as Restaurant[]);
-      }
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [load]);
 
-  return { restaurants, loading, error };
+  return { restaurants, loading, error, refresh: load };
 }
