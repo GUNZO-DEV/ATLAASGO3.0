@@ -217,6 +217,9 @@ const RESTAURANT_COLS =
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const storeKey = (idOrSlug: string): 'id' | 'slug' => (UUID_RE.test(idOrSlug) ? 'id' : 'slug');
 
+/** A dish search hit — a menu item plus the store it belongs to (for navigation). */
+export interface DishHit { id: string; name: string; priceDh: number; storeId: string; storeName: string; emoji: string | null; imageUrl: string | null; }
+
 async function sessionUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.user?.id ?? null;
@@ -413,19 +416,39 @@ export const agApi = {
       if (uncategorised.length) sections.push({ title: 'More', items: uncategorised.map(menuItemToSpec) });
       return sections.filter((s) => s.items.length);
     },
-    search: async (q: string, city?: string): Promise<{ stores: Store[]; items: MenuItem[] }> => {
-      if (!q.trim()) return { stores: [], items: [] };
-      let storeQ = supabase.from('restaurants').select(RESTAURANT_COLS).eq('status', 'live').ilike('name', `%${q}%`).limit(20);
+    search: async (q: string, city?: string): Promise<{ stores: Store[]; dishes: DishHit[] }> => {
+      const term = q.trim();
+      if (!term) return { stores: [], dishes: [] };
+      const clean = term.replace(/[%,()*]/g, ' ').trim() || term;
+      const like = `%${clean}%`;
+      // Stores: match name OR cuisine, scoped to live + the selected city.
+      let storeQ = supabase
+        .from('restaurants')
+        .select(RESTAURANT_COLS)
+        .eq('status', 'live')
+        .or(`name.ilike.${like},cuisine.ilike.${like}`)
+        .limit(20);
       if (city) storeQ = storeQ.ilike('city', city);
-      const [{ data: rs }, { data: mis }, favs] = await Promise.all([
-        storeQ,
-        supabase.from('menu_items').select('*').eq('available', true).ilike('name', `%${q}%`).limit(20),
-        favouriteSlugs(await sessionUserId()),
-      ]);
-      return {
-        stores: ((rs ?? []) as unknown as RestaurantRow[]).map((r) => restaurantToStore(r, favs)),
-        items: ((mis ?? []) as MenuItemRow[]).map(menuItemToSpec),
-      };
+      // Dishes: menu items by name, joined to their (live) restaurant for the store ref.
+      let dishQ = supabase
+        .from('menu_items')
+        .select('id, name, price_dh, image_url, restaurants!inner(slug, name, emoji, city, status)')
+        .eq('available', true)
+        .eq('restaurants.status', 'live')
+        .ilike('name', like)
+        .limit(24);
+      if (city) dishQ = dishQ.ilike('restaurants.city', city);
+      const [{ data: rs }, { data: ds }, favs] = await Promise.all([storeQ, dishQ, favouriteSlugs(await sessionUserId())]);
+      const stores = ((rs ?? []) as unknown as RestaurantRow[]).map((r) => restaurantToStore(r, favs));
+      type Rest = { slug: string; name: string; emoji: string | null };
+      type DishRow = { id: string; name: string; price_dh: number | null; image_url: string | null; restaurants: Rest | Rest[] | null };
+      const dishes: DishHit[] = ((ds ?? []) as DishRow[])
+        .map((d) => {
+          const rest = Array.isArray(d.restaurants) ? d.restaurants[0] : d.restaurants;
+          return { id: d.id, name: d.name, priceDh: d.price_dh ?? 0, storeId: rest?.slug ?? '', storeName: rest?.name ?? '', emoji: rest?.emoji ?? null, imageUrl: d.image_url };
+        })
+        .filter((d) => d.storeId);
+      return { stores, dishes };
     },
     trending: async (): Promise<string[]> => {
       // Real "trending in Ifrane" — the most-ordered dishes from food partners.

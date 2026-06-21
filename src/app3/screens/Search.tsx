@@ -25,14 +25,13 @@ export default function Search({ go }: { go: Go }) {
   const { data: trending } = useAsync(() => agApi.catalog.trending(), []);
   const { data: categories } = useAsync(() => agApi.catalog.categories('food'), []);
   const { data: search } = useAsync(
-    () => (q.trim() ? agApi.catalog.search(q, cityName) : Promise.resolve({ stores: [], items: [] })),
+    () => (q.trim() ? agApi.catalog.search(q, cityName) : Promise.resolve({ stores: [], dishes: [] })),
     [q, cityName],
   );
 
-  // prototype hardcoded `AG.categories.slice(1)` to drop its "All" chip; agApi
-  // categories carry no "All" entry, so we render them straight through.
   const cravings = categories ?? [];
-  const results = search?.stores ?? [];
+  const stores = search?.stores ?? [];
+  const dishes = search?.dishes ?? [];
 
   return (
     <div className="ag3-scroll ag3-anim" style={{ paddingTop: 8 }}>
@@ -72,9 +71,31 @@ export default function Search({ go }: { go: Go }) {
       )}
 
       {q && (
-        <div className="ag3-pad" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 12 } as CSSProperties}>
-          <div className="mono" style={{ fontSize: 12, color: 'var(--muted)' }}>{results.length} results for “{q}”</div>
-          {results.map((r) => <RestoRow key={r.id} r={r} onClick={() => go('restaurant', r)} />)}
+        <div className="ag3-pad" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 } as CSSProperties}>
+          {dishes.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="ag3-sectitle" style={{ fontSize: 16 }}>Dishes</div>
+              {dishes.map((d) => (
+                <button key={d.id} className="ag3-card ag3-press" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, textAlign: 'left', width: '100%' }} onClick={() => go('restaurant', { id: d.storeId })}>
+                  <PhotoTile cls="tile-b" em={d.emoji ?? '🍽️'} round="14px" style={{ width: 54, height: 54, flexShrink: 0 }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span className="disp" style={{ display: 'block', fontWeight: 700, fontSize: 14.5 }}>{d.name}</span>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>{d.storeName}</span>
+                  </span>
+                  <span className="mono" style={{ fontWeight: 700 }}>{d.priceDh}<span style={{ fontSize: '.72em', opacity: .65 }}> dh</span></span>
+                </button>
+              ))}
+            </div>
+          )}
+          {stores.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="ag3-sectitle" style={{ fontSize: 16 }}>Restaurants</div>
+              {stores.map((r) => <RestoRow key={r.id} r={r} onClick={() => go('restaurant', r)} />)}
+            </div>
+          )}
+          {dishes.length === 0 && stores.length === 0 && (
+            <div className="mono" style={{ fontSize: 12, color: 'var(--muted)' }}>No matches for “{q}”.</div>
+          )}
         </div>
       )}
       <div style={{ height: 16 }} />
