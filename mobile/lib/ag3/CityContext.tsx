@@ -55,7 +55,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         setCities(list);
         setCityId((prev) => {
           if (prev && list.some((c) => c.id === prev)) return prev;
-          const preferred = list.find((c) => c.id === 'ifrane') ?? list[0] ?? null;
+          const preferred = list.find((c) => c.served) ?? list.find((c) => c.id === 'ifrane') ?? list[0] ?? null;
           return preferred?.id ?? null;
         });
         setLoading(false);

@@ -99,7 +99,7 @@ function useSelectedCity() {
     if (list.length === 0) return;
     setCityId((prev) => {
       if (prev && list.some((c) => c.id === prev)) return prev;
-      return (list.find((c) => c.id === 'ifrane') ?? list[0])?.id ?? null;
+      return (list.find((c) => c.served) ?? list.find((c) => c.id === 'ifrane') ?? list[0])?.id ?? null;
     });
   }, [list]);
 
@@ -545,11 +545,17 @@ export default function Home() {
       {/* ══ City picker sheet ══ */}
       <BottomSheet visible={pickCity} onClose={() => setPickCity(false)} title="Deliver to">
         <View style={{ gap: 10 }}>
-          {cities.map((c) => {
+          {[...cities]
+            .sort((a, b) => Number(b.served) - Number(a.served))
+            .map((c) => {
             const on = c.id === city?.id;
+            // Only cities we actually deliver in are selectable; the rest show a
+            // "Soon" chip so nobody taps into an empty catalog.
+            const disabled = !c.served;
             return (
               <Pressable
                 key={c.id}
+                disabled={disabled}
                 onPress={() => {
                   setCity(c);
                   setPickCity(false);
@@ -559,6 +565,7 @@ export default function Home() {
                   {
                     backgroundColor: on ? 'rgba(255,87,34,0.08)' : t.colors.surface2,
                     borderColor: on ? t.colors.primary : t.colors.line,
+                    opacity: disabled ? 0.55 : 1,
                   },
                 ]}
               >
@@ -573,11 +580,17 @@ export default function Home() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.disp, { fontSize: 15.5, color: t.colors.fg }]}>{c.name}</Text>
                   <Text style={{ fontSize: 12.5, color: t.colors.muted }} numberOfLines={1}>
-                    {c.defaultAddress}
-                    {c.campus ? ' · Campus' : ''}
+                    {disabled ? 'Coming soon' : c.defaultAddress}
+                    {!disabled && c.campus ? ' · Campus' : ''}
                   </Text>
                 </View>
-                {on ? <ICheck size={20} color={t.colors.primary} /> : null}
+                {disabled ? (
+                  <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: t.colors.surface, borderWidth: 1, borderColor: t.colors.line }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 0.3, color: t.colors.muted }}>Soon</Text>
+                  </View>
+                ) : on ? (
+                  <ICheck size={20} color={t.colors.primary} />
+                ) : null}
               </Pressable>
             );
           })}
@@ -595,7 +608,10 @@ export default function Home() {
 /* WeatherStrip wired to agApi.cities.weather (null when city.weather === false). */
 function WeatherStripFor({ cityId, cityName }: { cityId: string; cityName: string }) {
   const { data: w } = useAsync(() => agApi.cities.weather(cityId), [cityId]);
-  if (!w) return null;
+  // Advisory-only: show the snow-styled strip just when weather actually slows
+  // delivery (eta bump > 0). On clear/normal days a live "Partly cloudy" writes
+  // eta 0, so the strip stays hidden instead of showing a snowflake in summer.
+  if (!w || w.etaAddMinutes <= 0) return null;
   return (
     <View style={[styles.pad, { marginTop: 16 }]}>
       <WeatherStrip

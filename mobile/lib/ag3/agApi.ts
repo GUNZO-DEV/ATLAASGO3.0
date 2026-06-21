@@ -123,7 +123,7 @@ export interface User {
   stats: { orders: number; favourites: number; walletDh: number };
 }
 export interface City {
-  id: string; name: string; campus: boolean; weather: boolean;
+  id: string; name: string; campus: boolean; weather: boolean; served: boolean;
   defaultAddress: string; defaultAddressSub: string;
 }
 export interface Weather { condition: string; tempC: number; etaAddMinutes: number; note: string; }
@@ -418,15 +418,15 @@ export const agApi = {
   cities: {
     list: async (): Promise<City[]> => {
       const { data } = await supabase.from('cities')
-        .select('id, name, campus, weather, default_address, default_address_sub').order('sort_order');
-      return ((data ?? []) as { id: string; name: string; campus: boolean; weather: boolean; default_address: string; default_address_sub: string }[])
-        .map((c) => ({ id: c.id, name: c.name, campus: c.campus, weather: c.weather, defaultAddress: c.default_address, defaultAddressSub: c.default_address_sub }));
+        .select('id, name, campus, weather, served, default_address, default_address_sub').order('sort_order');
+      return ((data ?? []) as { id: string; name: string; campus: boolean; weather: boolean; served: boolean; default_address: string; default_address_sub: string }[])
+        .map((c) => ({ id: c.id, name: c.name, campus: c.campus, weather: c.weather, served: c.served, defaultAddress: c.default_address, defaultAddressSub: c.default_address_sub }));
     },
     get: async (id: string): Promise<City | null> => {
       const { data: c } = await supabase.from('cities')
-        .select('id, name, campus, weather, default_address, default_address_sub').eq('id', id).maybeSingle();
+        .select('id, name, campus, weather, served, default_address, default_address_sub').eq('id', id).maybeSingle();
       if (!c) return null;
-      return { id: c.id, name: c.name, campus: c.campus, weather: c.weather, defaultAddress: c.default_address, defaultAddressSub: c.default_address_sub };
+      return { id: c.id, name: c.name, campus: c.campus, weather: c.weather, served: c.served, defaultAddress: c.default_address, defaultAddressSub: c.default_address_sub };
     },
     weather: async (cityId: string): Promise<Weather | null> => {
       const { data: city } = await supabase.from('cities').select('weather').eq('id', cityId).maybeSingle();
