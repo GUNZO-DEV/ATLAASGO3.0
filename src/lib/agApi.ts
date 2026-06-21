@@ -87,18 +87,29 @@ const VERTICALS: Vertical[] = [
   { id: 'grocery', label: 'Grocery', emoji: '🛒', blurb: 'Markets & daily essentials' },
   { id: 'pharmacy', label: 'Pharmacy', emoji: '💊', blurb: 'Meds & care, pharmacist in-app' },
 ];
-const FOOD_CATEGORIES: Category[] = [
-  { id: 'tagine', label: 'Tagine', emoji: '🍲' },
-  { id: 'cafe', label: 'Café', emoji: '☕' },
-  { id: 'pastry', label: 'Pastry', emoji: '🥐' },
-  { id: 'grill', label: 'Grill', emoji: '🔥' },
-  { id: 'pizza', label: 'Pizza', emoji: '🍕' },
-];
-const CUISINE_TO_CATEGORY: Record<string, string> = {
-  moroccan: 'tagine', tagine: 'tagine', cafe: 'cafe', cafés: 'cafe', café: 'cafe', coffee: 'cafe',
-  pastries: 'pastry', pastry: 'pastry', bakery: 'pastry', grill: 'grill', bbq: 'grill',
-  pizza: 'pizza', italian: 'pizza',
+// Cuisine chips + tokens are DERIVED from the live catalog (no hardcoded list).
+// Cuisine strings look like "Moroccan · Tagines" / "Burgers · Fast" — they get
+// split into individual slug tokens so category chips filter real restaurants.
+const TOKEN_EMOJI: Record<string, string> = {
+  moroccan: '🍲', tagine: '🍲', tagines: '🍲', tajine: '🍲', couscous: '🍲',
+  cafe: '☕', cafes: '☕', 'café': '☕', 'cafés': '☕', coffee: '☕', breakfast: '🍳',
+  pastry: '🥐', pastries: '🥐', bakery: '🥐', desserts: '🍰', crepes: '🥞', 'crêpes': '🥞',
+  grill: '🔥', grills: '🔥', grilled: '🔥', bbq: '🔥',
+  pizza: '🍕', italian: '🍝', pasta: '🍝',
+  burger: '🍔', burgers: '🍔', tacos: '🌮', burritos: '🌯', wings: '🍗',
+  sushi: '🍣', japonais: '🍣', 'thaï': '🍜', thai: '🍜', asian: '🥢',
+  healthy: '🥗', vegan: '🥗', salads: '🥗',
+  french: '🥖', bistro: '🍷', sandwiches: '🥪', sandwich: '🥪', street: '🌯', international: '🌍',
+  grocery: '🛒', market: '🛒', supermarket: '🛒', pharmacy: '💊', wellness: '💊',
 };
+// Too-generic to make a useful cuisine chip.
+const STOP_TOKENS = new Set([
+  'food', 'fine', 'dining', 'essentials', 'daily', 'fresh', 'grocery', 'market', 'supermarket',
+  'pharmacy', 'health', 'care', 'wellness', 'fast', 'halal',
+]);
+const normKey = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');
+const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const tokenEmoji = (token: string) => TOKEN_EMOJI[normKey(token)] ?? '🍽️';
 
 /* ── mappers ─────────────────────────────────────────────────────────────── */
 const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -111,9 +122,8 @@ function deriveVertical(r: Pick<RestaurantRow, 'cuisine' | 'cuisine_tags'>): Ver
 }
 
 function cuisineIds(r: Pick<RestaurantRow, 'cuisine' | 'cuisine_tags'>): string[] {
-  const raw = [r.cuisine, ...(r.cuisine_tags ?? [])].filter(Boolean);
-  const ids = raw.map((c) => CUISINE_TO_CATEGORY[c.toLowerCase()] ?? slug(c));
-  return Array.from(new Set(ids));
+  const raw = [r.cuisine ?? '', ...(r.cuisine_tags ?? [])].join(' · ');
+  return Array.from(new Set(raw.split(/[·,/|&]+/).map((s) => slug(s)).filter(Boolean)));
 }
 
 function priceTier(feeDh: number): 1 | 2 | 3 {
@@ -341,7 +351,27 @@ export const agApi = {
   /* §3 catalog */
   catalog: {
     verticals: async (): Promise<Vertical[]> => VERTICALS,
-    categories: async (vertical: VerticalId = 'food'): Promise<Category[]> => (vertical === 'food' ? FOOD_CATEGORIES : []),
+    categories: async (vertical: VerticalId = 'food'): Promise<Category[]> => {
+      // Derive cuisine chips from the live catalog for this vertical.
+      const { data } = await supabase.from('restaurants').select('cuisine, cuisine_tags, status').eq('status', 'live');
+      const rows = (data ?? []) as Pick<RestaurantRow, 'cuisine' | 'cuisine_tags'>[];
+      const acc = new Map<string, { label: string; emoji: string; n: number }>();
+      for (const r of rows) {
+        if (deriveVertical(r) !== vertical) continue;
+        const raw = [r.cuisine ?? '', ...(r.cuisine_tags ?? [])].join(' · ');
+        for (const token of raw.split(/[·,/|&]+/).map((s) => s.trim()).filter(Boolean)) {
+          const id = slug(token);
+          if (!id || STOP_TOKENS.has(id)) continue;
+          const cur = acc.get(id);
+          if (cur) cur.n += 1;
+          else acc.set(id, { label: titleCase(token), emoji: tokenEmoji(token), n: 1 });
+        }
+      }
+      return [...acc.entries()]
+        .sort((a, b) => b[1].n - a[1].n)
+        .slice(0, 8)
+        .map(([id, v]) => ({ id, label: v.label, emoji: v.emoji }));
+    },
     stores: async (p: { city?: string; vertical?: VerticalId; category?: string; fast?: boolean; sort?: 'rating' | 'eta' | 'distance'; limit?: number } = {}): Promise<Store[]> => {
       let q = supabase.from('restaurants').select(RESTAURANT_COLS).eq('status', 'live');
       if (p.city) q = q.ilike('city', p.city);
@@ -397,7 +427,28 @@ export const agApi = {
         items: ((mis ?? []) as MenuItemRow[]).map(menuItemToSpec),
       };
     },
-    trending: async (): Promise<string[]> => ['Tagine', 'Pizza', 'Coffee', 'Pastries', 'Late-night'],
+    trending: async (): Promise<string[]> => {
+      // Real "trending in Ifrane" — the most-ordered dishes from food partners.
+      const { data } = await supabase
+        .from('menu_items')
+        .select('name, popularity, restaurants(cuisine, cuisine_tags)')
+        .eq('available', true)
+        .order('popularity', { ascending: false })
+        .limit(40);
+      type Rest = { cuisine: string; cuisine_tags: string[] };
+      const rows = (data ?? []) as Array<{ name: string; restaurants: Rest | Rest[] | null }>;
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const row of rows) {
+        const rest = Array.isArray(row.restaurants) ? row.restaurants[0] : row.restaurants;
+        if (rest && deriveVertical(rest) !== 'food') continue;
+        if (seen.has(row.name)) continue;
+        seen.add(row.name);
+        out.push(row.name);
+        if (out.length >= 6) break;
+      }
+      return out.length ? out : ['Tagine', 'Pizza', 'Coffee', 'Pastries'];
+    },
   },
 
   /* §5 server-priced cart quote */
