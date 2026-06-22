@@ -7,6 +7,9 @@ import { GlovoClip } from "./GlovoClip";
 import { LandmarkMemeClip } from "./LandmarkMemeClip";
 import { SnowMemeClip } from "./SnowMemeClip";
 import { DormClip } from "./DormClip";
+import { RangeClip } from "./RangeClip";
+import { TaourirtClip } from "./TaourirtClip";
+import { KhdmaClip } from "./KhdmaClip";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -43,6 +46,15 @@ export const RemotionRoot: React.FC = () => {
       <Composition id="LandmarkMemeClip" component={LandmarkMemeClip} durationInFrames={330} fps={30} width={1080} height={1920} />
       <Composition id="SnowMemeClip" component={SnowMemeClip} durationInFrames={330} fps={30} width={1080} height={1920} />
       <Composition id="DormClip" component={DormClip} durationInFrames={330} fps={30} width={1080} height={1920} />
+
+      {/* 12s — HERO "our range" clip: AtlaasGo delivers to ALL Moroccan cities, not just the big ones */}
+      <Composition id="RangeClip" component={RangeClip} durationInFrames={360} fps={30} width={1080} height={1920} />
+
+      {/* 12s — small-city competitor jab starring Taourirt, real device mockup · silent */}
+      <Composition id="TaourirtClip" component={TaourirtClip} durationInFrames={360} fps={30} width={1080} height={1920} />
+
+      {/* 12s — rider-recruit MEME synced to "lkhdma lkhdma"; repeated delivery beat · silent */}
+      <Composition id="KhdmaClip" component={KhdmaClip} durationInFrames={360} fps={30} width={1080} height={1920} />
     </>
   );
 };
