@@ -30,6 +30,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useAg3Theme, type Ag3Theme } from '../components/ag3/theme';
 import {
@@ -113,6 +114,7 @@ const CITY_ID = 'ifrane';
 
 export default function CampusScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { create, submitting, error } = useCreateOrder();
@@ -182,7 +184,7 @@ export default function CampusScreen() {
           <IBack size={20} color={t.colors.fg} />
         </View>
       </Press>
-      <Text style={[styles.eyebrow, { color: t.colors.primary }]}>CAMPUS</Text>
+      <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('campus.eyebrow')}</Text>
       <View style={{ width: 42 }} />
     </MotiView>
   );
@@ -214,10 +216,10 @@ export default function CampusScreen() {
             <Text style={{ fontSize: 34 }}>🎓</Text>
           </LinearGradient>
           <Text style={[styles.disp, { fontSize: 22, color: t.colors.fg, marginTop: 18 }]}>
-            AUI campus courier
+            {tr('campus.gateTitle')}
           </Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Sign in to get anything in Ifrane delivered to your building.
+            {tr('campus.gateBody')}
           </Text>
           <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
             <LinearGradient
@@ -226,7 +228,7 @@ export default function CampusScreen() {
               end={t.gradients.end}
               style={[styles.signInBtn, t.shadows.glow]}
             >
-              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('campus.signIn')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -249,14 +251,14 @@ export default function CampusScreen() {
               <ICheck size={32} color={t.colors.ok} strokeWidth={3} />
             </View>
           </MotiView>
-          <Text style={[styles.disp, { fontSize: 26, color: t.colors.fg, marginTop: 20 }]}>On its way</Text>
+          <Text style={[styles.disp, { fontSize: 26, color: t.colors.fg, marginTop: 20 }]}>{tr('campus.successTitle')}</Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 21, marginTop: 8 }}>
-            Your rider is heading to <Text style={{ fontWeight: '800', color: t.colors.fg }}>{building}</Text>
-            {room.trim() ? `, Room ${room.trim()}` : ''}.
+            {tr('campus.successHeadingTo')} <Text style={{ fontWeight: '800', color: t.colors.fg }}>{building}</Text>
+            {room.trim() ? `, ${tr('campus.room')} ${room.trim()}` : ''}.
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 }}>
             <ActivityIndicator size="small" color={t.colors.muted} />
-            <Text style={{ fontSize: 13, color: t.colors.muted }}>Redirecting to live tracking…</Text>
+            <Text style={{ fontSize: 13, color: t.colors.muted }}>{tr('campus.redirecting')}</Text>
           </View>
         </View>
       </SafeAreaView>
@@ -264,10 +266,10 @@ export default function CampusScreen() {
   }
 
   const ctaLabel = !building
-    ? 'Select a building first'
+    ? tr('campus.ctaSelectBuilding')
     : what.trim().length < 3
-      ? 'Describe what you need'
-      : `Request delivery · ${FIXED_PRICE_DH} dh flat`;
+      ? tr('campus.ctaDescribe')
+      : tr('campus.ctaRequest', { price: FIXED_PRICE_DH });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
@@ -284,16 +286,16 @@ export default function CampusScreen() {
             <View style={[styles.heroBadge, { backgroundColor: 'rgba(255,87,34,0.10)' }]}>
               <IBolt size={12} color={t.colors.primary} />
               <Text style={[styles.heroBadgeTxt, { color: t.colors.primary }]}>
-                AUIER — Free campus delivery
+                {tr('campus.heroBadge')}
               </Text>
             </View>
           )}
           <Text style={[styles.hero, { color: t.colors.fg }]}>
-            What do you{'\n'}
-            <Text style={{ color: t.colors.primary }}>need?</Text>
+            {tr('campus.heroLine1')}{'\n'}
+            <Text style={{ color: t.colors.primary }}>{tr('campus.heroLine2')}</Text>
           </Text>
           <Text style={{ marginTop: 8, fontSize: 14, color: t.colors.muted, lineHeight: 20 }}>
-            Anything in Ifrane, delivered to your building. Flat {FIXED_PRICE_DH} dh. No surprises.
+            {tr('campus.heroSubtitle', { price: FIXED_PRICE_DH })}
           </Text>
         </Rise>
 
@@ -303,14 +305,14 @@ export default function CampusScreen() {
             {/* what do you need */}
             <View style={styles.labelRow}>
               <ISearch size={13} color={t.colors.muted} />
-              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>What do you need?</Text>
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>{tr('campus.whatLabel')}</Text>
             </View>
             <TextInput
               value={what}
               onChangeText={setWhat}
               multiline
               numberOfLines={3}
-              placeholder="e.g. Café Hassan tagine kefta + mint tea, or Snack Atlas brochette plate, or anything you want brought from town…"
+              placeholder={tr('campus.whatPlaceholder')}
               placeholderTextColor={t.colors.muted}
               style={[
                 styles.input,
@@ -343,7 +345,7 @@ export default function CampusScreen() {
             {/* building selector */}
             <View style={[styles.labelRow, { marginTop: 18 }]}>
               <IPin size={13} color={t.colors.muted} />
-              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Building / Location</Text>
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>{tr('campus.buildingLabel')}</Text>
             </View>
             <Press onPress={() => setPickerOpen(true)} scaleTo={0.985}>
               <View
@@ -356,7 +358,7 @@ export default function CampusScreen() {
                   style={{ flex: 1, fontSize: 15, fontWeight: building ? '700' : '400', color: building ? t.colors.fg : t.colors.muted }}
                   numberOfLines={1}
                 >
-                  {building || '— Select your building —'}
+                  {building || tr('campus.buildingPlaceholder')}
                 </Text>
                 <IChevD size={16} color={t.colors.muted} />
               </View>
@@ -365,12 +367,12 @@ export default function CampusScreen() {
             {/* room number */}
             <View style={[styles.labelRow, { marginTop: 18 }]}>
               <IPin size={13} color={t.colors.muted} />
-              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Room / Suite / Floor (optional)</Text>
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>{tr('campus.roomLabel')}</Text>
             </View>
             <TextInput
               value={room}
               onChangeText={setRoom}
-              placeholder="e.g. 204, Suite 3B, Ground floor lobby"
+              placeholder={tr('campus.roomPlaceholder')}
               placeholderTextColor={t.colors.muted}
               style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
             />
@@ -378,13 +380,13 @@ export default function CampusScreen() {
             {/* rider notes */}
             <View style={[styles.labelRow, { marginTop: 18 }]}>
               <Text style={[styles.fieldLabel, { color: t.colors.muted, marginLeft: 0 }]}>
-                Notes for the rider (optional)
+                {tr('campus.notesLabel')}
               </Text>
             </View>
             <TextInput
               value={notes}
               onChangeText={setNotes}
-              placeholder="e.g. I'm outside the main gate, leave at the door, call first"
+              placeholder={tr('campus.notesPlaceholder')}
               placeholderTextColor={t.colors.muted}
               style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
             />
@@ -392,11 +394,11 @@ export default function CampusScreen() {
             {/* fixed price strip */}
             <View style={[styles.priceStrip, { backgroundColor: 'rgba(255,87,34,0.08)', borderColor: 'rgba(255,87,34,0.18)' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: t.colors.fg }}>Fixed campus delivery fee</Text>
-                <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 1 }}>No minimum order · Any item in Ifrane</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: t.colors.fg }}>{tr('campus.priceTitle')}</Text>
+                <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 1 }}>{tr('campus.priceSubtitle')}</Text>
               </View>
               <Text style={[styles.disp, { fontSize: 22, color: t.colors.primary, fontVariant: ['tabular-nums'] }]}>
-                {FIXED_PRICE_DH} dh
+                {tr('campus.priceValue', { price: FIXED_PRICE_DH })}
               </Text>
             </View>
 
@@ -409,7 +411,7 @@ export default function CampusScreen() {
         {/* ── how it works ── */}
         <Rise delay={120}>
           <View style={styles.stepsRow}>
-            {['Describe what you want', 'Choose your building', 'Rider heads to you'].map((step, i) => (
+            {[tr('campus.step1'), tr('campus.step2'), tr('campus.step3')].map((step, i) => (
               <View key={step} style={styles.stepItem}>
                 <View style={[styles.stepNum, { backgroundColor: 'rgba(255,87,34,0.10)' }]}>
                   <Text style={{ fontSize: 11, fontWeight: '800', color: t.colors.primary }}>{i + 1}</Text>
@@ -428,7 +430,7 @@ export default function CampusScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, justifyContent: 'center', marginBottom: 9 }}>
           <IClock size={14} color={t.colors.muted} />
           <Text style={{ fontSize: 12, color: t.colors.muted }}>
-            Rider heads to you in <Text style={{ fontWeight: '800', color: t.colors.fg }}>15–30 min</Text> · pay cash or wallet
+            {tr('campus.etaPrefix')} <Text style={{ fontWeight: '800', color: t.colors.fg }}>{tr('campus.etaWindow')}</Text> {tr('campus.etaSuffix')}
           </Text>
         </View>
         <Press onPress={handleSubmit} disabled={!canSubmit}>
@@ -448,7 +450,7 @@ export default function CampusScreen() {
       </View>
 
       {/* ── building picker (3.0 BottomSheet) ── */}
-      <BottomSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title="Building / Location">
+      <BottomSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title={tr('campus.buildingLabel')}>
         {Object.entries(AUI_BUILDINGS).map(([group, buildings]) => (
           <View key={group} style={{ marginBottom: 16 }}>
             <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 8 }]}>{group}</Text>

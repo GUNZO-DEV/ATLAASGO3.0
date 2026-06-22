@@ -30,6 +30,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { agApi, type MenuItem, type MenuSection, type Store } from '../../lib/ag3/agApi';
 import { useAsync } from '../../lib/ag3/useAsync';
@@ -73,6 +74,7 @@ function ItemSheet({
   onAdd: (it: MenuItem, qty: number, optionIds: string[]) => void;
 }) {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const [qty, setQty] = useState(1);
   const [opts, setOpts] = useState<Record<string, boolean>>({});
 
@@ -90,7 +92,7 @@ function ItemSheet({
   const hasOptions = extras.length > 0;
   const extra = extras.reduce((s, e) => s + (opts[e.id] ? e.priceDh : 0), 0);
   const total = (item.priceDh + extra) * qty;
-  const meta = item.kcal ? `${item.kcal} kcal · made to order` : item.packSize ?? '';
+  const meta = item.kcal ? tr('restaurant.kcalMeta', { kcal: item.kcal }) : item.packSize ?? '';
 
   return (
     <BottomSheet visible={visible} onClose={onClose} title={undefined} height="90%">
@@ -117,7 +119,7 @@ function ItemSheet({
 
         {hasOptions ? (
           <>
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginTop: 20, marginBottom: 10 }]}>Make it yours</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginTop: 20, marginBottom: 10 }]}>{tr('restaurant.makeItYours')}</Text>
             <View style={{ gap: 8 }}>
               {extras.map((e) => {
                 const on = !!opts[e.id];
@@ -152,7 +154,7 @@ function ItemSheet({
                     </View>
                     <Text style={{ flex: 1, fontWeight: '600', fontSize: 14, color: t.colors.fg }}>{e.label}</Text>
                     <Text style={{ fontSize: 12.5, color: t.colors.muted, fontVariant: ['tabular-nums'] }}>
-                      {e.priceDh ? `+${e.priceDh} dh` : 'Free'}
+                      {e.priceDh ? tr('restaurant.optionPrice', { price: e.priceDh }) : tr('restaurant.free')}
                     </Text>
                   </Pressable>
                 );
@@ -163,14 +165,14 @@ function ItemSheet({
           <View style={[styles.noteCard, { backgroundColor: 'rgba(62,134,199,0.09)', borderColor: 'rgba(62,134,199,0.2)' }]}>
             <ICheck size={18} color={t.colors.snow} strokeWidth={2.5} />
             <Text style={{ flex: 1, fontSize: 12.5, color: t.colors.fgSoft, lineHeight: 18 }}>
-              Always read the label. A licensed pharmacist is available in-app for advice on any order.
+              {tr('restaurant.pharmacyNote')}
             </Text>
           </View>
         ) : (
           <View style={[styles.noteCard, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
             <ICheck size={18} color={t.colors.ok} strokeWidth={2.5} />
             <Text style={{ flex: 1, fontSize: 12.5, color: t.colors.fgSoft, lineHeight: 18 }}>
-              In stock · picked fresh and packed with care for your drop.
+              {tr('restaurant.stockNote')}
             </Text>
           </View>
         )}
@@ -199,7 +201,7 @@ function ItemSheet({
             style={[styles.addBtn, t.shadows.glow]}
           >
             <Text style={styles.addBtnTxt}>
-              Add · <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '800' }}>{total} dh</Text>
+              {tr('restaurant.add')} · <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '800' }}>{tr('restaurant.priceDh', { price: total })}</Text>
             </Text>
           </LinearGradient>
         </Press>
@@ -246,6 +248,7 @@ function MenuRow({ item, onPress }: { item: MenuItem; onPress: () => void }) {
 /* ── screen ─────────────────────────────────────────────────────────────────── */
 export default function RestaurantScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id: rawId } = useLocalSearchParams<{ id?: string }>();
@@ -338,12 +341,12 @@ export default function RestaurantScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-          <Text style={[styles.disp, { fontSize: 19, color: t.colors.fg }]}>Restaurant unavailable</Text>
+          <Text style={[styles.disp, { fontSize: 19, color: t.colors.fg }]}>{tr('restaurant.unavailableTitle')}</Text>
           <Text style={{ color: t.colors.muted, marginTop: 8, textAlign: 'center' }}>
-            We couldn’t load this place right now.
+            {tr('restaurant.unavailableBody')}
           </Text>
           <Pressable onPress={() => router.back()} style={{ marginTop: 20 }}>
-            <Text style={{ color: t.colors.primary, fontWeight: '700' }}>Go back</Text>
+            <Text style={{ color: t.colors.primary, fontWeight: '700' }}>{tr('restaurant.goBack')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -351,10 +354,10 @@ export default function RestaurantScreen() {
   }
 
   const metrics = [
-    { ic: <IStar size={17} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />, top: String(store.rating || '—'), sub: `${store.reviews} reviews` },
-    { ic: <IClock size={17} color={t.colors.primary} />, top: `${etaLabel(store)}m`, sub: 'delivery' },
-    { ic: <ITruck size={17} color={t.colors.ok} />, top: feeLabel(store), sub: 'fee' },
-    { ic: <IPin size={17} color={t.colors.fgSoft} />, top: store.distanceKm ? `${store.distanceKm} km` : '—', sub: 'away' },
+    { ic: <IStar size={17} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />, top: String(store.rating || '—'), sub: tr('restaurant.reviews', { n: store.reviews }) },
+    { ic: <IClock size={17} color={t.colors.primary} />, top: `${etaLabel(store)}m`, sub: tr('restaurant.delivery') },
+    { ic: <ITruck size={17} color={t.colors.ok} />, top: feeLabel(store), sub: tr('restaurant.fee') },
+    { ic: <IPin size={17} color={t.colors.fgSoft} />, top: store.distanceKm ? `${store.distanceKm} km` : '—', sub: tr('restaurant.away') },
   ];
 
   return (
@@ -416,7 +419,7 @@ export default function RestaurantScreen() {
           {store.promo ? (
             <View style={{ paddingHorizontal: 18, marginTop: 14 }}>
               <View style={[styles.promoStrip, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: t.colors.primary }}>🎁 {store.promo} · auto-applied at checkout</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: t.colors.primary }}>🎁 {tr('restaurant.promoApplied', { promo: store.promo })}</Text>
               </View>
             </View>
           ) : null}
@@ -450,7 +453,7 @@ export default function RestaurantScreen() {
         {/* ── menu sections (index 2+) ────────────────────────────────────── */}
         {sections.length === 0 ? (
           <Text style={{ paddingHorizontal: 18, paddingVertical: 32, color: t.colors.muted, fontSize: 14 }}>
-            This place hasn’t published a menu yet.
+            {tr('restaurant.noMenu')}
           </Text>
         ) : (
           sections.map((sec, si) => (
@@ -490,9 +493,9 @@ export default function RestaurantScreen() {
                   <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, fontVariant: ['tabular-nums'] }}>{cartCount}</Text>
                 </View>
                 <IBag size={17} color="#fff" />
-                <Text style={styles.cartBarTxt}>View cart</Text>
+                <Text style={styles.cartBarTxt}>{tr('restaurant.viewCart')}</Text>
               </View>
-              <Text style={[styles.cartBarTxt, { fontVariant: ['tabular-nums'] }]}>{cartTotal} dh</Text>
+              <Text style={[styles.cartBarTxt, { fontVariant: ['tabular-nums'] }]}>{tr('restaurant.priceDh', { price: cartTotal })}</Text>
             </LinearGradient>
           </Press>
         </MotiView>

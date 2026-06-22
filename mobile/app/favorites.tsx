@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useAg3Theme } from '../components/ag3/theme';
 import { IBack, IHeart, IStar, IChevR } from '../components/ag3/icons';
@@ -30,6 +31,7 @@ type Theme = ReturnType<typeof useAg3Theme>;
 
 export default function FavoritesScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { restaurants, loading, toggle } = useFavorites();
@@ -44,10 +46,10 @@ export default function FavoritesScreen() {
             <IHeart size={28} color={t.colors.muted} />
           </View>
           <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>
-            Your favourites
+            {tr('favorites.title')}
           </Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Sign in to save the spots you love.
+            {tr('favorites.signInBody')}
           </Text>
           <Press onPress={() => router.push('/sign-in')}>
             <LinearGradient
@@ -56,7 +58,7 @@ export default function FavoritesScreen() {
               end={t.gradients.end}
               style={[styles.cta, t.shadows.glow]}
             >
-              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('favorites.signIn')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -74,11 +76,11 @@ export default function FavoritesScreen() {
       >
         {/* title */}
         <Rise style={{ marginTop: 8, marginBottom: 16 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>SAVED</Text>
-          <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg }]}>Your favourites</Text>
+          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('favorites.eyebrow')}</Text>
+          <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg }]}>{tr('favorites.title')}</Text>
           {!loading && restaurants.length > 0 ? (
             <Text style={{ fontSize: 13, color: t.colors.muted, marginTop: 4 }}>
-              {restaurants.length} {restaurants.length === 1 ? 'spot' : 'spots'} you love
+              {tr('favorites.countLine', { n: restaurants.length })}
             </Text>
           ) : null}
         </Rise>
@@ -94,10 +96,10 @@ export default function FavoritesScreen() {
                 <IHeart size={26} color={t.colors.muted} />
               </View>
               <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg, marginTop: 14 }]}>
-                No favourites yet
+                {tr('favorites.emptyTitle')}
               </Text>
               <Text style={{ fontSize: 13, color: t.colors.muted, marginTop: 5, textAlign: 'center', lineHeight: 19 }}>
-                Tap the heart on any spot to save it here.
+                {tr('favorites.emptyBody')}
               </Text>
               <Press onPress={() => router.replace('/')}>
                 <LinearGradient
@@ -106,7 +108,7 @@ export default function FavoritesScreen() {
                   end={t.gradients.end}
                   style={[styles.cta, t.shadows.glow]}
                 >
-                  <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Browse spots</Text>
+                  <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('favorites.browseSpots')}</Text>
                 </LinearGradient>
               </Press>
             </View>
@@ -132,6 +134,7 @@ export default function FavoritesScreen() {
 
 /* ── header — sunset pin + title ──────────────────────────────────────────── */
 function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
+  const { t: tr } = useTranslation();
   return (
     <MotiView
       from={{ opacity: 0, translateX: -8 }}
@@ -144,7 +147,7 @@ function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
           <IBack size={20} color={t.colors.fg} />
         </View>
       </Press>
-      <Text style={[styles.disp, { fontSize: 20, color: t.colors.fg }]}>Favourites</Text>
+      <Text style={[styles.disp, { fontSize: 20, color: t.colors.fg }]}>{tr('favorites.headerTitle')}</Text>
       <LinearGradient
         colors={t.gradients.sunset}
         start={t.gradients.start}
@@ -169,6 +172,7 @@ function FavRow({
   onOpen: () => void;
   onUnfav: () => void;
 }) {
+  const { t: tr } = useTranslation();
   const em = r.emoji || foodEm(r.id);
   return (
     <Press onPress={onOpen} style={{ width: '100%' }}>
@@ -188,12 +192,12 @@ function FavRow({
             <View style={[styles.metaRow, { marginTop: 'auto' }]}>
               <Stars value={r.rating} size={12} />
               <Dot color={t.colors.muted} />
-              <Text style={{ fontSize: 12.5, color: t.colors.fgSoft, fontWeight: '600' }}>Saved</Text>
+              <Text style={{ fontSize: 12.5, color: t.colors.fgSoft, fontWeight: '600' }}>{tr('favorites.saved')}</Text>
             </View>
           ) : (
             <View style={[styles.metaRow, { marginTop: 'auto' }]}>
               <IStar size={12} color={t.colors.muted} />
-              <Text style={{ fontSize: 12.5, color: t.colors.fgSoft, fontWeight: '600' }}>Saved</Text>
+              <Text style={{ fontSize: 12.5, color: t.colors.fgSoft, fontWeight: '600' }}>{tr('favorites.saved')}</Text>
             </View>
           )}
         </View>

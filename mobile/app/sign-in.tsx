@@ -21,6 +21,7 @@
 // profile/wallet/role rows — so a brand-new mobile signup is fully wired into
 // the same backend as the web app.
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -45,16 +46,17 @@ import { Press, Rise } from '../components/ag3/primitives';
 
 type Mode = 'signin' | 'signup';
 
-function clerkErr(e: unknown): string {
+function clerkErr(e: unknown, fallback: string): string {
   return (
     (e as { errors?: { message?: string; longMessage?: string }[] })?.errors?.[0]?.longMessage ??
     (e as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
-    (e instanceof Error ? e.message : 'Something went wrong')
+    (e instanceof Error ? e.message : fallback)
   );
 }
 
 export default function AccountScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { isSignedIn } = useClerkAuth();
   const { signIn, setActive: setSignInActive, isLoaded: signInLoaded } = useSignIn();
@@ -78,7 +80,7 @@ export default function AccountScreen() {
   async function handleSignIn() {
     if (!signInLoaded || busy) return;
     if (!email.trim() || !password) {
-      Alert.alert('Missing details', 'Enter your email and password.');
+      Alert.alert(tr('auth.missingDetailsTitle'), tr('auth.missingDetailsBody'));
       return;
     }
     setBusy(true);
@@ -88,10 +90,10 @@ export default function AccountScreen() {
         await setSignInActive({ session: attempt.createdSessionId });
         router.replace('/');
       } else {
-        Alert.alert('Almost there', 'Additional verification is required for this account.');
+        Alert.alert(tr('auth.almostThereTitle'), tr('auth.signInVerifyBody'));
       }
     } catch (e) {
-      Alert.alert('Sign in failed', clerkErr(e));
+      Alert.alert(tr('auth.signInFailedTitle'), clerkErr(e, tr('auth.genericError')));
     } finally {
       setBusy(false);
     }
@@ -100,11 +102,11 @@ export default function AccountScreen() {
   async function handleSignUp() {
     if (!signUpLoaded || busy) return;
     if (!email.trim() || password.length < 8) {
-      Alert.alert('Check your details', 'Enter a valid email and a password of at least 8 characters.');
+      Alert.alert(tr('auth.checkDetailsTitle'), tr('auth.checkDetailsBody'));
       return;
     }
     if (username.trim().length < 3) {
-      Alert.alert('Pick a username', 'Choose a username of at least 3 characters.');
+      Alert.alert(tr('auth.pickUsernameTitle'), tr('auth.pickUsernameBody'));
       return;
     }
     setBusy(true);
@@ -118,7 +120,7 @@ export default function AccountScreen() {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingCode(true);
     } catch (e) {
-      Alert.alert('Could not create account', clerkErr(e));
+      Alert.alert(tr('auth.createFailedTitle'), clerkErr(e, tr('auth.genericError')));
     } finally {
       setBusy(false);
     }
@@ -127,7 +129,7 @@ export default function AccountScreen() {
   async function handleVerifyCode() {
     if (!signUpLoaded || busy) return;
     if (code.trim().length < 6) {
-      Alert.alert('Enter the code', 'Type the 6-digit code we emailed you.');
+      Alert.alert(tr('auth.enterCodeTitle'), tr('auth.enterCodeBody'));
       return;
     }
     setBusy(true);
@@ -137,10 +139,10 @@ export default function AccountScreen() {
         await setSignUpActive({ session: attempt.createdSessionId });
         router.replace('/');
       } else {
-        Alert.alert('Almost there', 'Verification incomplete — please try again.');
+        Alert.alert(tr('auth.almostThereTitle'), tr('auth.verifyIncompleteBody'));
       }
     } catch (e) {
-      Alert.alert('Verification failed', clerkErr(e));
+      Alert.alert(tr('auth.verifyFailedTitle'), clerkErr(e, tr('auth.genericError')));
     } finally {
       setBusy(false);
     }
@@ -150,16 +152,16 @@ export default function AccountScreen() {
     if (!signUpLoaded) return;
     try {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      Alert.alert('Code sent', 'We emailed you a fresh code.');
+      Alert.alert(tr('auth.codeSentTitle'), tr('auth.codeSentBody'));
     } catch (e) {
-      Alert.alert('Could not resend', clerkErr(e));
+      Alert.alert(tr('auth.resendFailedTitle'), clerkErr(e, tr('auth.genericError')));
     }
   }
 
   async function handleForgotPassword() {
     if (!signInLoaded || busy) return;
     if (!email.trim()) {
-      Alert.alert('Enter your email', 'Type your account email above, then tap “Forgot password?” again.');
+      Alert.alert(tr('auth.enterEmailTitle'), tr('auth.enterEmailBody'));
       return;
     }
     setBusy(true);
@@ -169,7 +171,7 @@ export default function AccountScreen() {
       setNewPassword('');
       setPendingReset(true);
     } catch (e) {
-      Alert.alert('Could not start reset', clerkErr(e));
+      Alert.alert(tr('auth.resetStartFailedTitle'), clerkErr(e, tr('auth.genericError')));
     } finally {
       setBusy(false);
     }
@@ -178,11 +180,11 @@ export default function AccountScreen() {
   async function handleResetPassword() {
     if (!signInLoaded || busy) return;
     if (resetCode.trim().length < 6) {
-      Alert.alert('Enter the code', 'Type the 6-digit code we emailed you.');
+      Alert.alert(tr('auth.enterCodeTitle'), tr('auth.enterCodeBody'));
       return;
     }
     if (newPassword.length < 8) {
-      Alert.alert('Pick a stronger password', 'Your new password needs at least 8 characters.');
+      Alert.alert(tr('auth.strongerPasswordTitle'), tr('auth.strongerPasswordBody'));
       return;
     }
     setBusy(true);
@@ -196,10 +198,10 @@ export default function AccountScreen() {
         await setSignInActive({ session: attempt.createdSessionId });
         router.replace('/');
       } else {
-        Alert.alert('Almost there', 'Additional verification is required — try signing in again.');
+        Alert.alert(tr('auth.almostThereTitle'), tr('auth.resetVerifyBody'));
       }
     } catch (e) {
-      Alert.alert('Reset failed', clerkErr(e));
+      Alert.alert(tr('auth.resetFailedTitle'), clerkErr(e, tr('auth.genericError')));
     } finally {
       setBusy(false);
     }
@@ -209,40 +211,40 @@ export default function AccountScreen() {
     if (!signInLoaded) return;
     try {
       await signIn.create({ strategy: 'reset_password_email_code', identifier: email.trim() });
-      Alert.alert('Code sent', 'We emailed you a fresh reset code.');
+      Alert.alert(tr('auth.codeSentTitle'), tr('auth.resetCodeSentBody'));
     } catch (e) {
-      Alert.alert('Could not resend', clerkErr(e));
+      Alert.alert(tr('auth.resendFailedTitle'), clerkErr(e, tr('auth.genericError')));
     }
   }
 
   // ── 3.0 copy: title / subtitle per step ───────────────────────────────────
   const eyebrow = isSignedIn
-    ? 'AtlaasGo · Account'
+    ? tr('auth.eyebrowAccount')
     : pendingReset
-      ? 'AtlaasGo · Reset'
+      ? tr('auth.eyebrowReset')
       : pendingCode
-        ? 'AtlaasGo · Verify'
-        : 'AtlaasGo · Account';
+        ? tr('auth.eyebrowVerify')
+        : tr('auth.eyebrowAccount');
 
   const title = isSignedIn
-    ? 'You’re signed in.'
+    ? tr('auth.titleSignedIn')
     : pendingReset
-      ? 'Reset your password.'
+      ? tr('auth.titleReset')
       : pendingCode
-        ? 'Check your email.'
+        ? tr('auth.titleVerify')
         : mode === 'signin'
-          ? 'Welcome back.'
-          : 'Create your account.';
+          ? tr('auth.titleWelcomeBack')
+          : tr('auth.titleCreate');
 
   const subtitle = isSignedIn
-    ? 'Your session is active — orders are linked to your account.'
+    ? tr('auth.subtitleSignedIn')
     : pendingReset
-      ? `We sent a 6-digit code to ${email.trim()}. Enter it below with your new password.`
+      ? tr('auth.subtitleReset', { email: email.trim() })
       : pendingCode
-        ? `We sent a 6-digit code to ${email.trim()}.`
+        ? tr('auth.subtitleVerify', { email: email.trim() })
         : mode === 'signin'
-          ? 'Sign in to track orders, save addresses, and use your wallet.'
-          : 'Join AtlaasGo — free delivery on your first order.';
+          ? tr('auth.subtitleSignIn')
+          : tr('auth.subtitleSignUp');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
@@ -298,7 +300,7 @@ export default function AccountScreen() {
                     end={t.gradients.end}
                     style={[styles.primaryBtn, t.shadows.glow]}
                   >
-                    <Text style={styles.primaryTxt}>Start ordering</Text>
+                    <Text style={styles.primaryTxt}>{tr('auth.startOrdering')}</Text>
                   </LinearGradient>
                 </Press>
               </View>
@@ -307,7 +309,7 @@ export default function AccountScreen() {
             /* ── Password reset step ──────────────────────────────────────── */
             <Rise delay={120}>
               <View style={[card(t), styles.formCard]}>
-                <Field t={t} label="Verification code">
+                <Field t={t} label={tr('auth.verificationCodeLabel')}>
                   <TextInput
                     value={resetCode}
                     onChangeText={setResetCode}
@@ -318,28 +320,28 @@ export default function AccountScreen() {
                     style={inputStyle(t)}
                   />
                 </Field>
-                <Field t={t} label="New password">
+                <Field t={t} label={tr('auth.newPasswordLabel')}>
                   <TextInput
                     value={newPassword}
                     onChangeText={setNewPassword}
                     secureTextEntry
                     autoComplete="new-password"
-                    placeholder="At least 8 characters"
+                    placeholder={tr('auth.passwordMinPlaceholder')}
                     placeholderTextColor={t.colors.muted}
                     style={inputStyle(t)}
                   />
                 </Field>
 
-                <PrimaryButton t={t} busy={busy} onPress={handleResetPassword} icon={KeyRound} label="Reset & sign in" />
+                <PrimaryButton t={t} busy={busy} onPress={handleResetPassword} icon={KeyRound} label={tr('auth.resetAndSignIn')} />
 
                 <Pressable onPress={resendResetCode} style={{ marginTop: 16 }}>
-                  <Text style={[styles.linkCenter, { color: t.colors.primary }]}>Resend code</Text>
+                  <Text style={[styles.linkCenter, { color: t.colors.primary }]}>{tr('auth.resendCode')}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => { setPendingReset(false); setResetCode(''); setNewPassword(''); }}
                   style={{ marginTop: 12 }}
                 >
-                  <Text style={[styles.mutedCenter, { color: t.colors.muted }]}>Back to sign in</Text>
+                  <Text style={[styles.mutedCenter, { color: t.colors.muted }]}>{tr('auth.backToSignIn')}</Text>
                 </Pressable>
               </View>
             </Rise>
@@ -347,7 +349,7 @@ export default function AccountScreen() {
             /* ── Email verification step ──────────────────────────────────── */
             <Rise delay={120}>
               <View style={[card(t), styles.formCard]}>
-                <Field t={t} label="Verification code">
+                <Field t={t} label={tr('auth.verificationCodeLabel')}>
                   <TextInput
                     value={code}
                     onChangeText={setCode}
@@ -359,13 +361,13 @@ export default function AccountScreen() {
                   />
                 </Field>
 
-                <PrimaryButton t={t} busy={busy} onPress={handleVerifyCode} icon={MailCheck} label="Verify & continue" />
+                <PrimaryButton t={t} busy={busy} onPress={handleVerifyCode} icon={MailCheck} label={tr('auth.verifyAndContinue')} />
 
                 <Pressable onPress={resendCode} style={{ marginTop: 16 }}>
-                  <Text style={[styles.linkCenter, { color: t.colors.primary }]}>Resend code</Text>
+                  <Text style={[styles.linkCenter, { color: t.colors.primary }]}>{tr('auth.resendCode')}</Text>
                 </Pressable>
                 <Pressable onPress={() => { setPendingCode(false); setCode(''); }} style={{ marginTop: 12 }}>
-                  <Text style={[styles.mutedCenter, { color: t.colors.muted }]}>Use a different email</Text>
+                  <Text style={[styles.mutedCenter, { color: t.colors.muted }]}>{tr('auth.useDifferentEmail')}</Text>
                 </Pressable>
               </View>
             </Rise>
@@ -390,14 +392,14 @@ export default function AccountScreen() {
                             color: active ? t.colors.fg : t.colors.muted,
                           }}
                         >
-                          {m === 'signin' ? 'Sign in' : 'Create account'}
+                          {m === 'signin' ? tr('auth.signIn') : tr('auth.createAccount')}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
 
-                <Field t={t} label="Email">
+                <Field t={t} label={tr('auth.emailLabel')}>
                   <TextInput
                     value={email}
                     onChangeText={setEmail}
@@ -411,7 +413,7 @@ export default function AccountScreen() {
                 </Field>
 
                 {mode === 'signup' && (
-                  <Field t={t} label="Username">
+                  <Field t={t} label={tr('auth.usernameLabel')}>
                     <TextInput
                       value={username}
                       onChangeText={setUsername}
@@ -424,13 +426,13 @@ export default function AccountScreen() {
                   </Field>
                 )}
 
-                <Field t={t} label="Password">
+                <Field t={t} label={tr('auth.passwordLabel')}>
                   <TextInput
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
                     autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                    placeholder={mode === 'signin' ? '••••••••' : 'At least 8 characters'}
+                    placeholder={mode === 'signin' ? '••••••••' : tr('auth.passwordMinPlaceholder')}
                     placeholderTextColor={t.colors.muted}
                     style={inputStyle(t)}
                   />
@@ -438,7 +440,7 @@ export default function AccountScreen() {
 
                 {mode === 'signin' && (
                   <Pressable onPress={handleForgotPassword} style={{ alignSelf: 'flex-end', marginTop: 2, marginBottom: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: t.colors.primary }}>Forgot password?</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: t.colors.primary }}>{tr('auth.forgotPassword')}</Text>
                   </Pressable>
                 )}
 
@@ -448,21 +450,21 @@ export default function AccountScreen() {
                     busy={busy}
                     onPress={mode === 'signin' ? handleSignIn : handleSignUp}
                     icon={mode === 'signin' ? LogIn : UserPlus}
-                    label={mode === 'signin' ? 'Sign in' : 'Create account'}
+                    label={mode === 'signin' ? tr('auth.signIn') : tr('auth.createAccount')}
                   />
                 </View>
 
                 <Text style={[styles.fine, { color: t.colors.muted }]}>
                   {mode === 'signin'
-                    ? 'New to AtlaasGo? Tap “Create account” above.'
-                    : 'By creating an account you agree to our Terms & Privacy Policy.'}
+                    ? tr('auth.fineNewUser')
+                    : tr('auth.fineTerms')}
                 </Text>
               </View>
             </Rise>
           )}
 
           {/* ── Built in Ifrane voice ── */}
-          <Text style={[styles.ifrane, { color: t.colors.muted }]}>Built in Ifrane 🏔</Text>
+          <Text style={[styles.ifrane, { color: t.colors.muted }]}>{tr('auth.builtInIfrane')} 🏔</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

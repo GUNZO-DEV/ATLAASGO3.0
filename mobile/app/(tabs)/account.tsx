@@ -192,8 +192,8 @@ export default function AccountScreen() {
       .update({ display_name: name.trim() || null, phone: phone.trim() || null })
       .eq('id', user.id);
     setSaving(false);
-    if (error) Alert.alert('Could not save', error.message);
-    else Alert.alert('Saved', 'Your profile is up to date.');
+    if (error) Alert.alert(tr('account.saveFailedTitle'), error.message);
+    else Alert.alert(tr('account.savedTitle'), tr('account.savedBody'));
   }
 
   async function handleDeleteAccount() {
@@ -207,7 +207,7 @@ export default function AccountScreen() {
       try { await signOut(); } catch {}
       router.replace('/');
     } catch (e) {
-      Alert.alert('Could not delete account', (e as Error).message ?? 'Please try again.');
+      Alert.alert(tr('account.deleteFailedTitle'), (e as Error).message ?? tr('account.tryAgain'));
     } finally {
       setDeleting(false);
     }
@@ -215,11 +215,11 @@ export default function AccountScreen() {
 
   function confirmDeleteAccount() {
     Alert.alert(
-      'Delete account?',
-      'This permanently deletes your AtlaasGo account — your profile, orders, wallet balance, addresses, and saved data. This cannot be undone.',
+      tr('account.deleteConfirmTitle'),
+      tr('account.deleteConfirmBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete account', style: 'destructive', onPress: handleDeleteAccount },
+        { text: tr('account.cancel'), style: 'cancel' },
+        { text: tr('account.deleteAccount'), style: 'destructive', onPress: handleDeleteAccount },
       ],
     );
   }
@@ -241,9 +241,9 @@ export default function AccountScreen() {
           >
             <IUser size={28} color={t.colors.muted} />
           </View>
-          <Text style={[styles.disp, { fontSize: 22, color: t.colors.fg, marginTop: 18 }]}>Your account</Text>
+          <Text style={[styles.disp, { fontSize: 22, color: t.colors.fg, marginTop: 18 }]}>{tr('account.signedOutTitle')}</Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Sign in to manage your profile, wallet, addresses and more.
+            {tr('account.signedOutBody')}
           </Text>
           <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
             <LinearGradient
@@ -252,7 +252,7 @@ export default function AccountScreen() {
               end={gradients.end}
               style={[styles.signInBtn, t.shadows.glow]}
             >
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{tr('account.signIn')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -261,7 +261,7 @@ export default function AccountScreen() {
   }
 
   // ── Derived identity / stats (spec-faithful, mirrors Profile.tsx) ─────────
-  const fullName = me?.name || name || 'Guest';
+  const fullName = me?.name || name || tr('account.guest');
   const initials = me?.initials || fullName.trim().charAt(0).toUpperCase() || 'A';
   const parts = fullName.split(' ');
   const firstName = parts[0] + (parts[1] ? ` ${parts[1].charAt(0)}.` : '');
@@ -272,37 +272,37 @@ export default function AccountScreen() {
 
   const defaultAddr = addresses?.find((a) => a.isDefault) ?? addresses?.[0];
   const addrCount = addresses?.length ?? 0;
-  const addrMore = addrCount > 1 ? ` · ${addrCount - 1} more` : '';
+  const addrMore = addrCount > 1 ? ` · ${tr('account.addressMore', { n: addrCount - 1 })}` : '';
   const addrLabel = defaultAddr
     ? `${defaultAddr.building || defaultAddr.label}${addrMore}`
-    : city?.defaultAddress ?? 'No saved address';
+    : city?.defaultAddress ?? tr('account.noSavedAddress');
 
   const activePromos = (promos ?? []).filter((p) => p.active);
   const promoSub = activePromos.length
-    ? `${activePromos.length} active · ${activePromos[0].label}`
-    : 'No active promos';
+    ? `${tr('account.activeCount', { n: activePromos.length })} · ${activePromos[0].label}`
+    : tr('account.noActivePromos');
 
   const identitySub = city?.campus
-    ? `AUI · ${defaultAddr?.building || city.defaultAddress} · since ${memberSince}`
-    : `${city?.name ?? 'Ifrane'} · since ${memberSince}`;
+    ? `AUI · ${defaultAddr?.building || city.defaultAddress} · ${tr('account.since', { year: memberSince })}`
+    : `${city?.name ?? 'Ifrane'} · ${tr('account.since', { year: memberSince })}`;
 
   const rows1: RowData[] = [
-    { icon: IWallet, title: 'AtlaasGo Wallet', sub: `${walletDh} dh balance`, color: t.colors.primary, href: '/wallet' },
-    { icon: IPin, title: 'Saved addresses', sub: addrLabel, color: t.colors.fgSoft, href: '/addresses' },
-    { icon: IHeart, title: 'Favourites', sub: `${favCount} place${favCount === 1 ? '' : 's'}`, color: '#E0526D', href: '/favorites' },
-    { icon: IGift, title: 'Promos & credits', sub: promoSub, color: t.colors.amber, href: '/prime' },
+    { icon: IWallet, title: tr('account.walletTitle'), sub: tr('account.walletBalance', { n: walletDh }), color: t.colors.primary, href: '/wallet' },
+    { icon: IPin, title: tr('account.savedAddresses'), sub: addrLabel, color: t.colors.fgSoft, href: '/addresses' },
+    { icon: IHeart, title: tr('account.favouritesTitle'), sub: tr('account.placesCount', { n: favCount }), color: '#E0526D', href: '/favorites' },
+    { icon: IGift, title: tr('account.promosCredits'), sub: promoSub, color: t.colors.amber, href: '/prime' },
   ];
   const rows2: RowData[] = [
-    ...(city?.campus ? [{ icon: IGroup, title: 'Group orders', sub: city.defaultAddressSub || city.defaultAddress, href: '/campus' }] : []),
-    { icon: IReceipt, title: 'Order history', sub: `${ordersCount} order${ordersCount === 1 ? '' : 's'}`, href: '/orders' },
-    { icon: IUser, title: 'Notifications', sub: 'Order updates & promos', color: '#3E86C7', href: '/notifications' },
+    ...(city?.campus ? [{ icon: IGroup, title: tr('account.groupOrders'), sub: city.defaultAddressSub || city.defaultAddress, href: '/campus' }] : []),
+    { icon: IReceipt, title: tr('account.orderHistory'), sub: tr('account.ordersCount', { n: ordersCount }), href: '/orders' },
+    { icon: IUser, title: tr('account.notificationsTitle'), sub: tr('account.notificationsSub'), color: '#3E86C7', href: '/notifications' },
   ];
 
   // ── Role-gated + growth entries (preserved) ───────────────────────────────
   const roleRows: RowData[] = [];
-  if (isRider) roleRows.push({ icon: Bike, title: 'Driver mode', sub: 'Your delivery assignments', href: '/driver', color: t.colors.fg });
-  if (isMerchant) roleRows.push({ icon: Store, title: 'Restaurant POS', sub: 'Live orders & kitchen display', href: '/merchant', color: '#0891B2' });
-  if (isAdmin) roleRows.push({ icon: Shield, title: 'Admin', sub: 'Orders, riders & applications', href: '/admin', color: '#7C3AED' });
+  if (isRider) roleRows.push({ icon: Bike, title: tr('account.driverMode'), sub: tr('account.driverModeSub'), href: '/driver', color: t.colors.fg });
+  if (isMerchant) roleRows.push({ icon: Store, title: tr('account.restaurantPos'), sub: tr('account.restaurantPosSub'), href: '/merchant', color: '#0891B2' });
+  if (isAdmin) roleRows.push({ icon: Shield, title: tr('account.adminTitle'), sub: tr('account.adminSub'), href: '/admin', color: '#7C3AED' });
 
   const Row = ({ r }: { r: RowData }) => {
     const Icon = r.icon;
@@ -346,13 +346,13 @@ export default function AccountScreen() {
           <View style={[card(t), styles.stats]}>
             {(
               [
-                [String(ordersCount), 'orders'],
-                [String(favCount), 'favourites'],
-                [String(walletDh), 'dh wallet'],
-              ] as [string, string][]
-            ).map(([v, label], i) => (
+                [String(ordersCount), 'orders', tr('account.statOrders')],
+                [String(favCount), 'favourites', tr('account.statFavourites')],
+                [String(walletDh), 'wallet', tr('account.statWallet')],
+              ] as [string, string, string][]
+            ).map(([v, key, label], i) => (
               <View
-                key={label}
+                key={key}
                 style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? 1 : 0, borderLeftColor: t.colors.line }}
               >
                 <Text style={[styles.disp, { fontSize: 19, color: t.colors.fg }]}>{v}</Text>
@@ -364,22 +364,22 @@ export default function AccountScreen() {
 
         {/* ── editable profile (preserved native save) ── */}
         <View style={{ marginTop: 18 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>Profile</Text>
+          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('account.profile')}</Text>
           {profileLoading ? (
             <View style={[card(t), { padding: 18, alignItems: 'center', marginTop: 10 }]}>
               <ActivityIndicator color={t.colors.primary} />
             </View>
           ) : (
             <View style={[card(t), { padding: 16, marginTop: 10, gap: 4 }]}>
-              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Display name</Text>
+              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>{tr('account.displayName')}</Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="Your name"
+                placeholder={tr('account.yourName')}
                 placeholderTextColor={t.colors.muted}
                 style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
               />
-              <Text style={[styles.fieldLabel, { color: t.colors.muted, marginTop: 12 }]}>Phone</Text>
+              <Text style={[styles.fieldLabel, { color: t.colors.muted, marginTop: 12 }]}>{tr('account.phone')}</Text>
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
@@ -390,7 +390,7 @@ export default function AccountScreen() {
               />
               <Press onPress={save} disabled={saving} style={{ marginTop: 14 }}>
                 <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={[styles.saveBtn, t.shadows.glow, { opacity: saving ? 0.7 : 1 }]}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Save profile</Text>}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{tr('account.saveProfile')}</Text>}
                 </LinearGradient>
               </Press>
             </View>
@@ -401,7 +401,7 @@ export default function AccountScreen() {
         <View style={{ marginTop: 18 }}>
           <View style={styles.eyebrowRow}>
             {dark ? <IMoon size={13} color={t.colors.primary} /> : <ISun size={13} color={t.colors.primary} />}
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>Appearance</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>{tr('account.appearance')}</Text>
           </View>
           <Press onPress={toggleTheme} style={{ marginTop: 10 }}>
             <View style={[card(t), styles.row]}>
@@ -417,7 +417,7 @@ export default function AccountScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>{tr('account.darkMode')}</Text>
                 <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>
-                  {dark ? 'On · easy on the eyes' : 'Off · follow the sun'}
+                  {dark ? tr('account.darkModeOn') : tr('account.darkModeOff')}
                 </Text>
               </View>
               <View style={[styles.track, { backgroundColor: dark ? t.colors.primary : t.colors.line }]}>
@@ -459,13 +459,13 @@ export default function AccountScreen() {
                 <IBolt size={13} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />
                 <Text style={[styles.eyebrow, { color: t.colors.amber, marginBottom: 0 }]}>AtlaasGo+</Text>
               </View>
-              <Text style={[styles.disp, { fontSize: 19, color: '#fff', marginTop: 6 }]}>Free delivery, all winter.</Text>
+              <Text style={[styles.disp, { fontSize: 19, color: '#fff', marginTop: 6 }]}>{tr('account.plusTagline')}</Text>
               <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.82)', marginTop: 3 }}>
-                Skip every fee for 49 dh/month · cancel anytime
+                {tr('account.plusSubline')}
               </Text>
               <Press onPress={() => router.push('/prime')} style={{ marginTop: 14, alignSelf: 'flex-start' }}>
                 <View style={styles.plusCta}>
-                  <Text style={{ color: '#1A1410', fontWeight: '800', fontSize: 14 }}>Try free for a month</Text>
+                  <Text style={{ color: '#1A1410', fontWeight: '800', fontSize: 14 }}>{tr('account.plusCta')}</Text>
                 </View>
               </Press>
             </View>
@@ -483,7 +483,7 @@ export default function AccountScreen() {
         {/* ── role-gated + growth entries (preserved) ── */}
         {roleRows.length > 0 && (
           <View style={{ marginTop: 18 }}>
-            <Text style={[styles.eyebrow, { color: t.colors.muted }]}>More</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.muted }]}>{tr('account.more')}</Text>
             <View style={{ marginTop: 10, gap: 10 }}>
               {roleRows.map((r) => <Row key={r.href} r={r} />)}
             </View>
@@ -493,31 +493,31 @@ export default function AccountScreen() {
         {/* ── application status (preserved web parity) ── */}
         {myApps.length > 0 && (
           <View style={{ marginTop: 22 }}>
-            <Text style={[styles.eyebrow, { color: t.colors.muted }]}>Applications</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.muted }]}>{tr('account.applications')}</Text>
             <View style={{ marginTop: 10, gap: 10 }}>
               {myApps.map((a) => {
                 const pill =
                   a.status === 'approved'
-                    ? { label: 'Approved', bg: 'rgba(47,163,107,0.14)', fg: t.colors.ok }
+                    ? { label: tr('account.statusApproved'), bg: 'rgba(47,163,107,0.14)', fg: t.colors.ok }
                     : a.status === 'rejected'
-                      ? { label: 'Not approved', bg: 'rgba(225,29,72,0.12)', fg: '#E0526D' }
+                      ? { label: tr('account.statusRejected'), bg: 'rgba(225,29,72,0.12)', fg: '#E0526D' }
                       : a.status === 'needs_info'
-                        ? { label: 'Needs info', bg: 'rgba(232,169,59,0.16)', fg: t.colors.warn }
+                        ? { label: tr('account.statusNeedsInfo'), bg: 'rgba(232,169,59,0.16)', fg: t.colors.warn }
                         : a.status === 'reviewing'
-                          ? { label: 'In review', bg: 'rgba(232,169,59,0.16)', fg: t.colors.warn }
-                          : { label: 'Submitted', bg: 'rgba(62,134,199,0.14)', fg: t.colors.snow };
+                          ? { label: tr('account.statusReviewing'), bg: 'rgba(232,169,59,0.16)', fg: t.colors.warn }
+                          : { label: tr('account.statusSubmitted'), bg: 'rgba(62,134,199,0.14)', fg: t.colors.snow };
                 return (
                   <View key={`${a.kind}-${a.id}`} style={[card(t), { padding: 14 }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>
-                        {a.kind === 'rider' ? 'Rider application' : 'Partner application'}
+                        {a.kind === 'rider' ? tr('account.riderApplication') : tr('account.partnerApplication')}
                       </Text>
                       <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: pill.bg }}>
                         <Text style={{ fontSize: 11, fontWeight: '700', color: pill.fg }}>{pill.label}</Text>
                       </View>
                     </View>
                     <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 4 }}>
-                      Submitted {new Date(a.created_at).toLocaleDateString()}
+                      {tr('account.submittedOn', { date: new Date(a.created_at).toLocaleDateString() })}
                     </Text>
                     {!!a.reviewer_notes && (
                       <Text style={{ fontSize: 12, color: t.colors.fgSoft, marginTop: 8, lineHeight: 18 }}>
@@ -535,7 +535,7 @@ export default function AccountScreen() {
         <Press onPress={() => signOut()} style={{ marginTop: 22 }}>
           <View style={[styles.signOut, { borderColor: 'rgba(225,29,72,0.28)' }]}>
             <LogOut size={16} color="#E0526D" />
-            <Text style={{ marginLeft: 8, fontSize: 14, fontWeight: '700', color: '#E0526D' }}>Sign out</Text>
+            <Text style={{ marginLeft: 8, fontSize: 14, fontWeight: '700', color: '#E0526D' }}>{tr('account.signOut')}</Text>
           </View>
         </Press>
 
@@ -546,12 +546,12 @@ export default function AccountScreen() {
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Trash2 size={14} color="#B91C1C" />
-              <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: '#B91C1C' }}>Delete account</Text>
+              <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: '#B91C1C' }}>{tr('account.deleteAccount')}</Text>
             </View>
           )}
         </Pressable>
         <Text style={{ fontSize: 11, textAlign: 'center', marginTop: 6, color: t.colors.muted }}>
-          Permanently removes your account and all your data.
+          {tr('account.deleteFooter')}
         </Text>
       </ScrollView>
     </SafeAreaView>

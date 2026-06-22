@@ -24,6 +24,7 @@
 // inline (same key/logic as lib/ag3/CityContext) instead of useCity().
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Dimensions,
@@ -124,6 +125,7 @@ function useSelectedCity() {
 export default function Home() {
   const router = useRouter();
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const { user } = useAuth();
   const { city, cities, setCity } = useSelectedCity();
 
@@ -187,12 +189,12 @@ export default function Home() {
     }, []),
   );
 
-  const greetingName = me?.name?.split(' ')[0] || 'there';
+  const greetingName = me?.name?.split(' ')[0] || tr('home.greetingFallback');
   const initials = me?.initials || (user ? 'A' : 'S');
 
   const vObj = (verticals ?? []).find((v) => v.id === vert);
   // agApi categories omit the "All" chip — prepend it (prototype parity).
-  const categories = [{ id: 'all', label: 'All', emoji: '✦' }, ...(foodCats ?? [])];
+  const categories = [{ id: 'all', label: tr('home.catAll'), emoji: '✦' }, ...(foodCats ?? [])];
 
   const inVert = stores ?? [];
   const list = vert === 'food' ? inVert.filter((r) => cat === 'all' || r.cuisineIds.includes(cat)) : inVert;
@@ -203,9 +205,9 @@ export default function Home() {
     vert !== 'food'
       ? vObj?.label ?? ''
       : cat === 'all'
-        ? 'All restaurants'
+        ? tr('home.allRestaurants')
         : categories.find((c) => c.id === cat)?.label ?? '';
-  const countNoun = vert === 'food' ? 'open' : list.length === 1 ? 'store' : 'stores';
+  const countNoun = vert === 'food' ? tr('home.countOpen') : list.length === 1 ? tr('home.countStore') : tr('home.countStores');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
@@ -251,11 +253,11 @@ export default function Home() {
               </LinearGradient>
               <View style={{ minWidth: 0, flex: 1 }}>
                 <Text style={[styles.eyebrow, { color: t.colors.primary }]} numberOfLines={1}>
-                  Deliver to · {city?.name ?? '…'}
+                  {tr('home.deliverTo')} · {city?.name ?? '…'}
                 </Text>
                 <View style={styles.deliverAddr}>
                   <Text style={[styles.disp, { fontSize: 15.5, color: t.colors.fg }]} numberOfLines={1}>
-                    {city?.defaultAddress ?? 'Pick a city'}
+                    {city?.defaultAddress ?? tr('home.pickCity')}
                   </Text>
                   <IChevD size={16} color={t.colors.fg} />
                 </View>
@@ -289,9 +291,9 @@ export default function Home() {
 
           {/* greeting */}
           <View style={{ marginTop: 18 }}>
-            <Text style={[styles.eyebrow, { color: t.colors.primary }]}>Good afternoon</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('home.goodAfternoon')}</Text>
             <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg, marginTop: 3, lineHeight: 30 }]}>
-              Hi {greetingName} 👋
+              {tr('home.hi', { name: greetingName })} 👋
             </Text>
           </View>
 
@@ -303,7 +305,7 @@ export default function Home() {
           >
             <ISearch size={20} color={t.colors.primary} />
             <Text style={{ flex: 1, fontSize: 14.5, color: t.colors.muted }} numberOfLines={1}>
-              Search food, groceries, pharmacy…
+              {tr('home.searchPlaceholder')}
             </Text>
             <View style={[styles.searchSlider, { backgroundColor: t.colors.surface2 }]}>
               <ISlider size={17} color={t.colors.fgSoft} />
@@ -316,7 +318,7 @@ export default function Home() {
 
         {/* ══ Vertical switcher ══ */}
         <View style={[styles.pad, { marginTop: 22 }]}>
-          <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg }]}>What do you need?</Text>
+          <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg }]}>{tr('home.whatDoYouNeed')}</Text>
         </View>
         <View style={[styles.pad, styles.vertGrid]}>
           {(verticals ?? []).map((v) => {
@@ -370,7 +372,7 @@ export default function Home() {
         {vert === 'food' && (
           <>
             <View style={[styles.pad, { marginTop: 22, marginBottom: 12 }]}>
-              <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg }]}>What are you craving?</Text>
+              <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg }]}>{tr('home.whatCraving')}</Text>
             </View>
             <ScrollView
               horizontal
@@ -437,7 +439,7 @@ export default function Home() {
                     <View />
                   )}
                   <View style={{ position: 'relative', zIndex: 2 }}>
-                    <Text style={styles.heroEyebrow}>LOCAL LEGEND</Text>
+                    <Text style={styles.heroEyebrow}>{tr('home.localLegend')}</Text>
                     <Text style={styles.heroName} numberOfLines={2}>
                       {hero.name}
                     </Text>
@@ -468,10 +470,10 @@ export default function Home() {
                   <IGroup size={22} color={t.colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.disp, { fontSize: 14.5, color: t.colors.fg }]}>Start a dorm group order</Text>
-                  <Text style={{ fontSize: 12, color: t.colors.fgSoft }}>Split one delivery fee across your floor</Text>
+                  <Text style={[styles.disp, { fontSize: 14.5, color: t.colors.fg }]}>{tr('home.groupTitle')}</Text>
+                  <Text style={{ fontSize: 12, color: t.colors.fgSoft }}>{tr('home.groupBody')}</Text>
                 </View>
-                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>Invite ›</Text>
+                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>{tr('home.invite')} ›</Text>
               </View>
             </Press>
           </View>
@@ -481,8 +483,8 @@ export default function Home() {
         {vert === 'food' && fast.length > 0 && (
           <>
             <View style={[styles.pad, styles.railHead]}>
-              <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg }]}>Fast near you</Text>
-              <Text style={{ fontSize: 12, color: t.colors.muted, fontVariant: ['tabular-nums'] }}>under 25 min</Text>
+              <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg }]}>{tr('home.fastNearYou')}</Text>
+              <Text style={{ fontSize: 12, color: t.colors.muted, fontVariant: ['tabular-nums'] }}>{tr('home.under25')}</Text>
             </View>
             <ScrollView
               horizontal
@@ -507,12 +509,12 @@ export default function Home() {
         {storesLoading && inVert.length === 0 ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
             <ActivityIndicator color={t.colors.primary} />
-            <Text style={{ marginTop: 12, fontSize: 13, color: t.colors.muted }}>Loading {cityName || 'nearby'}…</Text>
+            <Text style={{ marginTop: 12, fontSize: 13, color: t.colors.muted }}>{tr('home.loading', { place: cityName || tr('home.nearby') })}</Text>
           </View>
         ) : storesError ? (
           <View style={[styles.pad, { marginTop: 12 }]}>
             <View style={[styles.emptyCard, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Couldn’t reach the backend</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>{tr('home.errorTitle')}</Text>
               <Text style={{ marginTop: 4, fontSize: 12.5, color: t.colors.muted, textAlign: 'center' }}>
                 {storesError.message}
               </Text>
@@ -523,12 +525,18 @@ export default function Home() {
             <View style={[styles.emptyCard, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
               <ISearch size={20} color={t.colors.muted} />
               <Text style={{ marginTop: 8, fontSize: 14, fontWeight: '700', color: t.colors.fg }}>
-                Nothing open right now
+                {tr('home.emptyTitle')}
               </Text>
               <Text style={{ marginTop: 4, fontSize: 12.5, color: t.colors.muted, textAlign: 'center', lineHeight: 17 }}>
                 {vert === 'food'
-                  ? `No ${cat === 'all' ? 'restaurants' : (listTitle || 'places').toLowerCase()} are live in ${cityName || 'this city'} yet.`
-                  : `${vObj?.label ?? 'Stores'} are launching in ${cityName || 'this city'} shortly.`}
+                  ? tr('home.emptyFood', {
+                      what: cat === 'all' ? tr('home.restaurantsLower') : (listTitle || tr('home.placesLower')).toLowerCase(),
+                      city: cityName || tr('home.thisCity'),
+                    })
+                  : tr('home.emptyStore', {
+                      what: vObj?.label ?? tr('home.stores'),
+                      city: cityName || tr('home.thisCity'),
+                    })}
               </Text>
             </View>
           </View>
@@ -551,7 +559,7 @@ export default function Home() {
       </ScrollView>
 
       {/* ══ City picker sheet ══ */}
-      <BottomSheet visible={pickCity} onClose={() => setPickCity(false)} title="Deliver to">
+      <BottomSheet visible={pickCity} onClose={() => setPickCity(false)} title={tr('home.deliverTo')}>
         <View style={{ gap: 10 }}>
           {[...cities]
             .sort((a, b) => Number(b.served) - Number(a.served))
@@ -588,13 +596,13 @@ export default function Home() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.disp, { fontSize: 15.5, color: t.colors.fg }]}>{c.name}</Text>
                   <Text style={{ fontSize: 12.5, color: t.colors.muted }} numberOfLines={1}>
-                    {disabled ? 'Coming soon' : c.defaultAddress}
-                    {!disabled && c.campus ? ' · Campus' : ''}
+                    {disabled ? tr('home.comingSoon') : c.defaultAddress}
+                    {!disabled && c.campus ? ` · ${tr('home.campus')}` : ''}
                   </Text>
                 </View>
                 {disabled ? (
                   <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: t.colors.surface, borderWidth: 1, borderColor: t.colors.line }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 0.3, color: t.colors.muted }}>Soon</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 0.3, color: t.colors.muted }}>{tr('home.soon')}</Text>
                   </View>
                 ) : on ? (
                   <ICheck size={20} color={t.colors.primary} />
@@ -615,6 +623,7 @@ export default function Home() {
 
 /* WeatherStrip wired to agApi.cities.weather (null when city.weather === false). */
 function WeatherStripFor({ cityId, cityName }: { cityId: string; cityName: string }) {
+  const { t: tr } = useTranslation();
   const { data: w } = useAsync(() => agApi.cities.weather(cityId), [cityId]);
   // Advisory-only: show the snow-styled strip just when weather actually slows
   // delivery (eta bump > 0). On clear/normal days a live "Partly cloudy" writes
@@ -623,7 +632,7 @@ function WeatherStripFor({ cityId, cityName }: { cityId: string; cityName: strin
   return (
     <View style={[styles.pad, { marginTop: 16 }]}>
       <WeatherStrip
-        condition={`${w.condition} · in ${cityName}`}
+        condition={`${w.condition} · ${tr('home.inCity', { city: cityName })}`}
         tempC={w.tempC}
         etaAddMinutes={w.etaAddMinutes}
         note={w.note}

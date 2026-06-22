@@ -19,6 +19,7 @@
 //   and the weather ETA note (fetched via agApi.cities.weather for the order's
 //   city — CityProvider is not mounted app-wide, so we read it directly here).
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -73,13 +74,13 @@ const RECEIPT_SELECT =
 
 /* The 3.0 six-stage timeline. Maps the live DB stage → which rows are done/now.
  * (The DB has 5 active stages + delivered; we present the spec's 6.) */
-const TIMELINE: { key: OrderStage | 'delivered'; label: string; sub: string }[] = [
-  { key: 'ordered', label: 'Order placed', sub: 'We sent it to the kitchen' },
-  { key: 'preparing', label: 'In the kitchen', sub: 'Your food is being prepared' },
-  { key: 'enRoute', label: 'Picked up', sub: 'Courier has your order' },
-  { key: 'outForDelivery', label: 'On the way', sub: 'Heading to your drop-off' },
-  { key: 'arriving', label: 'Arriving', sub: 'Your courier is nearby' },
-  { key: 'delivered', label: 'Delivered', sub: 'Enjoy your order' },
+const TIMELINE: { key: OrderStage | 'delivered'; labelKey: string; subKey: string }[] = [
+  { key: 'ordered', labelKey: 'stageOrderedLabel', subKey: 'stageOrderedSub' },
+  { key: 'preparing', labelKey: 'stagePreparingLabel', subKey: 'stagePreparingSub' },
+  { key: 'enRoute', labelKey: 'stagePickedUpLabel', subKey: 'stagePickedUpSub' },
+  { key: 'outForDelivery', labelKey: 'stageOnTheWayLabel', subKey: 'stageOnTheWaySub' },
+  { key: 'arriving', labelKey: 'stageArrivingLabel', subKey: 'stageArrivingSub' },
+  { key: 'delivered', labelKey: 'stageDeliveredLabel', subKey: 'stageDeliveredSub' },
 ];
 
 /** One-shot fetch of the receipt columns — useOrderStatus only carries the
@@ -106,6 +107,7 @@ function useReceiptRow(orderId: string | undefined) {
 
 export default function OrderScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -138,7 +140,7 @@ export default function OrderScreen() {
   const canCancel = !isDemo && isMine && status === 'ordered';
   const canReorder = !isDemo && isTerminal && (receipt?.items?.length ?? 0) > 0;
 
-  const headerLandmark = order?.driverPayload?.headerLandmark ?? 'Near the Grand Mosque';
+  const headerLandmark = order?.driverPayload?.headerLandmark ?? tr('tracking.nearGrandMosque');
 
   // current stage index within the 6-stage 3.0 timeline
   const stageIdx = useMemo(() => {
@@ -159,24 +161,24 @@ export default function OrderScreen() {
   const itemCount = (receipt?.items ?? []).reduce((s, i) => s + (i.qty ?? 0), 0);
   const itemNames = (receipt?.items ?? []).map((i) => i.name).join(', ');
 
-  const courierName = rider?.name ?? (isDelivered ? 'Order delivered' : 'Finding your rider…');
+  const courierName = rider?.name ?? (isDelivered ? tr('tracking.orderDelivered') : tr('tracking.findingRider'));
   const courierInitial = (rider?.name ?? 'A').charAt(0).toUpperCase();
   const courierMeta =
     [rider?.vehicle, rider?.plate].filter(Boolean).join(' · ') ||
-    (isDelivered ? 'Thanks for ordering with AtlaasGo' : "We'll assign the nearest rider");
+    (isDelivered ? tr('tracking.thanksForOrdering') : tr('tracking.willAssignRider'));
 
   function confirmCancel() {
     if (!id || cancelBusy) return;
-    Alert.alert('Cancel this order?', 'The kitchen will be told to stop. This cannot be undone.', [
-      { text: 'Keep order', style: 'cancel' },
+    Alert.alert(tr('tracking.cancelConfirmTitle'), tr('tracking.cancelConfirmBody'), [
+      { text: tr('tracking.keepOrder'), style: 'cancel' },
       {
-        text: 'Cancel order',
+        text: tr('tracking.cancelOrder'),
         style: 'destructive',
         onPress: async () => {
           setCancelBusy(true);
           const res = await cancelOrder(id);
           setCancelBusy(false);
-          if (!res.ok) Alert.alert('Could not cancel', res.error);
+          if (!res.ok) Alert.alert(tr('tracking.couldNotCancel'), res.error);
         },
       },
     ]);
@@ -226,17 +228,17 @@ export default function OrderScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
           <Bike size={28} color={t.colors.muted} />
           <Text style={{ marginTop: 14, fontSize: 19, fontWeight: '800', color: t.colors.fg }}>
-            Order not found
+            {tr('tracking.notFoundTitle')}
           </Text>
           <Text style={{ marginTop: 8, fontSize: 13, textAlign: 'center', color: t.colors.muted, lineHeight: 19 }}>
             {user
-              ? 'This order does not exist or belongs to another account.'
-              : 'Sign in to see your order.'}
+              ? tr('tracking.notFoundBodyAuthed')
+              : tr('tracking.notFoundBodyGuest')}
           </Text>
           {!user ? (
             <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 22 }}>
               <View style={{ borderRadius: 999, paddingHorizontal: 28, paddingVertical: 14, backgroundColor: t.colors.primary }}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Sign in</Text>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr('tracking.signIn')}</Text>
               </View>
             </Press>
           ) : null}
@@ -308,16 +310,16 @@ export default function OrderScreen() {
             <View style={styles.liveRow}>
               {!isTerminal ? <View style={[styles.pip, { backgroundColor: t.colors.ok }]} /> : null}
               <Text style={[styles.eyebrow, { color: isCancelled ? t.colors.muted : t.colors.ok }]}>
-                {isCancelled ? `Order ${orderTag}` : isDelivered ? `Delivered · ${orderTag}` : `Live · order ${orderTag}`}
+                {isCancelled ? tr('tracking.eyebrowOrder', { tag: orderTag }) : isDelivered ? tr('tracking.eyebrowDelivered', { tag: orderTag }) : tr('tracking.eyebrowLive', { tag: orderTag })}
               </Text>
             </View>
             <Text style={{ fontWeight: '800', fontSize: 16, color: t.colors.fgSoft, marginTop: 2 }}>
-              {isCancelled ? 'Order cancelled' : isDelivered ? 'Delivered' : 'Arriving in'}
+              {isCancelled ? tr('tracking.statusCancelled') : isDelivered ? tr('tracking.statusDelivered') : tr('tracking.statusArrivingIn')}
             </Text>
 
             {isCancelled ? (
               <Text style={{ fontSize: 13, color: t.colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 19, maxWidth: 280 }}>
-                This order was cancelled — nothing was charged beyond any refund in progress.
+                {tr('tracking.cancelledBody')}
               </Text>
             ) : (
               <GradientEta value={etaShown} gradient={t.gradients.sunset} start={t.gradients.start} end={t.gradients.end} />
@@ -329,16 +331,16 @@ export default function OrderScreen() {
                   <>
                     <Snowflake size={14} color={t.colors.snow} />
                     <Text style={{ fontSize: 12.5, color: t.colors.muted, textAlign: 'center' }}>
-                      {weather?.note || `ETA adjusted +${weatherAdd} min for snow on the pass`}
+                      {weather?.note || tr('tracking.weatherNote', { n: weatherAdd })}
                     </Text>
                   </>
                 ) : (
                   <Text style={{ fontSize: 12.5, color: t.colors.muted, textAlign: 'center' }}>
                     {isDelivered
-                      ? 'Hope it hit the spot — rate the order below.'
+                      ? tr('tracking.deliveredHint')
                       : rider?.vehicle
-                        ? `Your courier is on the way · ${rider.vehicle}`
-                        : 'Your courier is on the way'}
+                        ? tr('tracking.courierOnWayVehicle', { vehicle: rider.vehicle })
+                        : tr('tracking.courierOnWay')}
                   </Text>
                 )}
               </View>
@@ -403,8 +405,8 @@ export default function OrderScreen() {
           {/* Live tracking eyebrow (real, active orders) */}
           {!isDemo && !isTerminal && (riderPt || dest) ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 }}>
-              <Text style={[styles.eyebrow, { color: t.colors.muted }]}>Live tracking</Text>
-              {riderLive ? <Text style={[styles.eyebrow, { color: t.colors.primary }]}>● Live</Text> : null}
+              <Text style={[styles.eyebrow, { color: t.colors.muted }]}>{tr('tracking.liveTracking')}</Text>
+              {riderLive ? <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('tracking.liveDot')}</Text> : null}
             </View>
           ) : null}
 
@@ -451,9 +453,9 @@ export default function OrderScreen() {
                             color: now ? t.colors.primary : t.colors.fg,
                           }}
                         >
-                          {s.label}
+                          {tr(`tracking.${s.labelKey}`)}
                         </Text>
-                        <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>{s.sub}</Text>
+                        <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>{tr(`tracking.${s.subKey}`)}</Text>
                       </View>
                     </View>
                   );
@@ -487,7 +489,7 @@ export default function OrderScreen() {
                       {storeName}
                     </Text>
                     <Text style={{ fontSize: 12, color: t.colors.muted }} numberOfLines={1}>
-                      {itemCount} item{itemCount === 1 ? '' : 's'} · {itemNames}
+                      {tr('tracking.itemCount', { n: itemCount })} · {itemNames}
                     </Text>
                   </View>
                   <ChevronRight size={20} color={t.colors.muted} />
@@ -504,7 +506,7 @@ export default function OrderScreen() {
               transition={{ type: 'timing', duration: 360, delay: 250 }}
               style={{ marginTop: 18 }}
             >
-              <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 8 }]}>Receipt</Text>
+              <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 8 }]}>{tr('tracking.receipt')}</Text>
               <Receipt order={receipt} defaultOpen={isCancelled} />
             </MotiView>
           ) : null}
@@ -523,7 +525,7 @@ export default function OrderScreen() {
                 ) : (
                   <>
                     <XCircle size={16} color="#E11D48" />
-                    <Text style={{ fontWeight: '700', fontSize: 14, color: '#E11D48' }}>Cancel order</Text>
+                    <Text style={{ fontWeight: '700', fontSize: 14, color: '#E11D48' }}>{tr('tracking.cancelOrder')}</Text>
                   </>
                 )}
               </View>
@@ -540,7 +542,7 @@ export default function OrderScreen() {
                 style={[styles.actionBtn, t.shadows.glow]}
               >
                 <RotateCcw size={16} color="#fff" strokeWidth={2.5} />
-                <Text style={{ fontWeight: '700', fontSize: 14, color: '#fff' }}>Order again</Text>
+                <Text style={{ fontWeight: '700', fontSize: 14, color: '#fff' }}>{tr('tracking.orderAgain')}</Text>
               </LinearGradient>
             </Press>
           ) : null}
@@ -565,9 +567,9 @@ export default function OrderScreen() {
                   <MessageCircle size={17} color={t.colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Chat about this order</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>{tr('tracking.chatTitle')}</Text>
                   <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>
-                    Message the kitchen or your rider
+                    {tr('tracking.chatSub')}
                   </Text>
                 </View>
                 <ChevronRight size={18} color={t.colors.primary} />
@@ -594,9 +596,9 @@ export default function OrderScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                   <Bike size={14} color={t.colors.muted} />
-                  <Text style={[styles.eyebrow, { color: t.colors.muted }]}>Dev · view as driver</Text>
+                  <Text style={[styles.eyebrow, { color: t.colors.muted }]}>{tr('tracking.devViewAsDriver')}</Text>
                 </View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.primary }}>Open →</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.primary }}>{tr('tracking.open')}</Text>
               </View>
             </Press>
           ) : null}
@@ -656,6 +658,7 @@ function MaskedGradientNumber({
   start: { x: number; y: number };
   end: { x: number; y: number };
 }) {
+  const { t: tr } = useTranslation();
   const numStyle = { fontWeight: '800' as const, fontSize: 64, lineHeight: 66, letterSpacing: -2 };
   const unitStyle = { fontWeight: '800' as const, fontSize: 22 };
   if (MaskedView) {
@@ -664,14 +667,14 @@ function MaskedGradientNumber({
         maskElement={
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', backgroundColor: 'transparent' }}>
             <Text style={[numStyle, { color: '#000' }]}>{value}</Text>
-            <Text style={[unitStyle, { color: '#000', marginBottom: 8 }]}> min</Text>
+            <Text style={[unitStyle, { color: '#000', marginBottom: 8 }]}> {tr('tracking.minUnit')}</Text>
           </View>
         }
       >
         <LinearGradient colors={gradient} start={start} end={end}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', opacity: 0 }}>
             <Text style={numStyle}>{value}</Text>
-            <Text style={unitStyle}> min</Text>
+            <Text style={unitStyle}> {tr('tracking.minUnit')}</Text>
           </View>
         </LinearGradient>
       </MaskedView>
@@ -681,7 +684,7 @@ function MaskedGradientNumber({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
       <Text style={[numStyle, { color: gradient[0] }]}>{value}</Text>
-      <Text style={[unitStyle, { color: gradient[1], marginBottom: 8 }]}> min</Text>
+      <Text style={[unitStyle, { color: gradient[1], marginBottom: 8 }]}> {tr('tracking.minUnit')}</Text>
     </View>
   );
 }

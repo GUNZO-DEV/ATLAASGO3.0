@@ -29,6 +29,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
+import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../lib/auth';
 import { useWallet } from '../hooks/useWallet';
@@ -53,16 +54,16 @@ const WALLET_PURPLE = '#9C6ADE';
 
 const TOPUP_PRESETS = [20, 50, 100, 200];
 
-function txLabel(kind: string): string {
+function txLabel(kind: string, tr: (key: string) => string): string {
   switch (kind) {
     case 'topup':
-      return 'Top-up';
+      return tr('wallet.kindTopup');
     case 'order_payment':
-      return 'Order payment';
+      return tr('wallet.kindOrderPayment');
     case 'refund':
-      return 'Refund';
+      return tr('wallet.kindRefund');
     case 'referral':
-      return 'Referral bonus';
+      return tr('wallet.kindReferral');
     default:
       return kind.replace(/_/g, ' ');
   }
@@ -94,6 +95,7 @@ async function startTopup(amountDh: number, userEmail: string | undefined, userI
 
 export default function WalletScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { balanceDh, txs, loading } = useWallet();
@@ -104,7 +106,7 @@ export default function WalletScreen() {
   async function handleTopup() {
     const amount = Math.round(Number(topupAmount));
     if (!amount || amount < 20 || amount > 2000) {
-      Alert.alert('Invalid amount', 'Enter an amount between 20 and 2 000 dh.');
+      Alert.alert(tr('wallet.invalidAmountTitle'), tr('wallet.invalidAmountBody'));
       return;
     }
     if (!user) return;
@@ -117,10 +119,10 @@ export default function WalletScreen() {
       const paid = await payWithPaymentSheet(clientSecret, user.email ?? 'AtlaasGo customer');
       if (paid) {
         setTopupOpen(false);
-        Alert.alert('Payment received ✓', 'Your balance will update in a moment.');
+        Alert.alert(tr('wallet.paymentReceivedTitle'), tr('wallet.paymentReceivedBody'));
       }
     } catch (e) {
-      Alert.alert('Could not complete top-up', (e as Error).message);
+      Alert.alert(tr('wallet.topupFailedTitle'), (e as Error).message);
     } finally {
       setTopupBusy(false);
     }
@@ -135,9 +137,9 @@ export default function WalletScreen() {
           <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
             <IWallet size={28} color={WALLET_PURPLE} />
           </View>
-          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>Your wallet</Text>
+          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>{tr('wallet.yourWallet')}</Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Sign in to see your balance and top up.
+            {tr('wallet.signInPrompt')}
           </Text>
           <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
             <LinearGradient
@@ -146,7 +148,7 @@ export default function WalletScreen() {
               end={t.gradients.end}
               style={[styles.signInBtn, t.shadows.glow]}
             >
-              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('wallet.signIn')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -174,7 +176,7 @@ export default function WalletScreen() {
             <View pointerEvents="none" style={styles.heroSheen} />
 
             <View style={styles.heroTopRow}>
-              <Text style={styles.heroEyebrow}>AVAILABLE BALANCE</Text>
+              <Text style={styles.heroEyebrow}>{tr('wallet.availableBalance')}</Text>
               <View style={styles.heroGlyph}>
                 <IWallet size={18} color={WALLET_PURPLE} />
               </View>
@@ -189,7 +191,7 @@ export default function WalletScreen() {
               <View style={styles.heroTopupBtn}>
                 <IPlus size={16} color={t.colors.primary} strokeWidth={2.6} />
                 <Text style={{ marginLeft: 6, color: t.colors.primary, fontWeight: '800', fontSize: 13.5 }}>
-                  Top up
+                  {tr('wallet.topUp')}
                 </Text>
               </View>
             </Press>
@@ -200,7 +202,7 @@ export default function WalletScreen() {
         <Rise delay={60} style={{ marginTop: 24 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 12 }}>
             <IReceipt size={15} color={t.colors.primary} />
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>Activity</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>{tr('wallet.activity')}</Text>
           </View>
 
           {loading ? (
@@ -213,10 +215,10 @@ export default function WalletScreen() {
                 <IReceipt size={22} color={t.colors.muted} />
               </View>
               <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg, marginTop: 12 }}>
-                No transactions yet
+                {tr('wallet.emptyTitle')}
               </Text>
               <Text style={{ fontSize: 12.5, color: t.colors.muted, marginTop: 3, textAlign: 'center' }}>
-                Top up your wallet to get started.
+                {tr('wallet.emptyBody')}
               </Text>
             </View>
           ) : (
@@ -236,7 +238,7 @@ export default function WalletScreen() {
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ fontSize: 14.5, fontWeight: '700', color: t.colors.fg }} numberOfLines={1}>
-                        {txLabel(tx.kind)}
+                        {txLabel(tx.kind, tr)}
                       </Text>
                       <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>
                         {new Date(tx.createdAt).toLocaleDateString()}
@@ -262,7 +264,7 @@ export default function WalletScreen() {
       </ScrollView>
 
       {/* ── top-up sheet (ag3 BottomSheet) ── */}
-      <BottomSheet visible={topupOpen} onClose={() => setTopupOpen(false)} title="Top up wallet">
+      <BottomSheet visible={topupOpen} onClose={() => setTopupOpen(false)} title={tr('wallet.topUpWallet')}>
         {/* preset amounts */}
         <View style={{ flexDirection: 'row', gap: 9, marginBottom: 16 }}>
           {TOPUP_PRESETS.map((preset) => {
@@ -293,12 +295,12 @@ export default function WalletScreen() {
         </View>
 
         {/* custom amount */}
-        <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>Or enter amount (20–2 000 dh)</Text>
+        <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>{tr('wallet.orEnterAmount')}</Text>
         <TextInput
           value={topupAmount}
           onChangeText={setTopupAmount}
           keyboardType="number-pad"
-          placeholder="Amount in dh"
+          placeholder={tr('wallet.amountPlaceholder')}
           placeholderTextColor={t.colors.muted}
           style={[
             styles.input,
@@ -319,7 +321,7 @@ export default function WalletScreen() {
               <>
                 <IBolt size={16} color={t.colors.onPrimary} fill={t.colors.onPrimary} strokeWidth={0} />
                 <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15.5 }}>
-                  Pay {topupAmount ? `${topupAmount} dh` : '—'}
+                  {tr('wallet.pay', { amount: topupAmount ? `${topupAmount} dh` : '—' })}
                 </Text>
               </>
             )}
@@ -333,6 +335,7 @@ export default function WalletScreen() {
 /* ── sub-components ───────────────────────────────────────────────────────── */
 
 function Header({ t, onBack }: { t: Ag3Theme; onBack: () => void }) {
+  const { t: tr } = useTranslation();
   return (
     <MotiView
       from={{ opacity: 0, translateX: -8 }}
@@ -345,7 +348,7 @@ function Header({ t, onBack }: { t: Ag3Theme; onBack: () => void }) {
           <IBack size={20} color={t.colors.fg} />
         </View>
       </Press>
-      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Wallet</Text>
+      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>{tr('wallet.title')}</Text>
     </MotiView>
   );
 }

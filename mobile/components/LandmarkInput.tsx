@@ -2,14 +2,15 @@ import { MotiView } from 'moti';
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { MapPin, Sparkles } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import type { Coords } from '../hooks/useLocation';
 
-const SUGGESTIONS = [
-  'Near the Grand Mosque',
-  'Behind the Telecom Shop',
-  'Across from Café Hassan',
-  'Next to the AUI gate',
-  'Near the Michlifen pharmacy',
+const SUGGESTION_KEYS = [
+  'suggestionMosque',
+  'suggestionTelecom',
+  'suggestionCafe',
+  'suggestionGate',
+  'suggestionPharmacy',
 ];
 
 const MIN_LANDMARK_LENGTH = 3;
@@ -32,6 +33,7 @@ export function LandmarkInput({
   onCaptureCoords: () => void;
   capturing: boolean;
 }) {
+  const { t: tr } = useTranslation();
   const [focused, setFocused] = useState(false);
   const valid = value.trim().length >= MIN_LANDMARK_LENGTH;
   const showError = !valid && value.length > 0;
@@ -44,7 +46,7 @@ export function LandmarkInput({
           className="ml-1.5 text-[11px] uppercase font-bold"
           style={{ letterSpacing: 1.4, color: '#7A6F66' }}
         >
-          Landmark · required
+          {tr('landmark.label')}
         </Text>
       </View>
 
@@ -72,7 +74,7 @@ export function LandmarkInput({
           onChangeText={onChange}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder='e.g. "Near the Grand Mosque"'
+          placeholder={tr('landmark.placeholder')}
           placeholderTextColor="#9B8F84"
           multiline
           style={{
@@ -93,7 +95,7 @@ export function LandmarkInput({
           transition={{ type: 'timing', duration: 180 }}
         >
           <Text className="text-[12px] mt-2" style={{ color: '#EF4444' }}>
-            Add a quick landmark so your driver finds you fast.
+            {tr('landmark.error')}
           </Text>
         </MotiView>
       )}
@@ -101,27 +103,30 @@ export function LandmarkInput({
       <View className="flex-row items-center mt-3">
         <Sparkles size={12} color="#7A6F66" />
         <Text className="ml-1.5 text-[11px] font-semibold" style={{ color: '#7A6F66' }}>
-          Try one of these
+          {tr('landmark.tryOne')}
         </Text>
       </View>
       <View className="flex-row flex-wrap mt-2">
-        {SUGGESTIONS.map((s) => (
-          <MotiView
-            key={s}
-            from={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'timing', duration: 240 }}
-            style={{ marginRight: 8, marginBottom: 8 }}
-          >
-            <Text
-              onPress={() => onChange(s)}
-              className="border border-black/10 rounded-full px-3 py-1.5 text-[12px]"
-              style={{ color: '#2A211C' }}
+        {SUGGESTION_KEYS.map((key) => {
+          const label = tr(`landmark.${key}`);
+          return (
+            <MotiView
+              key={key}
+              from={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'timing', duration: 240 }}
+              style={{ marginRight: 8, marginBottom: 8 }}
             >
-              {s}
-            </Text>
-          </MotiView>
-        ))}
+              <Text
+                onPress={() => onChange(label)}
+                className="border border-black/10 rounded-full px-3 py-1.5 text-[12px]"
+                style={{ color: '#2A211C' }}
+              >
+                {label}
+              </Text>
+            </MotiView>
+          );
+        })}
       </View>
 
       {/* GPS capture strip */}
@@ -134,18 +139,18 @@ export function LandmarkInput({
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 1.2, color: '#7A6F66' }}>
-            GPS pin
+            {tr('landmark.gpsPin')}
           </Text>
           <Text className="text-[14px] mt-0.5 font-semibold" style={{ color: '#1A1410' }}>
             {coords
               ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
               : capturing
-                ? 'Reading your location…'
-                : 'Tap to capture'}
+                ? tr('landmark.reading')
+                : tr('landmark.tapToCapture')}
           </Text>
           {coords?.accuracyM != null && (
             <Text className="text-[11px] mt-0.5" style={{ color: '#7A6F66' }}>
-              ±{Math.round(coords.accuracyM)} m accuracy
+              {tr('landmark.accuracy', { n: Math.round(coords.accuracyM) })}
             </Text>
           )}
         </View>
@@ -158,7 +163,7 @@ export function LandmarkInput({
             overflow: 'hidden',
           }}
         >
-          {coords ? 'Update' : 'Capture'}
+          {coords ? tr('landmark.update') : tr('landmark.capture')}
         </Text>
       </View>
     </View>

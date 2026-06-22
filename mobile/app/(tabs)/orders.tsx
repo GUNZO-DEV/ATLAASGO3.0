@@ -13,6 +13,7 @@
 //   • signed-out / no-orders / error empty states.
 // Only the visuals were swapped to the 3.0 ag3 theme + primitives.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MotiView } from 'moti';
 import {
   ActivityIndicator,
@@ -43,15 +44,15 @@ import {
 } from '../../components/ag3/primitives';
 import type { OrderStatus } from '../../lib/types';
 
-/* ── DB status → live label + progress fraction (mirrors the 3.0 Orders card) ─ */
+/* ── DB status → live label key + progress fraction (mirrors the 3.0 Orders card) ─ */
 const STATUS_LABEL: Record<string, string> = {
-  ordered: 'Order placed',
-  preparing: 'In the kitchen',
-  enRoute: 'Picked up · on the way',
-  outForDelivery: 'On the way',
-  arriving: 'Arriving now',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
+  ordered: 'orders.statusOrdered',
+  preparing: 'orders.statusPreparing',
+  enRoute: 'orders.statusEnRoute',
+  outForDelivery: 'orders.statusOutForDelivery',
+  arriving: 'orders.statusArriving',
+  delivered: 'orders.statusDelivered',
+  cancelled: 'orders.statusCancelled',
 };
 const STATUS_PROGRESS: Record<string, number> = {
   ordered: 0.1,
@@ -103,16 +104,19 @@ function normalizeItems(raw: unknown): OrderItemLine[] {
   return lines;
 }
 
-/* friendly title for a card — the saved drop landmark, else "Delivery" */
-function orderTitle(o: { driverPayload?: { headerLandmark?: string }; landmark?: string }): string {
-  return o.driverPayload?.headerLandmark || o.landmark || 'Delivery';
+/* friendly title for a card — the saved drop landmark, else a localized fallback */
+function orderTitle(
+  o: { driverPayload?: { headerLandmark?: string }; landmark?: string },
+  fallback: string,
+): string {
+  return o.driverPayload?.headerLandmark || o.landmark || fallback;
 }
 
 /* "Tagine · 2 more" — first item name + remaining count (3.0 sub line) */
-function itemsSub(lines: OrderItemLine[] | undefined): string {
+function itemsSub(lines: OrderItemLine[] | undefined, moreLabel: (n: number) => string): string {
   if (!lines || lines.length === 0) return '';
   const more = lines.length - 1;
-  return more > 0 ? `${lines[0].name} · ${more} more` : lines[0].name;
+  return more > 0 ? `${lines[0].name} · ${moreLabel(more)}` : lines[0].name;
 }
 
 /* short weekday like the prototype's past-order timestamp */
@@ -129,6 +133,7 @@ function whenLabel(iso: string): string {
  */
 export default function OrdersScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { orders, loading, error, refresh } = useOrdersList(30);
@@ -186,7 +191,7 @@ export default function OrdersScreen() {
   function reorder(orderId: string) {
     const lines = itemsById[orderId];
     if (!lines || lines.length === 0) {
-      Alert.alert('Nothing to re-add', 'This order has no saved item details.');
+      Alert.alert(tr('orders.reorderEmptyTitle'), tr('orders.reorderEmptyBody'));
       return;
     }
     // add() keeps one-restaurant-per-cart semantics: the first item replaces a
@@ -224,7 +229,7 @@ export default function OrdersScreen() {
             <IBack size={20} color={t.colors.fg} />
           </View>
         </Press>
-        <Text style={[styles.eyebrow, { color: t.colors.primary }]}>Your orders</Text>
+        <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('orders.eyebrow')}</Text>
         <View style={{ width: 44 }} />
       </MotiView>
     );
@@ -240,9 +245,9 @@ export default function OrdersScreen() {
             <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2 }]}>
               <IReceipt size={28} color={t.colors.primary} />
             </View>
-            <Text style={[styles.emptyTitle, { color: t.colors.fg }]}>Sign in to see orders</Text>
+            <Text style={[styles.emptyTitle, { color: t.colors.fg }]}>{tr('orders.signedOutTitle')}</Text>
             <Text style={[styles.emptyBody, { color: t.colors.fgSoft }]}>
-              Your order history and live tracking appear here once you sign in.
+              {tr('orders.signedOutBody')}
             </Text>
             <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 22 }}>
               <LinearGradient
@@ -251,7 +256,7 @@ export default function OrdersScreen() {
                 end={t.gradients.end}
                 style={[styles.primaryBtn, t.shadows.glow]}
               >
-                <Text style={styles.primaryBtnTxt}>Sign in</Text>
+                <Text style={styles.primaryBtnTxt}>{tr('orders.signIn')}</Text>
               </LinearGradient>
             </Press>
           </View>
@@ -277,9 +282,9 @@ export default function OrdersScreen() {
           transition={{ type: 'timing', duration: 360, delay: 90 }}
           style={{ marginTop: 18 }}
         >
-          <Text style={[styles.h1, { color: t.colors.fg }]}>Orders</Text>
+          <Text style={[styles.h1, { color: t.colors.fg }]}>{tr('orders.title')}</Text>
           <Text style={{ marginTop: 6, fontSize: 14, color: t.colors.fgSoft, lineHeight: 20 }}>
-            Tap any order to track it live.
+            {tr('orders.subtitle')}
           </Text>
         </MotiView>
 
@@ -289,7 +294,7 @@ export default function OrdersScreen() {
           </View>
         ) : error && orders.length === 0 ? (
           <View style={[styles.noticeCard, { backgroundColor: t.colors.surface, borderColor: 'rgba(185,28,28,0.25)' }]}>
-            <Text style={[styles.noticeTitle, { color: t.colors.fg }]}>Couldn’t load orders</Text>
+            <Text style={[styles.noticeTitle, { color: t.colors.fg }]}>{tr('orders.errorTitle')}</Text>
             <Text style={[styles.noticeBody, { color: t.colors.fgSoft }]}>{error.message}</Text>
           </View>
         ) : orders.length === 0 ? (
@@ -297,9 +302,9 @@ export default function OrdersScreen() {
             <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2 }]}>
               <IBag size={28} color={t.colors.primary} />
             </View>
-            <Text style={[styles.emptyTitle, { color: t.colors.fg }]}>No orders yet</Text>
+            <Text style={[styles.emptyTitle, { color: t.colors.fg }]}>{tr('orders.emptyTitle')}</Text>
             <Text style={[styles.emptyBody, { color: t.colors.fgSoft }]}>
-              When you place an order it’ll show up here with live tracking.
+              {tr('orders.emptyBody')}
             </Text>
             <Press onPress={() => router.replace('/')} style={{ marginTop: 22 }}>
               <LinearGradient
@@ -308,7 +313,7 @@ export default function OrdersScreen() {
                 end={t.gradients.end}
                 style={[styles.primaryBtn, t.shadows.glow]}
               >
-                <Text style={styles.primaryBtnTxt}>Browse</Text>
+                <Text style={styles.primaryBtnTxt}>{tr('orders.browse')}</Text>
               </LinearGradient>
             </Press>
           </View>
@@ -322,24 +327,24 @@ export default function OrdersScreen() {
                 transition={{ type: 'timing', duration: 320, delay: 120 }}
                 style={{ marginTop: 22 }}
               >
-                <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>In progress</Text>
+                <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('orders.inProgress')}</Text>
                 <Press onPress={() => router.push({ pathname: '/order/[id]', params: { id: live.id } })} style={{ width: '100%' }}>
                   <View style={[styles.liveCard, { backgroundColor: t.colors.surface, borderColor: 'rgba(255,87,34,0.26)' }, t.shadows.card]}>
                     <View style={styles.liveRow}>
                       <PhotoTile tile={tileFor(live.id)} em={foodEm(live.id)} radius={14} style={{ width: 54, height: 54 }} />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={[styles.disp, { fontSize: 15.5, color: t.colors.fg }]} numberOfLines={1}>
-                          {orderTitle(live)}
+                          {orderTitle(live, tr('orders.deliveryFallback'))}
                         </Text>
                         <View style={styles.liveLine}>
                           <Pip color={t.colors.ok} />
                           <Text style={{ fontSize: 12, color: t.colors.ok, fontWeight: '700' }} numberOfLines={1}>
-                            {STATUS_LABEL[live.status] ?? STAGE_LABELS[live.status]?.title ?? live.status}
+                            {STATUS_LABEL[live.status] ? tr(STATUS_LABEL[live.status]) : STAGE_LABELS[live.status]?.title ?? live.status}
                           </Text>
                         </View>
                       </View>
                       <LinearGradient colors={t.gradients.sunset} start={t.gradients.start} end={t.gradients.end} style={[styles.trackPill, t.shadows.glow]}>
-                        <Text style={styles.trackPillTxt}>Track</Text>
+                        <Text style={styles.trackPillTxt}>{tr('orders.track')}</Text>
                       </LinearGradient>
                     </View>
                     {/* gradient progress bar */}
@@ -364,11 +369,11 @@ export default function OrdersScreen() {
                 transition={{ type: 'timing', duration: 320, delay: live ? 180 : 120 }}
                 style={{ marginTop: 24 }}
               >
-                <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>Past orders</Text>
+                <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('orders.pastOrders')}</Text>
                 <View style={{ gap: 12 }}>
                   {past.map((o, i) => {
                     const lines = itemsById[o.id];
-                    const sub = itemsSub(lines);
+                    const sub = itemsSub(lines, (n) => tr('orders.moreItems', { n }));
                     const cancelled = o.status === 'cancelled';
                     return (
                       <MotiView
@@ -384,10 +389,10 @@ export default function OrdersScreen() {
                             <PhotoTile tile={tileFor(o.id)} em={foodEm(o.id)} radius={13} style={{ width: 50, height: 50 }} />
                             <View style={{ flex: 1, minWidth: 0 }}>
                               <Text style={[styles.disp, { fontSize: 14.5, color: t.colors.fg }]} numberOfLines={1}>
-                                {orderTitle(o)}
+                                {orderTitle(o, tr('orders.deliveryFallback'))}
                               </Text>
                               <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>
-                                {cancelled ? 'Cancelled' : sub ? `${sub} · ` : ''}
+                                {cancelled ? tr('orders.cancelled') : sub ? `${sub} · ` : ''}
                                 {cancelled ? '' : whenLabel(o.createdAt)}
                               </Text>
                             </View>
@@ -399,7 +404,7 @@ export default function OrdersScreen() {
                                 style={{ marginTop: 4 }}
                                 disabled={cancelled && (!lines || lines.length === 0)}
                               >
-                                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13 }}>Reorder</Text>
+                                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13 }}>{tr('orders.reorder')}</Text>
                               </Pressable>
                             </View>
                           </View>
@@ -415,7 +420,7 @@ export default function OrdersScreen() {
             {past.length === 0 && live ? (
               <View style={[styles.noticeCard, { backgroundColor: t.colors.surface2, borderColor: t.colors.line2, marginTop: 24 }]}>
                 <Text style={[styles.noticeBody, { color: t.colors.fgSoft }]}>
-                  Your past orders will appear here once this one is delivered.
+                  {tr('orders.pastPending')}
                 </Text>
               </View>
             ) : null}

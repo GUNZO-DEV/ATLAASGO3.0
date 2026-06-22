@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
@@ -40,6 +41,7 @@ const CRAVE_W = (Dimensions.get('window').width - 52) / 2;
 export default function Search() {
   const router = useRouter();
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
 
   // Selected city (persisted 'ag3-city', default ifrane) — scopes the search +
   // labels the "Trending in …" eyebrow. (No CityProvider mounted app-wide.)
@@ -123,7 +125,7 @@ export default function Search() {
       >
         {/* header: title + search pill */}
         <Rise style={[styles.pad, { marginTop: 8 }]}>
-          <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg, marginBottom: 14 }]}>Search</Text>
+          <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg, marginBottom: 14 }]}>{tr('search.title')}</Text>
           <View
             style={[
               styles.searchField,
@@ -135,17 +137,17 @@ export default function Search() {
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder="Search dishes, restaurants, cuisines…"
+              placeholder={tr('search.placeholder')}
               placeholderTextColor={t.colors.muted}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
               onSubmitEditing={() => query && pushRecent(query)}
               style={[styles.searchInput, { color: t.colors.fg }]}
-              accessibilityLabel="Search"
+              accessibilityLabel={tr('search.title')}
             />
             {query.length > 0 && (
-              <Pressable onPress={() => setQ('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+              <Pressable onPress={() => setQ('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={tr('search.clearSearch')}>
                 <View style={[styles.clearBtn, { backgroundColor: t.colors.surface2 }]}>
                   <IClose size={13} color={t.colors.fg} />
                 </View>
@@ -163,10 +165,10 @@ export default function Search() {
                 <View style={styles.headRow}>
                   <View style={styles.eyebrowRow}>
                     <IClock size={13} color={t.colors.muted} />
-                    <Text style={[styles.eyebrow, { color: t.colors.muted }]}>Recent</Text>
+                    <Text style={[styles.eyebrow, { color: t.colors.muted }]}>{tr('search.recent')}</Text>
                   </View>
                   <Pressable onPress={() => persistRecents([])} hitSlop={8}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.primary }}>Clear</Text>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.primary }}>{tr('search.clear')}</Text>
                   </Pressable>
                 </View>
                 <View style={styles.chipWrap}>
@@ -175,7 +177,7 @@ export default function Search() {
                       <Pressable onPress={() => setQ(term)} hitSlop={4} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={{ fontSize: 13.5, fontWeight: '600', color: t.colors.fg }}>{term}</Text>
                       </Pressable>
-                      <Pressable onPress={() => removeRecent(term)} hitSlop={8} accessibilityLabel={`Remove ${term}`}>
+                      <Pressable onPress={() => removeRecent(term)} hitSlop={8} accessibilityLabel={tr('search.remove', { term })}>
                         <IClose size={12} color={t.colors.muted} />
                       </Pressable>
                     </View>
@@ -189,7 +191,7 @@ export default function Search() {
               <View style={styles.eyebrowRow}>
                 <IFire size={13} color={t.colors.primary} />
                 <Text style={[styles.eyebrow, { color: t.colors.primary }]}>
-                  Trending{cityName ? ` in ${cityName}` : ''}
+                  {cityName ? tr('search.trendingIn', { city: cityName }) : tr('search.trending')}
                 </Text>
               </View>
               <View style={[styles.chipWrap, { marginTop: 11 }]}>
@@ -205,7 +207,7 @@ export default function Search() {
 
             {/* browse by craving */}
             <Rise delay={140} style={[styles.pad, { marginTop: 24 }]}>
-              <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg, marginBottom: 12 }]}>Browse by craving</Text>
+              <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg, marginBottom: 12 }]}>{tr('search.browseByCraving')}</Text>
               <View style={styles.cravingGrid}>
                 {cravings.map((c, i) => {
                   const colors = t.tileGradients[CRAVING_TILES[i % CRAVING_TILES.length]];
@@ -235,9 +237,9 @@ export default function Search() {
             ) : !hasResults ? (
               <View style={[styles.emptyCard, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }, t.shadows.card]}>
                 <ISearch size={20} color={t.colors.muted} />
-                <Text style={{ marginTop: 10, fontWeight: '800', fontSize: 15, color: t.colors.fg }}>No matches</Text>
+                <Text style={{ marginTop: 10, fontWeight: '800', fontSize: 15, color: t.colors.fg }}>{tr('search.noMatches')}</Text>
                 <Text style={{ marginTop: 4, fontSize: 12.5, color: t.colors.fgSoft, textAlign: 'center', lineHeight: 18 }}>
-                  Nothing matches “{query}”{cityName ? ` in ${cityName}` : ''}. Try another dish, place or cuisine.
+                  {cityName ? tr('search.noMatchesBodyCity', { query, city: cityName }) : tr('search.noMatchesBody', { query })}
                 </Text>
               </View>
             ) : (
@@ -245,7 +247,7 @@ export default function Search() {
                 {/* dishes */}
                 {dishes.length > 0 && (
                   <View style={{ marginBottom: stores.length ? 22 : 0 }}>
-                    <Text style={[styles.sectitle, { color: t.colors.fg }]}>Dishes</Text>
+                    <Text style={[styles.sectitle, { color: t.colors.fg }]}>{tr('search.dishes')}</Text>
                     <View style={{ gap: 10 }}>
                       {dishes.map((d, i) => (
                         <MotiView
@@ -273,7 +275,7 @@ export default function Search() {
                 {/* restaurants */}
                 {stores.length > 0 && (
                   <View>
-                    <Text style={[styles.sectitle, { color: t.colors.fg }]}>Restaurants</Text>
+                    <Text style={[styles.sectitle, { color: t.colors.fg }]}>{tr('search.restaurants')}</Text>
                     <View style={{ gap: 12 }}>
                       {stores.map((r, i) => (
                         <MotiView

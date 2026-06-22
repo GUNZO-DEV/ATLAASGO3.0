@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ChevronDown, ChevronUp, Receipt as ReceiptIcon } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 /**
  * Itemized order receipt — mobile port of web src/components/OrderReceipt.tsx.
@@ -36,10 +38,10 @@ export type ReceiptOrder = {
   created_at: string;
 };
 
-function paymentLabel(method: string | null): string {
-  if (method === 'cash') return 'Cash';
-  if (method === 'wallet') return 'Wallet';
-  return 'Card';
+function paymentLabel(method: string | null, tr: TFunction): string {
+  if (method === 'cash') return tr('receipt.payCash');
+  if (method === 'wallet') return tr('receipt.payWallet');
+  return tr('receipt.payCard');
 }
 
 function FeeRow({ label, value }: { label: string; value: string }) {
@@ -52,10 +54,11 @@ function FeeRow({ label, value }: { label: string; value: string }) {
 }
 
 export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; defaultOpen?: boolean }) {
+  const { t: tr } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
   const items = order.items ?? [];
   const itemCount = items.reduce((acc, i) => acc + i.qty, 0);
-  const restaurantName = items[0]?.restaurantName ?? 'Your order';
+  const restaurantName = items[0]?.restaurantName ?? tr('receipt.fallbackName');
   const placedAt = new Date(order.created_at);
 
   return (
@@ -78,7 +81,7 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
             </Text>
             <View className="flex-row items-center mt-0.5" style={{ gap: 6 }}>
               <Text className="text-[12px]" style={{ color: MUTED }}>
-                {itemCount} item{itemCount === 1 ? '' : 's'} ·{' '}
+                {tr('receipt.itemCount', { n: itemCount })} ·{' '}
                 {placedAt.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
@@ -91,7 +94,7 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
               className="text-[10px] uppercase font-bold mt-0.5"
               style={{ letterSpacing: 1.0, color: MUTED }}
             >
-              {paymentLabel(order.payment_method)}
+              {paymentLabel(order.payment_method, tr)}
             </Text>
           </View>
           {open ? <ChevronUp size={16} color={MUTED} /> : <ChevronDown size={16} color={MUTED} />}
@@ -104,7 +107,7 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
 
           {/* Items */}
           {items.length === 0 ? (
-            <Text className="text-[13px]" style={{ color: MUTED }}>No item details on this order.</Text>
+            <Text className="text-[13px]" style={{ color: MUTED }}>{tr('receipt.noItems')}</Text>
           ) : (
             <View style={{ gap: 10 }}>
               {items.map((item, i) => (
@@ -130,14 +133,14 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
           <View
             style={{ borderTopWidth: 1, borderColor: LINE, borderStyle: 'dashed', marginTop: 16, paddingTop: 12, gap: 6 }}
           >
-            <FeeRow label="Subtotal" value={`${order.subtotal_dh ?? 0} dh`} />
-            <FeeRow label="Delivery fee" value={`${order.delivery_fee_dh ?? 0} dh`} />
-            <FeeRow label="Service fee" value={`${order.service_fee_dh ?? 0} dh`} />
+            <FeeRow label={tr('receipt.subtotal')} value={`${order.subtotal_dh ?? 0} dh`} />
+            <FeeRow label={tr('receipt.deliveryFee')} value={`${order.delivery_fee_dh ?? 0} dh`} />
+            <FeeRow label={tr('receipt.serviceFee')} value={`${order.service_fee_dh ?? 0} dh`} />
             <View
               className="flex-row items-center justify-between"
               style={{ borderTopWidth: 1, borderColor: LINE, marginTop: 8, paddingTop: 10 }}
             >
-              <Text className="text-[15px]" style={{ fontWeight: '800', color: INK }}>Total</Text>
+              <Text className="text-[15px]" style={{ fontWeight: '800', color: INK }}>{tr('receipt.total')}</Text>
               <Text className="text-[15px]" style={{ fontWeight: '800', color: BRAND, fontVariant: ['tabular-nums'] }}>
                 {order.total_dh ?? 0} dh
               </Text>
@@ -151,7 +154,7 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
               style={{ backgroundColor: 'rgba(5,150,105,0.10)' }}
             >
               <Text className="text-[11px] uppercase font-bold" style={{ letterSpacing: 0.8, color: '#059669' }}>
-                Promo · {order.promotion_code}
+                {tr('receipt.promo')} · {order.promotion_code}
               </Text>
             </View>
           ) : null}
@@ -163,7 +166,7 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
               style={{ backgroundColor: 'rgba(26,20,16,0.03)' }}
             >
               <Text className="text-[12px]" style={{ color: MUTED, lineHeight: 18 }}>
-                <Text style={{ fontWeight: '700', color: INK }}>Note for the rider: </Text>
+                <Text style={{ fontWeight: '700', color: INK }}>{tr('receipt.riderNote')} </Text>
                 {order.delivery_notes}
               </Text>
             </View>

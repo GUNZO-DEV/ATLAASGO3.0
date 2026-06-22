@@ -24,6 +24,7 @@
 // None of the money math or order-create logic is touched.
 import { MotiView } from 'moti';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,12 +60,6 @@ import {
 
 const MIN_ORDER_DH = 30; // Minimum order subtotal — same as web (src/pages/Cart.tsx)
 
-const CATEGORY_LABELS: Record<CategoryKey, string> = {
-  food: 'Food',
-  pharmacy: 'Pharmacy',
-  groceries: 'Groceries',
-};
-
 /** Morocco-friendly phone check — starts +212 or 0, then 5/6/7 and 8 digits. */
 function isValidMoroccanPhone(raw: string): boolean {
   const cleaned = raw.replace(/[\s-]/g, '');
@@ -85,6 +80,7 @@ type SavedAddress = {
 
 export default function Checkout() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string; speed?: string; tipDh?: string; handoff?: string; addressId?: string }>();
   const categoryKey = (params.category as CategoryKey) ?? 'food';
@@ -225,14 +221,14 @@ export default function Checkout() {
     if (!user) return;
     const cleaned = phoneInput.replace(/[\s-]/g, '');
     if (!isValidMoroccanPhone(cleaned)) {
-      Alert.alert('Invalid phone', 'Enter a Moroccan number like +212612345678 or 0612345678.');
+      Alert.alert(tr('checkout.invalidPhoneTitle'), tr('checkout.invalidPhoneBody'));
       return;
     }
     setPhoneSaving(true);
     const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', user.id);
     setPhoneSaving(false);
     if (error) {
-      Alert.alert('Could not save phone', error.message);
+      Alert.alert(tr('checkout.savePhoneErrorTitle'), error.message);
       return;
     }
     setPhoneOnFile(cleaned);
@@ -246,34 +242,34 @@ export default function Checkout() {
     // Production: a real order requires a signed-in user (RLS enforces
     // orders.customer_id = auth.uid()).
     if (!user) {
-      Alert.alert('Sign in to order', 'Create an account or sign in to place your order.', [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Sign in', onPress: () => router.push('/sign-in') },
+      Alert.alert(tr('checkout.signInTitle'), tr('checkout.signInBody'), [
+        { text: tr('checkout.notNow'), style: 'cancel' },
+        { text: tr('checkout.signIn'), onPress: () => router.push('/sign-in') },
       ]);
       return;
     }
     if (items.length === 0) {
-      Alert.alert('Cart is empty', 'Add items before placing an order.');
+      Alert.alert(tr('checkout.emptyCartTitle'), tr('checkout.emptyCartBody'));
       return;
     }
     if (!subtotalOk) {
-      Alert.alert('Almost there', `Minimum order is ${MIN_ORDER_DH} dh — add ${MIN_ORDER_DH - subtotal} dh more to checkout.`);
+      Alert.alert(tr('checkout.almostThereTitle'), tr('checkout.minOrderBody', { min: MIN_ORDER_DH, more: MIN_ORDER_DH - subtotal }));
       return;
     }
     if (!phoneOk) {
-      Alert.alert('Phone needed', 'Add your phone number so your rider can reach you.');
+      Alert.alert(tr('checkout.phoneNeededTitle'), tr('checkout.phoneNeededBody'));
       return;
     }
     if (!effectiveCoords) {
-      Alert.alert('Location required', 'Tap "Capture" to share your GPS pin, or pick a saved address.');
+      Alert.alert(tr('checkout.locationRequiredTitle'), tr('checkout.locationRequiredBody'));
       return;
     }
     if (!landmarkValid) {
-      Alert.alert('Landmark required', 'Add a quick landmark so your driver finds you.');
+      Alert.alert(tr('checkout.landmarkRequiredTitle'), tr('checkout.landmarkRequiredBody'));
       return;
     }
     if (!quote) {
-      Alert.alert('One moment', "We're still calculating your total — try again in a second.");
+      Alert.alert(tr('checkout.oneMomentTitle'), tr('checkout.oneMomentBody'));
       return;
     }
 
@@ -306,7 +302,7 @@ export default function Checkout() {
       handoff,
     });
     if (!orderId) {
-      Alert.alert('Could not place order', createError?.message ?? 'Please try again in a moment.');
+      Alert.alert(tr('checkout.placeOrderErrorTitle'), createError?.message ?? tr('checkout.tryAgainMoment'));
       return;
     }
 
@@ -319,16 +315,16 @@ export default function Checkout() {
         const { data, error } = await supabase.functions.invoke('create-payment-intent', {
           body: { orderId, totalDh: finalTotal, customerEmail: user.email ?? undefined },
         });
-        if (error || !data?.clientSecret) throw new Error(error?.message ?? 'Could not start the payment');
+        if (error || !data?.clientSecret) throw new Error(error?.message ?? tr('checkout.paymentStartError'));
         const paid = await payWithPaymentSheet(data.clientSecret as string, user.email ?? 'AtlaasGo customer');
         if (!paid) {
           await cancelOrder(orderId);
-          Alert.alert('Payment canceled', 'Your order was not placed.');
+          Alert.alert(tr('checkout.paymentCanceledTitle'), tr('checkout.paymentCanceledBody'));
           return;
         }
       } catch (e) {
         await cancelOrder(orderId);
-        Alert.alert('Payment failed', `${(e as Error).message}\n\nYour order was not placed — try again or pay cash on delivery.`);
+        Alert.alert(tr('checkout.paymentFailedTitle'), tr('checkout.paymentFailedBody', { message: (e as Error).message }));
         return;
       }
     }
@@ -352,16 +348,16 @@ export default function Checkout() {
           // a free order on the books — cancel it and stop.
           await cancelOrder(orderId);
           Alert.alert(
-            'Wallet payment failed',
-            'Your wallet balance changed and the payment could not be completed. Your order was not placed — please try again.',
+            tr('checkout.walletFailedTitle'),
+            tr('checkout.walletFailedBody'),
           );
           return;
         }
         // Partial credit: the cash remainder still covers the order, but the
         // wallet portion was not applied — ask the user to pay full cash.
         Alert.alert(
-          'Wallet credit not applied',
-          'Your order was placed, but the wallet payment failed — please pay the full amount in cash on delivery.',
+          tr('checkout.walletNotAppliedTitle'),
+          tr('checkout.walletNotAppliedBody'),
         );
       }
     }
@@ -389,7 +385,7 @@ export default function Checkout() {
             <IBack size={20} color={t.colors.fg} />
           </View>
         </Press>
-        <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Payment</Text>
+        <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>{tr('checkout.headerTitle')}</Text>
         <View style={{ width: 42 }} />
       </MotiView>
     );
@@ -405,10 +401,10 @@ export default function Checkout() {
             <IBag size={28} color={t.colors.muted} />
           </View>
           <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>
-            Nothing to check out
+            {tr('checkout.emptyTitle')}
           </Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Your cart is empty. Add items from a spot to get started.
+            {tr('checkout.emptyBody')}
           </Text>
           <Press onPress={() => router.replace('/')}>
             <LinearGradient
@@ -417,7 +413,7 @@ export default function Checkout() {
               end={t.gradients.end}
               style={[styles.browseBtn, t.shadows.glow]}
             >
-              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Browse spots</Text>
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('checkout.browseSpots')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -436,10 +432,10 @@ export default function Checkout() {
       >
         <Rise>
           <Text style={[styles.eyebrow, { color: t.colors.primary, marginTop: 6 }]}>
-            {CATEGORY_LABELS[categoryKey].toUpperCase()} DELIVERY
+            {tr('checkout.categoryDeliveryEyebrow', { category: tr(`checkout.category_${categoryKey}`).toUpperCase() })}
           </Text>
           <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg, marginTop: 3, lineHeight: 31 }]}>
-            Where exactly{'\n'}should we drop it?
+            {tr('checkout.dropHeading')}
           </Text>
         </Rise>
 
@@ -452,7 +448,7 @@ export default function Checkout() {
             ]}
           >
             <Text style={{ fontSize: 12, color: t.colors.fgSoft, lineHeight: 18 }}>
-              You'll be asked to sign in before your order is placed.
+              {tr('checkout.signInNote')}
             </Text>
           </View>
         )}
@@ -464,7 +460,7 @@ export default function Checkout() {
           </View>
         ) : addresses.length > 0 ? (
           <Rise style={{ marginTop: 22 }}>
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>SAVED ADDRESSES</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.savedAddresses')}</Text>
             <View style={{ gap: 10 }}>
               {addresses.map((a) => {
                 const active = selectedAddressId === a.id;
@@ -497,10 +493,10 @@ export default function Checkout() {
                       )}
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }} numberOfLines={1}>
-                          {a.label ?? 'Address'}
+                          {a.label ?? tr('checkout.addressFallback')}
                         </Text>
                         <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>
-                          {[a.line1, a.building, a.room ? `Rm ${a.room}` : null].filter(Boolean).join(' · ') ||
+                          {[a.line1, a.building, a.room ? tr('checkout.roomShort', { room: a.room }) : null].filter(Boolean).join(' · ') ||
                             a.landmark ||
                             '—'}
                         </Text>
@@ -513,7 +509,7 @@ export default function Checkout() {
               {selectedAddressId && (
                 <Press onPress={() => setSelectedAddressId(null)}>
                   <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.primary, paddingHorizontal: 2, paddingVertical: 4 }}>
-                    Use a new address instead
+                    {tr('checkout.useNewAddress')}
                   </Text>
                 </Press>
               )}
@@ -527,7 +523,7 @@ export default function Checkout() {
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 }}>
                 <IPin size={14} color={t.colors.primary} strokeWidth={2.5} />
-                <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>LANDMARK · REQUIRED</Text>
+                <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>{tr('checkout.landmarkRequiredEyebrow')}</Text>
               </View>
               <View
                 style={[
@@ -542,7 +538,7 @@ export default function Checkout() {
                 <TextInput
                   value={landmark}
                   onChangeText={setLandmark}
-                  placeholder='e.g. "Near the Grand Mosque"'
+                  placeholder={tr('checkout.landmarkPlaceholder')}
                   placeholderTextColor={t.colors.muted}
                   multiline
                   style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: t.colors.fg, minHeight: 64 }}
@@ -556,7 +552,7 @@ export default function Checkout() {
               >
                 <ICheck size={14} color={t.colors.ok} />
                 <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
-                  Using the saved GPS pin from “{selectedAddress.label ?? 'this address'}” — no need to capture.
+                  {tr('checkout.savedGpsNote', { address: selectedAddress.label ?? tr('checkout.thisAddress') })}
                 </Text>
               </View>
             </View>
@@ -581,7 +577,7 @@ export default function Checkout() {
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <IPhone size={15} color={t.colors.warn} />
               <Text style={{ marginLeft: 8, fontSize: 13, fontWeight: '700', color: t.colors.warn, flex: 1 }}>
-                Add a phone number so your rider can reach you
+                {tr('checkout.addPhonePrompt')}
               </Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
@@ -589,7 +585,7 @@ export default function Checkout() {
                 value={phoneInput}
                 onChangeText={setPhoneInput}
                 keyboardType="phone-pad"
-                placeholder="+212612345678 or 0612345678"
+                placeholder={tr('checkout.phonePlaceholder')}
                 placeholderTextColor={t.colors.muted}
                 style={{
                   flex: 1,
@@ -613,7 +609,7 @@ export default function Checkout() {
                   {phoneSaving ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Save</Text>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{tr('checkout.save')}</Text>
                   )}
                 </LinearGradient>
               </Press>
@@ -623,12 +619,12 @@ export default function Checkout() {
 
         {/* ── Driver notes (wired to orders.delivery_notes) ── */}
         <Rise style={{ marginTop: 22 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>DRIVER NOTES · OPTIONAL</Text>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.driverNotesEyebrow')}</Text>
           <View style={[card(t), styles.inputWrap]}>
             <TextInput
               value={notes}
               onChangeText={setNotes}
-              placeholder="Gate code, floor, anything else"
+              placeholder={tr('checkout.driverNotesPlaceholder')}
               placeholderTextColor={t.colors.muted}
               multiline
               style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: t.colors.fg, minHeight: 56 }}
@@ -638,7 +634,7 @@ export default function Checkout() {
 
         {/* ── Promo code ── */}
         <Rise style={{ marginTop: 22 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>PROMO CODE</Text>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.promoCodeEyebrow')}</Text>
           {promo.applied ? (
             <View
               style={[
@@ -648,7 +644,7 @@ export default function Checkout() {
             >
               <ICheck size={14} color={t.colors.ok} />
               <Text style={{ marginLeft: 8, fontSize: 13, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
-                {promo.applied.code} applied · −{promo.applied.discountDh} dh
+                {tr('checkout.promoApplied', { code: promo.applied.code, discount: promo.applied.discountDh })}
               </Text>
               <Press
                 onPress={() => {
@@ -691,7 +687,7 @@ export default function Checkout() {
                   {promo.checking ? (
                     <ActivityIndicator color={t.colors.bg} size="small" />
                   ) : (
-                    <Text style={{ color: t.colors.bg, fontWeight: '800', fontSize: 13 }}>Apply</Text>
+                    <Text style={{ color: t.colors.bg, fontWeight: '800', fontSize: 13 }}>{tr('checkout.apply')}</Text>
                   )}
                 </View>
               </Press>
@@ -704,7 +700,7 @@ export default function Checkout() {
 
         {/* ── Payment method ── */}
         <Rise style={{ marginTop: 22 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>PAY WITH</Text>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.payWithEyebrow')}</Text>
           <View style={{ gap: 10 }}>
             {/* Cash on delivery — default */}
             <Press onPress={() => setPayMethod('cash')}>
@@ -723,8 +719,8 @@ export default function Checkout() {
                   <Banknote size={17} color="#fff" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Cash on delivery</Text>
-                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Pay the rider when it arrives</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>{tr('checkout.cashTitle')}</Text>
+                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>{tr('checkout.cashSubtitle')}</Text>
                 </View>
                 {payMethod === 'cash' && <ICheck size={18} color={t.colors.primary} />}
               </View>
@@ -753,9 +749,9 @@ export default function Checkout() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>
-                      Wallet credit{payMethod === 'wallet' && walletCredit > 0 ? ` · −${walletCredit} dh` : ''}
+                      {tr('checkout.walletTitle')}{payMethod === 'wallet' && walletCredit > 0 ? tr('checkout.walletCreditSuffix', { amount: walletCredit }) : ''}
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Balance: {balanceDh} dh</Text>
+                    <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>{tr('checkout.walletBalance', { balance: balanceDh })}</Text>
                   </View>
                   {payMethod === 'wallet' && <ICheck size={18} color={t.colors.primary} />}
                 </View>
@@ -781,8 +777,8 @@ export default function Checkout() {
                     <CreditCard size={17} color={t.colors.bg} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Credit / debit card</Text>
-                    <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Secure payment via Stripe</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>{tr('checkout.cardTitle')}</Text>
+                    <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>{tr('checkout.cardSubtitle')}</Text>
                   </View>
                   {payMethod === 'card' && <ICheck size={18} color={t.colors.primary} />}
                 </View>
@@ -793,8 +789,8 @@ export default function Checkout() {
                   <CreditCard size={17} color={t.colors.bg} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>Credit / debit card</Text>
-                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>Arriving in the next update</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }}>{tr('checkout.cardTitle')}</Text>
+                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 2 }}>{tr('checkout.cardComingSoon')}</Text>
                 </View>
               </View>
             )}
@@ -804,7 +800,7 @@ export default function Checkout() {
           {payMethod === 'wallet' && walletCredit > 0 && !fullyCoveredByWallet && (
             <View style={[styles.warnStrip, { backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.warn, lineHeight: 18 }}>
-                Wallet covers {walletCredit} dh — the remaining {finalTotal} dh is cash on delivery.
+                {tr('checkout.walletPartialNote', { covers: walletCredit, remaining: finalTotal })}
               </Text>
             </View>
           )}
@@ -814,7 +810,7 @@ export default function Checkout() {
         {!subtotalOk && (
           <View style={[styles.warnStrip, { marginTop: 18, backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.warn, lineHeight: 18 }}>
-              Minimum order is {MIN_ORDER_DH} dh — add {MIN_ORDER_DH - subtotal} dh more to checkout.
+              {tr('checkout.minOrderWarning', { min: MIN_ORDER_DH, more: MIN_ORDER_DH - subtotal })}
             </Text>
           </View>
         )}
@@ -827,17 +823,17 @@ export default function Checkout() {
             end={t.gradients.end}
             style={StyleSheet.absoluteFill}
           />
-          <BillRow label="Subtotal" value={`${subtotal} dh`} />
-          <BillRow label="Delivery" value={deliveryFee === 0 ? 'Free' : `${deliveryFee} dh`} />
-          {priorityDh > 0 && <BillRow label="Priority" value={`${priorityDh} dh`} />}
-          {weatherDh > 0 && <BillRow label="Winter surcharge" value={`${weatherDh} dh`} />}
-          {tipAmount > 0 && <BillRow label="Courier tip" value={`${tipAmount} dh`} />}
+          <BillRow label={tr('checkout.billSubtotal')} value={`${subtotal} dh`} />
+          <BillRow label={tr('checkout.billDelivery')} value={deliveryFee === 0 ? tr('checkout.billFree') : `${deliveryFee} dh`} />
+          {priorityDh > 0 && <BillRow label={tr('checkout.billPriority')} value={`${priorityDh} dh`} />}
+          {weatherDh > 0 && <BillRow label={tr('checkout.billWinterSurcharge')} value={`${weatherDh} dh`} />}
+          {tipAmount > 0 && <BillRow label={tr('checkout.billCourierTip')} value={`${tipAmount} dh`} />}
           {promoDiscount > 0 && (
-            <BillRow label={`Promo · ${promo.applied?.code}`} value={`−${promoDiscount} dh`} accent="#3FD08A" />
+            <BillRow label={tr('checkout.billPromo', { code: promo.applied?.code })} value={`−${promoDiscount} dh`} accent="#3FD08A" />
           )}
-          {walletCredit > 0 && <BillRow label="Wallet credit" value={`−${walletCredit} dh`} accent="#A99DFF" />}
+          {walletCredit > 0 && <BillRow label={tr('checkout.billWalletCredit')} value={`−${walletCredit} dh`} accent="#A99DFF" />}
           <View style={styles.billTotalRow}>
-            <Text style={[styles.disp, { fontSize: 15, color: '#fff' }]}>Total</Text>
+            <Text style={[styles.disp, { fontSize: 15, color: '#fff' }]}>{tr('checkout.billTotal')}</Text>
             <Text style={[styles.disp, { fontSize: 19, color: '#fff', fontVariant: ['tabular-nums'] }]}>
               {finalTotal} dh
             </Text>
@@ -855,11 +851,11 @@ export default function Checkout() {
           <View style={styles.etaLine}>
             <Clock size={13} color={t.colors.muted} />
             <Text style={{ fontSize: 12, color: t.colors.muted }}>
-              Arrives in{' '}
+              {tr('checkout.arrivesIn')}{' '}
               <Text style={{ fontWeight: '800', color: t.colors.fg }}>
-                {quote.etaMinutes[0]}–{quote.etaMinutes[1]} min
+                {tr('checkout.etaRange', { min: quote.etaMinutes[0], max: quote.etaMinutes[1] })}
               </Text>
-              {selectedAddress?.label ? ` · to ${selectedAddress.label}` : ''}
+              {selectedAddress?.label ? tr('checkout.etaToAddress', { address: selectedAddress.label }) : ''}
             </Text>
           </View>
         )}
@@ -898,22 +894,24 @@ export default function Checkout() {
     return (
       <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15, marginRight: 6, letterSpacing: 0.2 }}>
         {submitting
-          ? 'Placing order…'
+          ? tr('checkout.placingOrder')
           : !user
-            ? 'Sign in to order'
+            ? tr('checkout.signInToOrder')
             : !subtotalOk
-              ? `Add ${MIN_ORDER_DH - subtotal} dh more`
+              ? tr('checkout.addMore', { more: MIN_ORDER_DH - subtotal })
               : !phoneOk
-                ? 'Add your phone first'
+                ? tr('checkout.addPhoneFirst')
                 : !effectiveCoords
-                  ? 'Capture GPS first'
+                  ? tr('checkout.captureGpsFirst')
                   : !landmarkValid
-                    ? 'Add a landmark'
+                    ? tr('checkout.addLandmark')
                     : !quote
-                      ? 'Pricing…'
+                      ? tr('checkout.pricing')
                       : fullyCoveredByWallet
-                        ? 'Place order · paid from wallet'
-                        : `Place order · ${finalTotal} dh${walletCredit > 0 ? ' cash' : ''}`}
+                        ? tr('checkout.placeOrderWallet')
+                        : walletCredit > 0
+                          ? tr('checkout.placeOrderCash', { total: finalTotal })
+                          : tr('checkout.placeOrderTotal', { total: finalTotal })}
       </Text>
     );
   }

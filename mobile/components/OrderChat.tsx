@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   FlatList,
@@ -37,12 +38,12 @@ const BRAND = '#FF5722';
 const CREAM = '#FBF7F2';
 const LINE = 'rgba(26,20,16,0.08)';
 
-const ROLE_LABELS: Record<string, string> = {
-  customer: 'Customer',
-  rider: 'Rider',
-  merchant: 'Kitchen',
-  admin: 'Support',
-  super_admin: 'Support',
+const ROLE_LABEL_KEYS: Record<string, string> = {
+  customer: 'roleCustomer',
+  rider: 'roleRider',
+  merchant: 'roleKitchen',
+  admin: 'roleSupport',
+  super_admin: 'roleSupport',
 };
 
 function fmtTime(iso: string): string {
@@ -50,6 +51,7 @@ function fmtTime(iso: string): string {
 }
 
 function Bubble({ message, mine, showLabel }: { message: OrderMessage; mine: boolean; showLabel: boolean }) {
+  const { t: tr } = useTranslation();
   const isLocation = message.kind === 'location' && message.location_lat != null && message.location_lng != null;
 
   const openMap = () => {
@@ -72,7 +74,7 @@ function Bubble({ message, mine, showLabel }: { message: OrderMessage; mine: boo
           className="text-[10px] uppercase font-bold mb-1 ml-2"
           style={{ letterSpacing: 1.0, color: MUTED }}
         >
-          {ROLE_LABELS[message.sender_role] ?? 'Support'}
+          {tr(`chat.${ROLE_LABEL_KEYS[message.sender_role] ?? 'roleSupport'}`)}
         </Text>
       ) : null}
       <Pressable onPress={openMap} disabled={!isLocation}>
@@ -99,10 +101,10 @@ function Bubble({ message, mine, showLabel }: { message: OrderMessage; mine: boo
               </View>
               <View className="ml-2.5">
                 <Text className="text-[14px]" style={{ fontWeight: '700', color: mine ? '#fff' : INK }}>
-                  {message.body || 'My location'}
+                  {message.body || tr('chat.myLocation')}
                 </Text>
                 <Text className="text-[11px] mt-0.5" style={{ color: mine ? 'rgba(255,255,255,0.75)' : MUTED }}>
-                  Tap to open the map
+                  {tr('chat.tapToOpenMap')}
                 </Text>
               </View>
             </View>
@@ -134,6 +136,7 @@ export function OrderChat({
   role: 'customer' | 'merchant' | 'rider';
   onClose: () => void;
 }) {
+  const { t: tr } = useTranslation();
   const { messages, loading, sending, error, send, markRead, me } = useOrderChat(
     orderId,
     role as ChatRole,
@@ -173,7 +176,7 @@ export function OrderChat({
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      await send('My location', 'location', {
+      await send(tr('chat.myLocation'), 'location', {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
       });
@@ -201,7 +204,7 @@ export function OrderChat({
             </View>
             <View className="ml-3">
               <Text className="text-[16px]" style={{ fontWeight: '900', color: INK, letterSpacing: -0.3 }}>
-                Order chat
+                {tr('chat.title')}
               </Text>
               <Text className="text-[11px] uppercase font-bold mt-0.5" style={{ letterSpacing: 1.2, color: MUTED }}>
                 #{orderId.slice(0, 6).toUpperCase()}
@@ -222,10 +225,10 @@ export function OrderChat({
           <View className="flex-1 items-center justify-center px-8">
             <MessageCircle size={28} color={MUTED} />
             <Text className="mt-4 text-[18px]" style={{ fontWeight: '800', color: INK }}>
-              Sign in to chat
+              {tr('chat.signInTitle')}
             </Text>
             <Text className="mt-2 text-[13px] text-center" style={{ color: MUTED, lineHeight: 19 }}>
-              You need to be signed in to message about this order.
+              {tr('chat.signInBody')}
             </Text>
           </View>
         ) : (
@@ -250,10 +253,10 @@ export function OrderChat({
                   <View className="flex-1 items-center justify-center px-8">
                     <Text style={{ fontSize: 34 }}>💬</Text>
                     <Text className="mt-3 text-[17px]" style={{ fontWeight: '800', color: INK }}>
-                      Say salam
+                      {tr('chat.emptyTitle')}
                     </Text>
                     <Text className="mt-1.5 text-[13px] text-center" style={{ color: MUTED, lineHeight: 19 }}>
-                      Tap a quick reply or type a note below.
+                      {tr('chat.emptyBody')}
                     </Text>
                   </View>
                 }
@@ -309,7 +312,7 @@ export function OrderChat({
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Type a message…"
+                placeholder={tr('chat.placeholder')}
                 placeholderTextColor="#A89E94"
                 multiline
                 style={{

@@ -31,6 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { GraduationCap, Pencil, Trash2 } from 'lucide-react-native';
 
 import { useAg3Theme } from '../components/ag3/theme';
@@ -66,6 +67,7 @@ const AUI_BUILDINGS = [...AUI_DORMS, ...AUI_OTHER];
 
 export default function AddressesScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { addresses, loading, add, update, remove, setDefault } = useAddresses();
@@ -114,7 +116,7 @@ export default function AddressesScreen() {
 
   async function submit() {
     if (landmark.trim().length < 3) {
-      Alert.alert('Add a landmark', 'A landmark helps your driver find you (min 3 characters).');
+      Alert.alert(tr('addresses.landmarkAlertTitle'), tr('addresses.landmarkAlertBody'));
       return;
     }
     setBusy(true);
@@ -122,7 +124,7 @@ export default function AddressesScreen() {
     const err = editingId ? await update(editingId, input) : await add(input);
     setBusy(false);
     if (err) {
-      Alert.alert('Could not save', err);
+      Alert.alert(tr('addresses.saveErrorTitle'), err);
     } else {
       resetForm();
     }
@@ -138,10 +140,10 @@ export default function AddressesScreen() {
             <IPin size={28} color={t.colors.muted} />
           </View>
           <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>
-            Saved addresses
+            {tr('addresses.signedOutTitle')}
           </Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Sign in to save home, the dorm, or the café you camp at.
+            {tr('addresses.signedOutBody')}
           </Text>
           <Press onPress={() => router.push('/sign-in')}>
             <LinearGradient
@@ -150,7 +152,7 @@ export default function AddressesScreen() {
               end={t.gradients.end}
               style={[styles.browseBtn, t.shadows.glow]}
             >
-              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('addresses.signIn')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -170,8 +172,8 @@ export default function AddressesScreen() {
         {/* eyebrow + title */}
         <Rise>
           <View style={[styles.pad, { marginTop: 6, marginBottom: 4 }]}>
-            <Text style={[styles.eyebrow, { color: t.colors.primary }]}>WHERE WE DROP</Text>
-            <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg }]}>Delivery addresses</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('addresses.eyebrow')}</Text>
+            <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg }]}>{tr('addresses.title')}</Text>
           </View>
         </Rise>
 
@@ -206,28 +208,28 @@ export default function AddressesScreen() {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                       <Text style={{ fontSize: 15, fontWeight: '800', color: t.colors.fg }} numberOfLines={1}>
-                        {a.label || 'Address'}
+                        {a.label || tr('addresses.addressFallback')}
                       </Text>
                       {a.isDefault && (
                         <View style={[styles.badge, { backgroundColor: 'rgba(47,163,107,0.14)' }]}>
                           <ICheck size={12} color={t.colors.ok} />
-                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.colors.ok }}>DEFAULT</Text>
+                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.colors.ok }}>{tr('addresses.defaultBadge')}</Text>
                         </View>
                       )}
                       {a.isCampus && (
                         <View style={[styles.badge, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
-                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.colors.primary }}>CAMPUS</Text>
+                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: t.colors.primary }}>{tr('addresses.campusBadge')}</Text>
                         </View>
                       )}
                     </View>
                     <Text style={{ fontSize: 12.5, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>
-                      {[a.line1, a.landmark, a.building && `Bldg ${a.building}`, a.room && `Rm ${a.room}`].filter(Boolean).join(' · ')}
+                      {[a.line1, a.landmark, a.building && tr('addresses.bldgPrefix', { building: a.building }), a.room && tr('addresses.roomPrefix', { room: a.room })].filter(Boolean).join(' · ')}
                     </Text>
                     {a.coords && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                         <IPin size={11} color={t.colors.primary} />
                         <Text style={{ fontSize: 11, fontWeight: '600', color: t.colors.primary, fontVariant: ['tabular-nums'] }}>
-                          GPS · {a.coords.lat.toFixed(5)}, {a.coords.lng.toFixed(5)}
+                          {tr('addresses.gpsPrefix')} · {a.coords.lat.toFixed(5)}, {a.coords.lng.toFixed(5)}
                         </Text>
                       </View>
                     )}
@@ -240,7 +242,7 @@ export default function AddressesScreen() {
                     <Pressable onPress={() => setDefault(a.id)}>
                       <View style={[styles.actionPill, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
                         <ICheck size={13} color={t.colors.fgSoft} />
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.fgSoft }}>Set default</Text>
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.fgSoft }}>{tr('addresses.setDefault')}</Text>
                       </View>
                     </Pressable>
                   )}
@@ -265,7 +267,7 @@ export default function AddressesScreen() {
                   <IPin size={24} color={t.colors.muted} />
                 </View>
                 <Text style={{ fontSize: 14, color: t.colors.fgSoft, textAlign: 'center', lineHeight: 20, marginTop: 14 }}>
-                  No saved addresses yet — add your first delivery spot in under 20 seconds.
+                  {tr('addresses.emptyBody')}
                 </Text>
               </View>
             )}
@@ -277,15 +279,15 @@ export default function AddressesScreen() {
           <Rise style={[styles.pad, { marginTop: 18 }]}>
             <View style={[card(t), { padding: 18, borderRadius: t.radii.lg }]}>
               <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg, marginBottom: 14 }]}>
-                {editingId ? 'Edit address' : 'New address'}
+                {editingId ? tr('addresses.editTitle') : tr('addresses.newTitle')}
               </Text>
 
-              <Field t={t} value={label} onChangeText={setLabel} placeholder="Label (Home · Dorm · Studio)" />
-              <Field t={t} value={line1} onChangeText={setLine1} placeholder="Address (Avenue Mohammed V, Ifrane)" />
-              <Field t={t} value={landmark} onChangeText={setLandmark} placeholder="Landmark (e.g. Near AUI gate)" />
+              <Field t={t} value={label} onChangeText={setLabel} placeholder={tr('addresses.labelPlaceholder')} />
+              <Field t={t} value={line1} onChangeText={setLine1} placeholder={tr('addresses.addressPlaceholder')} />
+              <Field t={t} value={landmark} onChangeText={setLandmark} placeholder={tr('addresses.landmarkPlaceholder')} />
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Field t={t} value={building} onChangeText={setBuilding} placeholder="Building" style={{ flex: 1 }} />
-                <Field t={t} value={room} onChangeText={setRoom} placeholder="Room" style={{ flex: 1 }} />
+                <Field t={t} value={building} onChangeText={setBuilding} placeholder={tr('addresses.buildingPlaceholder')} style={{ flex: 1 }} />
+                <Field t={t} value={room} onChangeText={setRoom} placeholder={tr('addresses.roomPlaceholder')} style={{ flex: 1 }} />
               </View>
 
               {/* AUI campus toggle */}
@@ -309,14 +311,14 @@ export default function AddressesScreen() {
                   {isCampus && <ICheck size={14} color="#fff" strokeWidth={3} />}
                 </View>
                 <Text style={{ marginLeft: 11, fontSize: 14, fontWeight: '700', color: t.colors.fg }}>
-                  AUI campus delivery
+                  {tr('addresses.campusToggle')}
                 </Text>
               </Pressable>
 
               {/* Quick-pick chips (campus only) */}
               {isCampus && (
                 <View style={{ marginTop: 8, marginBottom: 6 }}>
-                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 9 }]}>QUICK PICK A BUILDING</Text>
+                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 9 }]}>{tr('addresses.quickPick')}</Text>
                   <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
                       {AUI_BUILDINGS.map((b) => {
@@ -363,16 +365,16 @@ export default function AddressesScreen() {
                   <IPin size={18} color="#fff" />
                 </LinearGradient>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 1 }]}>GPS PIN</Text>
+                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 1 }]}>{tr('addresses.gpsPin')}</Text>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-                    {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}` : 'Tap to capture'}
+                    {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}` : tr('addresses.tapToCapture')}
                   </Text>
                 </View>
                 <Press onPress={capturePin}>
                   <View style={[styles.gpsBtn, { backgroundColor: t.colors.primary, opacity: gpsStatus === 'requesting' ? 0.6 : 1 }]}>
                     {gpsStatus === 'requesting'
                       ? <ActivityIndicator size="small" color="#fff" />
-                      : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12.5 }}>{pin ? 'Update' : 'Capture'}</Text>}
+                      : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12.5 }}>{pin ? tr('addresses.update') : tr('addresses.capture')}</Text>}
                   </View>
                 </Press>
               </View>
@@ -390,11 +392,11 @@ export default function AddressesScreen() {
                 >
                   {busy
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{editingId ? 'Save changes' : 'Save address'}</Text>}
+                    : <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{editingId ? tr('addresses.saveChanges') : tr('addresses.saveAddress')}</Text>}
                 </LinearGradient>
               </Press>
               <Pressable onPress={resetForm} style={{ marginTop: 12, alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: t.colors.muted }}>Cancel</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: t.colors.muted }}>{tr('addresses.cancel')}</Text>
               </Pressable>
             </View>
           </Rise>
@@ -409,7 +411,7 @@ export default function AddressesScreen() {
               >
                 <IPlus size={18} color={t.colors.onPrimary} />
                 <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>
-                  {addresses.length === 0 ? 'Add address' : 'Add another address'}
+                  {addresses.length === 0 ? tr('addresses.addAddress') : tr('addresses.addAnother')}
                 </Text>
               </LinearGradient>
             </Press>
@@ -423,6 +425,7 @@ export default function AddressesScreen() {
 /* ── sub-components ───────────────────────────────────────────────────────── */
 
 function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
+  const { t: tr } = useTranslation();
   return (
     <MotiView
       from={{ opacity: 0, translateX: -8 }}
@@ -435,7 +438,7 @@ function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
           <IBack size={20} color={t.colors.fg} />
         </View>
       </Press>
-      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Addresses</Text>
+      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>{tr('addresses.headerTitle')}</Text>
     </MotiView>
   );
 }

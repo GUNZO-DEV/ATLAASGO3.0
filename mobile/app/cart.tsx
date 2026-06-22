@@ -33,6 +33,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useAg3Theme } from '../components/ag3/theme';
 import {
@@ -62,6 +63,7 @@ const CITY_ID = 'ifrane';
 
 export default function CartScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
 
   // ── live cart (lib/cart zustand store — shared with restaurant + checkout) ──
@@ -71,7 +73,7 @@ export default function CartScreen() {
   const localSubtotal = useCart((s) => s.subtotal());
 
   const storeId = items[0]?.restaurantId ?? null;
-  const restoName = items[0]?.restaurantName ?? 'Your order';
+  const restoName = items[0]?.restaurantName ?? tr('cart.yourOrder');
 
   // ── city + weather (campus gating, weather strip) ──
   const { data: city } = useAsync(() => agApi.cities.get(CITY_ID), []);
@@ -100,12 +102,12 @@ export default function CartScreen() {
     ? {
         name: selectedAddress.label,
         sub: selectedAddress.sub,
-        note: selectedAddress.dropNote ?? 'Leave at the door',
+        note: selectedAddress.dropNote ?? tr('cart.leaveAtTheDoor'),
       }
     : {
-        name: city?.defaultAddress ?? 'Delivery address',
+        name: city?.defaultAddress ?? tr('cart.deliveryAddress'),
         sub: city?.defaultAddressSub ?? '',
-        note: 'Leave at the door',
+        note: tr('cart.leaveAtTheDoor'),
       };
 
   // ── server-side bill: re-quote on every input that affects price ──
@@ -165,10 +167,10 @@ export default function CartScreen() {
             <IBag size={28} color={t.colors.muted} />
           </View>
           <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>
-            Your cart is empty
+            {tr('cart.emptyTitle')}
           </Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Add items from a spot to get started.
+            {tr('cart.emptyBody')}
           </Text>
           <Press onPress={() => router.replace('/')}>
             <LinearGradient
@@ -178,7 +180,7 @@ export default function CartScreen() {
               style={[styles.browseBtn, t.shadows.glow]}
             >
               <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>
-                Browse spots
+                {tr('cart.browseSpots')}
               </Text>
             </LinearGradient>
           </Press>
@@ -205,7 +207,7 @@ export default function CartScreen() {
               style={{ width: 46, height: 46 }}
             />
             <View>
-              <Text style={[styles.eyebrow, { color: t.colors.primary }]}>ORDER FROM</Text>
+              <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('cart.orderFrom')}</Text>
               <Text style={[styles.disp, { fontSize: 16, color: t.colors.fg }]} numberOfLines={1}>
                 {restoName}
               </Text>
@@ -216,10 +218,10 @@ export default function CartScreen() {
         {/* items */}
         <Section
           t={t}
-          title="Your items"
+          title={tr('cart.yourItems')}
           right={
             <Pressable onPress={() => router.back()} hitSlop={8}>
-              <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>+ Add more</Text>
+              <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>{tr('cart.addMore')}</Text>
             </Pressable>
           }
         >
@@ -255,17 +257,17 @@ export default function CartScreen() {
         {/* drop / address */}
         <Section
           t={t}
-          title={isCampus ? 'Dorm-precise drop' : 'Delivery address'}
+          title={isCampus ? tr('cart.dormPreciseDrop') : tr('cart.deliveryAddress')}
           right={
             isCampus ? (
               <Pressable onPress={() => setPickOpen((o) => !o)} hitSlop={8}>
                 <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>
-                  {pickOpen ? 'Done' : 'Change'}
+                  {pickOpen ? tr('cart.done') : tr('cart.change')}
                 </Text>
               </Pressable>
             ) : (
               <Pressable onPress={() => router.push('/')} hitSlop={8}>
-                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>Change</Text>
+                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>{tr('cart.change')}</Text>
               </Pressable>
             )
           }
@@ -290,7 +292,7 @@ export default function CartScreen() {
               </View>
               <View style={[styles.badge, { backgroundColor: 'rgba(47,163,107,0.14)' }]}>
                 <ICheck size={13} color={t.colors.ok} />
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: t.colors.ok }}>Pinned</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: t.colors.ok }}>{tr('cart.pinned')}</Text>
               </View>
             </View>
 
@@ -337,15 +339,15 @@ export default function CartScreen() {
                 value={handoff}
                 onChange={setHandoff}
                 options={[
-                  ['door', 'Leave at door'],
-                  ['hand', 'Hand to me'],
-                  ['lounge', isCampus ? 'Floor lounge' : 'Concierge'],
+                  ['door', tr('cart.handoffDoor')],
+                  ['hand', tr('cart.handoffHand')],
+                  ['lounge', isCampus ? tr('cart.handoffLounge') : tr('cart.handoffConcierge')],
                 ]}
               />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 11, paddingHorizontal: 2 }}>
                 <IUser size={15} color={t.colors.muted} />
                 <Text style={{ fontSize: 12.5, color: t.colors.muted }}>
-                  Note for courier · “{d.note}”
+                  {tr('cart.noteForCourier', { note: d.note })}
                 </Text>
               </View>
             </View>
@@ -353,21 +355,21 @@ export default function CartScreen() {
         </Section>
 
         {/* delivery speed */}
-        <Section t={t} title="Delivery speed">
+        <Section t={t} title={tr('cart.deliverySpeed')}>
           <View style={{ gap: 10 }}>
             {(
               [
                 {
                   k: 'standard' as Speed,
-                  title: 'Standard',
-                  sub: hasWeather ? '18–24 min · weather-adjusted' : '18–24 min · standard delivery',
-                  price: 'Free',
+                  title: tr('cart.speedStandard'),
+                  sub: hasWeather ? tr('cart.speedStandardSubWeather') : tr('cart.speedStandardSub'),
+                  price: tr('cart.free'),
                 },
                 {
                   k: 'priority' as Speed,
-                  title: 'Priority',
-                  sub: '14–18 min · jumps the queue',
-                  price: '+9 dh',
+                  title: tr('cart.speedPriority'),
+                  sub: tr('cart.speedPrioritySub'),
+                  price: tr('cart.priorityPrice'),
                 },
               ]
             ).map((o) => {
@@ -394,7 +396,7 @@ export default function CartScreen() {
                         fontSize: 13,
                         fontWeight: '700',
                         fontVariant: ['tabular-nums'],
-                        color: o.price === 'Free' ? t.colors.ok : t.colors.fg,
+                        color: o.k === 'standard' ? t.colors.ok : t.colors.fg,
                       }}
                     >
                       {o.price}
@@ -409,18 +411,18 @@ export default function CartScreen() {
             <View style={[styles.snowStrip, { backgroundColor: 'rgba(62,134,199,0.09)', borderColor: 'rgba(62,134,199,0.2)' }]}>
               <ISnow size={19} color={t.colors.snow} />
               <Text style={{ fontSize: 12, color: t.colors.fgSoft, flex: 1, lineHeight: 17 }}>
-                Snow on the Atlas pass adds{' '}
+                {tr('cart.snowStripBefore')}{' '}
                 <Text style={{ fontWeight: '800', color: t.colors.fg }}>
                   {weatherFee ? `${weatherFee} dh` : `~${weather?.etaAddMinutes ?? 4} min`}
                 </Text>{' '}
-                to the run. We track it live and update your ETA.
+                {tr('cart.snowStripAfter')}
               </Text>
             </View>
           )}
         </Section>
 
         {/* tip */}
-        <Section t={t} title="Tip your courier">
+        <Section t={t} title={tr('cart.tipYourCourier')}>
           <View style={{ flexDirection: 'row', gap: 9 }}>
             {[0, 5, 10, 15].map((amt) => {
               const active = tip === amt;
@@ -441,7 +443,7 @@ export default function CartScreen() {
                         color: active ? t.colors.primary : t.colors.fg,
                       }}
                     >
-                      {amt === 0 ? 'None' : `${amt} dh`}
+                      {amt === 0 ? tr('cart.tipNone') : `${amt} dh`}
                     </Text>
                   </View>
                 </Press>
@@ -451,7 +453,7 @@ export default function CartScreen() {
         </Section>
 
         {/* payment */}
-        <Section t={t} title="Payment">
+        <Section t={t} title={tr('cart.payment')}>
           <Press onPress={placeOrder}>
             <View style={[card(t), styles.payRow]}>
               <View style={[styles.payIcon, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
@@ -459,10 +461,10 @@ export default function CartScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>
-                  {payment?.label ?? 'AtlaasGo Wallet'}
+                  {payment?.label ?? tr('cart.walletLabel')}
                 </Text>
                 <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 1 }}>
-                  {payment?.last4 ? `•••• ${payment.last4}` : 'Choose card, wallet or cash at checkout'}
+                  {payment?.last4 ? `•••• ${payment.last4}` : tr('cart.paymentHint')}
                 </Text>
               </View>
               <IChevR size={20} color={t.colors.muted} />
@@ -471,25 +473,25 @@ export default function CartScreen() {
         </Section>
 
         {/* bill */}
-        <Section t={t} title="Bill summary">
+        <Section t={t} title={tr('cart.billSummary')}>
           <View style={[card(t), { paddingHorizontal: 16, paddingVertical: 15 }]}>
-            <BillRow t={t} label="Subtotal" value={`${sub} dh`} />
+            <BillRow t={t} label={tr('cart.subtotal')} value={`${sub} dh`} />
             {baseFee ? (
-              <BillRow t={t} label="Delivery fee" value={`${baseFee} dh`} />
+              <BillRow t={t} label={tr('cart.deliveryFee')} value={`${baseFee} dh`} />
             ) : (
-              <BillRow t={t} label="Delivery fee" value="Free" ok />
+              <BillRow t={t} label={tr('cart.deliveryFee')} value={tr('cart.free')} ok />
             )}
             {speed === 'priority' && priority ? (
-              <BillRow t={t} label="Priority" value={`${priority} dh`} />
+              <BillRow t={t} label={tr('cart.priority')} value={`${priority} dh`} />
             ) : null}
             {hasWeather && weatherFee ? (
-              <BillRow t={t} label="Winter surcharge" value={`${weatherFee} dh`} />
+              <BillRow t={t} label={tr('cart.winterSurcharge')} value={`${weatherFee} dh`} />
             ) : null}
-            {tipDh > 0 ? <BillRow t={t} label="Courier tip" value={`${tipDh} dh`} /> : null}
+            {tipDh > 0 ? <BillRow t={t} label={tr('cart.courierTip')} value={`${tipDh} dh`} /> : null}
 
             <View style={[styles.hr, { backgroundColor: t.colors.line, marginVertical: 9 }]} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg }]}>Total</Text>
+              <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg }]}>{tr('cart.total')}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                 {quoting && <ActivityIndicator size="small" color={t.colors.muted} />}
                 <Text
@@ -513,7 +515,7 @@ export default function CartScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, justifyContent: 'center', marginBottom: 9 }}>
           <IClock size={14} color={t.colors.muted} />
           <Text style={{ fontSize: 12, color: t.colors.muted }}>
-            Arrives in <Text style={{ fontWeight: '800', color: t.colors.fg }}>{eta} min</Text> · to {d.name}
+            {tr('cart.arrivesIn')} <Text style={{ fontWeight: '800', color: t.colors.fg }}>{tr('cart.etaMin', { eta })}</Text> {tr('cart.arrivesTo', { name: d.name })}
           </Text>
         </View>
         <Press onPress={placeOrder} disabled={items.length === 0}>
@@ -523,7 +525,7 @@ export default function CartScreen() {
             end={t.gradients.end}
             style={[styles.placeBtn, t.shadows.glow]}
           >
-            <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15.5 }}>Place order</Text>
+            <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15.5 }}>{tr('cart.placeOrder')}</Text>
             <Text
               style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15.5, fontVariant: ['tabular-nums'] }}
             >
@@ -541,6 +543,7 @@ export default function CartScreen() {
 type Theme = ReturnType<typeof useAg3Theme>;
 
 function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
+  const { t: tr } = useTranslation();
   return (
     <MotiView
       from={{ opacity: 0, translateX: -8 }}
@@ -553,7 +556,7 @@ function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
           <IBack size={20} color={t.colors.fg} />
         </View>
       </Press>
-      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>Checkout</Text>
+      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>{tr('cart.checkout')}</Text>
     </MotiView>
   );
 }

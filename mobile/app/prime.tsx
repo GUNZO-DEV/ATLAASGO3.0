@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -34,18 +35,17 @@ type Theme = ReturnType<typeof useAg3Theme>;
 // matching the "49 dh/month" winter-membership framing on the account banner.
 const LEAD_TIER = PRIME_TIERS[0];
 
-const HERO_PERKS = [
-  'Free delivery on every order, all winter',
-  'Exclusive promos & member-only pricing',
-  'Priority support when you need it',
-] as const;
+const HERO_PERK_KEYS = ['heroPerkFreeDelivery', 'heroPerkPromos', 'heroPerkSupport'] as const;
 
 export default function PrimeScreen() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const { sub, loading, refresh } = usePrime();
   const [buyingTier, setBuyingTier] = useState<string | null>(null);
+
+  const HERO_PERKS = HERO_PERK_KEYS.map((k) => tr(`prime.${k}`));
 
   async function buyTier(tier: string) {
     if (!user) {
@@ -59,7 +59,7 @@ export default function PrimeScreen() {
       const { data, error } = await supabase.functions.invoke('create-prime-checkout', {
         body: { tier, userId: user.id, customerEmail: user.email ?? undefined, siteUrl: 'https://atlaasgo.com' },
       });
-      if (error || !data?.url || !data?.sessionId) throw new Error(error?.message ?? 'Could not start checkout');
+      if (error || !data?.url || !data?.sessionId) throw new Error(error?.message ?? tr('prime.checkoutError'));
       await WebBrowser.openBrowserAsync(data.url as string);
       // Browser dismissed — try to activate. Fails cleanly if payment wasn't completed.
       const { data: act, error: actErr } = await supabase.functions.invoke('activate-prime', {
@@ -67,15 +67,15 @@ export default function PrimeScreen() {
       });
       if (actErr || !act?.ok) {
         Alert.alert(
-          'Payment not finished',
-          "If you completed the payment, your membership activates within a minute — pull back into this screen to refresh.",
+          tr('prime.paymentNotFinishedTitle'),
+          tr('prime.paymentNotFinishedBody'),
         );
       } else {
         await refresh();
-        Alert.alert('Welcome to AtlaasGo+ ✦', 'Your membership is active.');
+        Alert.alert(tr('prime.welcomeTitle'), tr('prime.welcomeBody'));
       }
     } catch (e) {
-      Alert.alert('Could not start checkout', (e as Error).message);
+      Alert.alert(tr('prime.checkoutError'), (e as Error).message);
     } finally {
       setBuyingTier(null);
     }
@@ -84,10 +84,10 @@ export default function PrimeScreen() {
   const activeTier = sub ? PRIME_TIERS.find((x) => x.id === sub.tier) : undefined;
   const leadIsActive = sub?.tier === LEAD_TIER.id;
   const stickyLabel = leadIsActive
-    ? 'You’re a member'
+    ? tr('prime.stickyMember')
     : sub
-      ? `Switch to ${LEAD_TIER.name}`
-      : 'Try free for a month';
+      ? tr('prime.stickySwitch', { name: LEAD_TIER.name })
+      : tr('prime.stickyTryFree');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
@@ -109,10 +109,10 @@ export default function PrimeScreen() {
             </View>
 
             <Text style={[styles.disp, { fontSize: 28, color: '#fff', marginTop: 10 }]}>
-              Free delivery, all winter.
+              {tr('prime.heroTitle')}
             </Text>
             <Text style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.82)', marginTop: 6, lineHeight: 19 }}>
-              Skip every delivery fee from {LEAD_TIER.priceDh} dh/month · cancel anytime.
+              {tr('prime.heroSubtitle', { price: LEAD_TIER.priceDh })}
             </Text>
 
             {/* benefit rows with check icons */}
@@ -141,7 +141,7 @@ export default function PrimeScreen() {
                 <IBolt size={22} color="#fff" fill="#fff" strokeWidth={0} />
               </LinearGradient>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.eyebrow, { color: t.colors.ok }]}>Active membership</Text>
+                <Text style={[styles.eyebrow, { color: t.colors.ok }]}>{tr('prime.activeMembership')}</Text>
                 <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg, marginTop: 2 }]} numberOfLines={1}>
                   {activeTier?.name ?? sub.tier}
                 </Text>
@@ -149,7 +149,7 @@ export default function PrimeScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
                     <IClock size={13} color={t.colors.muted} />
                     <Text style={{ fontSize: 12.5, color: t.colors.muted }}>
-                      Renews {new Date(sub.expiresAt).toLocaleDateString()}
+                      {tr('prime.renews', { date: new Date(sub.expiresAt).toLocaleDateString() })}
                     </Text>
                   </View>
                 )}
@@ -160,7 +160,7 @@ export default function PrimeScreen() {
 
         {/* ── plans ── */}
         <View style={[styles.pad, { marginTop: 24 }]}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginLeft: 2 }]}>Choose your plan</Text>
+          <Text style={[styles.eyebrow, { color: t.colors.primary, marginLeft: 2 }]}>{tr('prime.choosePlan')}</Text>
           <View style={{ marginTop: 12, gap: 12 }}>
             {PRIME_TIERS.map((tier, i) => {
               const current = sub?.tier === tier.id;
@@ -185,7 +185,7 @@ export default function PrimeScreen() {
                         {current && (
                           <View style={[styles.pill, { backgroundColor: 'rgba(47,163,107,0.14)', marginTop: 6 }]}>
                             <ICheck size={12} color={t.colors.ok} strokeWidth={3} />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: t.colors.ok }}>Current plan</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: t.colors.ok }}>{tr('prime.currentPlan')}</Text>
                           </View>
                         )}
                       </View>
@@ -213,7 +213,7 @@ export default function PrimeScreen() {
                     >
                       {current ? (
                         <View style={[styles.planBtn, { backgroundColor: t.colors.surface2, borderWidth: 1, borderColor: t.colors.line }]}>
-                          <Text style={{ fontWeight: '800', fontSize: 14.5, color: t.colors.muted }}>Current plan</Text>
+                          <Text style={{ fontWeight: '800', fontSize: 14.5, color: t.colors.muted }}>{tr('prime.currentPlan')}</Text>
                         </View>
                       ) : (
                         <LinearGradient
@@ -226,7 +226,7 @@ export default function PrimeScreen() {
                             <ActivityIndicator color={t.colors.onPrimary} />
                           ) : (
                             <Text style={{ fontWeight: '800', fontSize: 14.5, color: t.colors.onPrimary }}>
-                              Choose {tier.name}
+                              {tr('prime.choose', { name: tier.name })}
                             </Text>
                           )}
                         </LinearGradient>
@@ -239,7 +239,7 @@ export default function PrimeScreen() {
           </View>
 
           <Text style={{ fontSize: 11.5, color: t.colors.muted, textAlign: 'center', marginTop: 16, lineHeight: 17 }}>
-            Billed securely via Stripe · cancel anytime from your account.
+            {tr('prime.billingNote')}
           </Text>
         </View>
       </ScrollView>
@@ -275,7 +275,7 @@ export default function PrimeScreen() {
         </Press>
         {!leadIsActive && (
           <Text style={{ fontSize: 11.5, color: t.colors.muted, textAlign: 'center', marginTop: 9 }}>
-            {LEAD_TIER.priceDh} dh{LEAD_TIER.period} · cancel anytime
+            {tr('prime.stickyPrice', { price: LEAD_TIER.priceDh, period: LEAD_TIER.period })}
           </Text>
         )}
       </View>

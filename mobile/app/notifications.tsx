@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useAg3Theme } from '../components/ag3/theme';
 import {
@@ -51,17 +52,18 @@ function iconFor(kind: string): { Icon: AgIcon; color: string } {
   }
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, tr: (key: string, opts?: Record<string, unknown>) => string): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 60) return tr('notifications.justNow');
+  if (s < 3600) return tr('notifications.minutesAgo', { n: Math.floor(s / 60) });
+  if (s < 86400) return tr('notifications.hoursAgo', { n: Math.floor(s / 3600) });
   return new Date(iso).toLocaleDateString();
 }
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const { items, unread, loading, markRead, markAllRead } = useNotifications();
 
@@ -74,9 +76,9 @@ export default function NotificationsScreen() {
           <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
             <IBell size={28} color={t.colors.muted} />
           </View>
-          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>Notifications</Text>
+          <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, marginTop: 18 }]}>{tr('notifications.title')}</Text>
           <Text style={{ fontSize: 14, color: t.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 8 }}>
-            Sign in to see order updates and promos.
+            {tr('notifications.signedOutBody')}
           </Text>
           <Press onPress={() => router.push('/sign-in')} style={{ marginTop: 24 }}>
             <LinearGradient
@@ -85,7 +87,7 @@ export default function NotificationsScreen() {
               end={t.gradients.end}
               style={[styles.signInBtn, t.shadows.glow]}
             >
-              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>Sign in</Text>
+              <Text style={{ color: t.colors.onPrimary, fontWeight: '800', fontSize: 15 }}>{tr('notifications.signIn')}</Text>
             </LinearGradient>
           </Press>
         </View>
@@ -111,10 +113,10 @@ export default function NotificationsScreen() {
               <IBell size={26} color={t.colors.muted} />
             </View>
             <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg, marginTop: 16 }]}>
-              You’re all caught up
+              {tr('notifications.emptyTitle')}
             </Text>
             <Text style={{ fontSize: 13, color: t.colors.muted, marginTop: 6, textAlign: 'center' }}>
-              Order updates and promos will appear here.
+              {tr('notifications.emptyBody')}
             </Text>
           </View>
         ) : (
@@ -160,7 +162,7 @@ export default function NotificationsScreen() {
                             {n.title}
                           </Text>
                           <Text style={{ fontSize: 11.5, color: t.colors.muted, marginLeft: 8 }}>
-                            {timeAgo(n.createdAt)}
+                            {timeAgo(n.createdAt, tr)}
                           </Text>
                         </View>
                         {n.body ? (
@@ -198,6 +200,7 @@ function Header({
   onBack: () => void;
   onReadAll: () => void;
 }) {
+  const { t: tr } = useTranslation();
   return (
     <MotiView
       from={{ opacity: 0, translateX: -8 }}
@@ -212,17 +215,17 @@ function Header({
       </Press>
 
       <View style={{ flex: 1, marginLeft: 12 }}>
-        <Text style={[styles.disp, { fontSize: 20, color: t.colors.fg }]}>Notifications</Text>
+        <Text style={[styles.disp, { fontSize: 20, color: t.colors.fg }]}>{tr('notifications.title')}</Text>
         {unread > 0 ? (
           <Text style={{ fontSize: 12, color: t.colors.primary, fontWeight: '700', marginTop: 1 }}>
-            {unread} unread
+            {tr('notifications.unreadCount', { n: unread })}
           </Text>
         ) : null}
       </View>
 
       {unread > 0 ? (
         <Pressable onPress={onReadAll} hitSlop={8}>
-          <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>Read all</Text>
+          <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>{tr('notifications.readAll')}</Text>
         </Pressable>
       ) : null}
     </MotiView>

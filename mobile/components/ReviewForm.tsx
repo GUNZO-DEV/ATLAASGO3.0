@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { Check, Star } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { PressableScale } from './primitives/PressableScale';
 import { useAuth } from '../lib/auth';
 import { useReview } from '../hooks/useReview';
@@ -49,6 +50,7 @@ export function ReviewForm({
   orderId: string;
   restaurantId: string | null;
 }) {
+  const { t: tr } = useTranslation();
   const { user } = useAuth();
   const { review, loading, submitting, error, submit } = useReview(orderId);
   const [restaurantRating, setRestaurantRating] = useState(0);
@@ -91,10 +93,10 @@ export function ReviewForm({
   return (
     <View className="rounded-3xl bg-white p-5" style={{ borderWidth: 1, borderColor: LINE }}>
       <Text className="text-[10px] uppercase font-bold" style={{ letterSpacing: 1.2, color: BRAND }}>
-        How did it go?
+        {tr('review.eyebrow')}
       </Text>
       <Text className="mt-1 text-[19px]" style={{ fontWeight: '900', color: INK, letterSpacing: -0.4 }}>
-        Rate this order
+        {tr('review.title')}
       </Text>
 
       {(hasExisting || saved) && (
@@ -104,32 +106,32 @@ export function ReviewForm({
         >
           <Check size={14} color="#059669" strokeWidth={3} />
           <Text className="ml-2 flex-1 text-[12px]" style={{ color: '#059669', fontWeight: '600' }}>
-            Thanks — you can update it anytime
+            {tr('review.savedNote')}
           </Text>
         </View>
       )}
 
       <View className="mt-4">
         <Text className="text-[12px] font-bold mb-2" style={{ color: MUTED }}>
-          Food & restaurant
+          {tr('review.foodLabel')}
         </Text>
         <Stars value={restaurantRating} onChange={setRestaurantRating} />
       </View>
 
       <View className="mt-4">
         <Text className="text-[12px] font-bold mb-2" style={{ color: MUTED }}>
-          Your rider · optional
+          {tr('review.riderLabel')}
         </Text>
         <Stars value={riderRating} onChange={setRiderRating} size={22} />
       </View>
 
       <Text className="text-[12px] font-bold mt-4 mb-2" style={{ color: MUTED }}>
-        Comment · optional
+        {tr('review.commentLabel')}
       </Text>
       <TextInput
         value={comment}
         onChangeText={setComment}
-        placeholder="What stood out?"
+        placeholder={tr('review.commentPlaceholder')}
         placeholderTextColor="#A89E94"
         multiline
         numberOfLines={3}
@@ -160,7 +162,7 @@ export function ReviewForm({
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
-              {hasExisting ? 'Update review' : 'Submit review'}
+              {hasExisting ? tr('review.updateButton') : tr('review.submitButton')}
             </Text>
           )}
         </View>
