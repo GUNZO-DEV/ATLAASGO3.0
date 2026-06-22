@@ -31,6 +31,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useClerk } from '@clerk/clerk-expo';
@@ -42,6 +43,7 @@ import { useRoles } from '../../hooks/useRoles';
 import { useMyApplications } from '../../hooks/useMyApplications';
 
 import { agApi, type City, type Lang } from '../../lib/ag3/agApi';
+import { setAppLanguage, LANG_LABELS } from '../../lib/i18n';
 import { useAsync } from '../../lib/ag3/useAsync';
 import { useAg3Theme, gradients, type Scheme } from '../../components/ag3/theme';
 import { Press, Rise } from '../../components/ag3/primitives';
@@ -89,6 +91,7 @@ export default function AccountScreen() {
   // null = follow system until rehydrated; once set we pin the ag3 scheme.
   const [scheme, setScheme] = useState<Scheme | null>(null);
   const t = useAg3Theme(scheme ?? undefined);
+  const { t: tr } = useTranslation();
   const dark = t.isDark;
 
   // ── Language: self-contained segmented control (no global i18n provider).
@@ -171,8 +174,14 @@ export default function AccountScreen() {
 
   function setLanguage(next: Lang) {
     setLangState(next);
-    void AsyncStorage.setItem(LANG_KEY, next).catch(() => {});
     agApi.me.setLanguage(next).catch(() => {});
+    // Apply across the whole app. Text updates live; switching to/from Arabic
+    // flips the layout direction, which only takes effect after a restart.
+    void setAppLanguage(next).then(({ needsRestart }) => {
+      if (needsRestart) {
+        Alert.alert(tr('account.restartTitle'), tr('account.restartBody', { lang: LANG_LABELS[next] }));
+      }
+    });
   }
 
   async function save() {
@@ -406,7 +415,7 @@ export default function AccountScreen() {
                 </View>
               )}
               <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>Dark mode</Text>
+                <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>{tr('account.darkMode')}</Text>
                 <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>
                   {dark ? 'On · easy on the eyes' : 'Off · follow the sun'}
                 </Text>
@@ -422,7 +431,7 @@ export default function AccountScreen() {
         <View style={{ marginTop: 18 }}>
           <View style={styles.eyebrowRow}>
             <IGlobe size={13} color={t.colors.primary} />
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>Language</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>{tr('account.language')}</Text>
           </View>
           <View style={[styles.seg, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
             {LANGS.map(([k, label]) => {

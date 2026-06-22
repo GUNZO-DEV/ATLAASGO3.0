@@ -1,0 +1,31 @@
+{
+  "tabs": { "home": "Home", "search": "Search", "orders": "Orders", "profile": "Profile" },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "done": "Done",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "loading": "Loading…",
+    "retry": "Try again"
+  },
+  "account": {
+    "title": "Account",
+    "appearance": "Appearance",
+    "darkMode": "Dark mode",
+    "darkModeHint": "Easier on the eyes at night",
+    "language": "Language",
+    "languageHint": "Choose your preferred language",
+    "wallet": "Wallet",
+    "addresses": "Addresses",
+    "favourites": "Favourites",
+    "orders": "Your orders",
+    "promos": "Promo codes",
+    "notifications": "Notifications",
+    "help": "Help & support",
+    "signOut": "Sign out",
+    "deleteAccount": "Delete account",
+    "restartTitle": "Restart to apply",
+    "restartBody": "Close and reopen AtlaasGo to switch the layout to {{lang}}."
+  }
+}

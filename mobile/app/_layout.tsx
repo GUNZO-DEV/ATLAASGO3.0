@@ -1,4 +1,5 @@
 import '../global.css';
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,10 +13,16 @@ import { PushRegistrar } from '../components/PushRegistrar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { tokenCache } from '../lib/tokenCache';
 import { StripeProviderMaybe } from '../lib/stripe';
+import { bootstrapLanguage } from '../lib/i18n';
 
 const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
 export default function RootLayout() {
+  // Apply the saved language (and Arabic RTL flag) once, at app start.
+  useEffect(() => {
+    void bootstrapLanguage();
+  }, []);
+
   return (
     <ErrorBoundary>
       <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>

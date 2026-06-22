@@ -1,0 +1,31 @@
+{
+  "tabs": { "home": "Accueil", "search": "Recherche", "orders": "Commandes", "profile": "Profil" },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "done": "Terminé",
+    "signIn": "Se connecter",
+    "signOut": "Se déconnecter",
+    "loading": "Chargement…",
+    "retry": "Réessayer"
+  },
+  "account": {
+    "title": "Compte",
+    "appearance": "Apparence",
+    "darkMode": "Mode sombre",
+    "darkModeHint": "Plus reposant pour les yeux la nuit",
+    "language": "Langue",
+    "languageHint": "Choisissez votre langue préférée",
+    "wallet": "Portefeuille",
+    "addresses": "Adresses",
+    "favourites": "Favoris",
+    "orders": "Vos commandes",
+    "promos": "Codes promo",
+    "notifications": "Notifications",
+    "help": "Aide et assistance",
+    "signOut": "Se déconnecter",
+    "deleteAccount": "Supprimer le compte",
+    "restartTitle": "Redémarrage requis",
+    "restartBody": "Fermez puis rouvrez AtlaasGo pour passer la mise en page en {{lang}}."
+  }
+}

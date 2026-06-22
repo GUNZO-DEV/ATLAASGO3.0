@@ -1,0 +1,31 @@
+{
+  "tabs": { "home": "الرئيسية", "search": "بحث", "orders": "الطلبات", "profile": "حسابي" },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "done": "تم",
+    "signIn": "تسجيل الدخول",
+    "signOut": "تسجيل الخروج",
+    "loading": "جارٍ التحميل…",
+    "retry": "إعادة المحاولة"
+  },
+  "account": {
+    "title": "الحساب",
+    "appearance": "المظهر",
+    "darkMode": "الوضع الداكن",
+    "darkModeHint": "أسهل على العين ليلاً",
+    "language": "اللغة",
+    "languageHint": "اختر لغتك المفضّلة",
+    "wallet": "المحفظة",
+    "addresses": "العناوين",
+    "favourites": "المفضّلة",
+    "orders": "طلباتك",
+    "promos": "رموز الخصم",
+    "notifications": "الإشعارات",
+    "help": "المساعدة والدعم",
+    "signOut": "تسجيل الخروج",
+    "deleteAccount": "حذف الحساب",
+    "restartTitle": "إعادة التشغيل مطلوبة",
+    "restartBody": "أغلق AtlaasGo وأعد فتحه لتطبيق اتجاه الواجهة بالعربية."
+  }
+}

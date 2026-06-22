@@ -7,6 +7,7 @@
 // Material-3 look from the 3.0 prototype: cream/ink surface, hairline top
 // border, terracotta active token with a soft pill behind the active icon.
 import { Tabs } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { View, Text, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAg3Theme } from '../../components/ag3/theme';
@@ -57,6 +58,7 @@ function TabItem({
 
 export default function TabsLayout() {
   const t = useAg3Theme();
+  const { t: tr } = useTranslation();
   const insets = useSafeAreaInsets();
   const active = t.colors.primary;
   const inactive = t.colors.muted;
@@ -93,7 +95,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <TabItem
               Icon={IHome}
-              label="Home"
+              label={tr('tabs.home')}
               focused={focused}
               color={focused ? active : inactive}
               activeBg={activeBg}
@@ -107,7 +109,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <TabItem
               Icon={ISearch}
-              label="Search"
+              label={tr('tabs.search')}
               focused={focused}
               color={focused ? active : inactive}
               activeBg={activeBg}
@@ -121,7 +123,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <TabItem
               Icon={IReceipt}
-              label="Orders"
+              label={tr('tabs.orders')}
               focused={focused}
               color={focused ? active : inactive}
               activeBg={activeBg}
@@ -135,7 +137,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <TabItem
               Icon={IUser}
-              label="Profile"
+              label={tr('tabs.profile')}
               focused={focused}
               color={focused ? active : inactive}
               activeBg={activeBg}
