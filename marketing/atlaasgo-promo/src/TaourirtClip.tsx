@@ -460,9 +460,9 @@ const S4: React.FC = () => {
           lineHeight: 1.06,
         }}
       >
-        bladek
+        Taourirt
         <br />
-        tstahl. 🇲🇦
+        katstahel tahya
       </div>
     </AbsoluteFill>
   );
