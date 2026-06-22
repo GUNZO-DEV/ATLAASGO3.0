@@ -1,7 +1,7 @@
 // AtlaasDriver — incoming OFFER ping.
 // A dark-scrim bottom-sheet overlay that surfaces a freshly-assigned job before
-// the rider accepts it. RN translation of the design's screen-offer.jsx, kept on
-// the dark emerald cockpit (NOT the design's light/coral default).
+// the rider accepts it. RN translation of the design's screen-offer.jsx, on the
+// light cream/white sheet with the sunset-orange accent.
 //
 // 18s countdown bar that auto-fires onDecline at 0, a big payout hero, the drop
 // landmark, a RouteSummary rail, and Decline (X) / Accept buttons.
@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { Timer, X, Navigation } from 'lucide-react-native';
 import type { DriverJob } from '../../hooks/useDriverAssignments';
-import { BG, CARD, LINE, EMERALD, GLOW, CREAM, MUTED, DANGER, LiveDot, RouteSummary, Tappable } from './ui';
+import { BG, CARD, LINE, LINE2, BG2, EMERALD, GLOW, CREAM, MUTED, DANGER, LiveDot, RouteSummary, Tappable } from './ui';
 
 const OFFER_SECS = 18;
 
@@ -53,8 +53,8 @@ export function OfferSheet({
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onDecline}>
-      {/* dark scrim */}
-      <View style={{ flex: 1, backgroundColor: 'rgba(2,8,5,0.72)', justifyContent: 'flex-end' }}>
+      {/* warm dark scrim (design: rgba(8,7,5,.55)) */}
+      <View style={{ flex: 1, backgroundColor: 'rgba(8,7,5,0.55)', justifyContent: 'flex-end' }}>
         <Pressable style={{ flex: 1 }} onPress={onDecline} />
         <MotiView
           from={{ translateY: 40, opacity: 0 }}
@@ -67,8 +67,14 @@ export function OfferSheet({
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               borderWidth: 1,
-              borderColor: 'rgba(52,211,153,0.30)',
+              borderColor: LINE,
               overflow: 'hidden',
+              // soft lift off the scrim
+              shadowColor: '#1A1410',
+              shadowOffset: { width: 0, height: -10 },
+              shadowOpacity: 0.18,
+              shadowRadius: 40,
+              elevation: 12,
             }}
           >
             <SafeAreaView edges={['bottom']}>
@@ -90,13 +96,13 @@ export function OfferSheet({
                   </View>
                   <View
                     style={{
-                      backgroundColor: 'rgba(52,211,153,0.14)',
+                      backgroundColor: 'rgba(255,87,34,0.12)', // --grad-soft / sunset tint
                       borderRadius: 8,
                       paddingHorizontal: 9,
                       paddingVertical: 3,
                     }}
                   >
-                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: GLOW, letterSpacing: 0.4 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: EMERALD, letterSpacing: 0.4 }}>
                       NEW OFFER
                     </Text>
                   </View>
@@ -114,12 +120,12 @@ export function OfferSheet({
                   </Text>
                 </View>
 
-                {/* countdown bar */}
+                {/* countdown bar — light track, sunset-gradient fill */}
                 <View
                   style={{
                     height: 5,
                     borderRadius: 999,
-                    backgroundColor: 'rgba(255,255,255,0.07)',
+                    backgroundColor: BG2,
                     overflow: 'hidden',
                   }}
                 >
@@ -128,9 +134,20 @@ export function OfferSheet({
                       width: `${pct}%`,
                       height: '100%',
                       borderRadius: 999,
-                      backgroundColor: left <= 5 ? DANGER : EMERALD,
+                      overflow: 'hidden',
                     }}
-                  />
+                  >
+                    {left <= 5 ? (
+                      <View style={{ flex: 1, backgroundColor: DANGER }} />
+                    ) : (
+                      <LinearGradient
+                        colors={[EMERALD, GLOW]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={{ flex: 1 }}
+                      />
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -160,15 +177,21 @@ export function OfferSheet({
                   </View>
                 </View>
 
-                {/* route rail */}
+                {/* route rail (design .ag-card) */}
                 <View
                   style={{
                     backgroundColor: CARD,
                     borderRadius: 16,
                     borderWidth: 1,
-                    borderColor: LINE,
+                    borderColor: LINE2,
                     padding: 16,
                     marginTop: 18,
+                    // soft elevation (--sh-1)
+                    shadowColor: '#1A1410',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 18,
+                    elevation: 2,
                   }}
                 >
                   <RouteSummary
@@ -195,10 +218,17 @@ export function OfferSheet({
                       height: 56,
                       borderRadius: 16,
                       borderWidth: 1,
-                      borderColor: `${DANGER}55`,
+                      borderColor: LINE,
+                      backgroundColor: CARD,
                       alignItems: 'center',
                       justifyContent: 'center',
                       opacity: busy ? 0.6 : 1,
+                      // soft elevation (--sh-1)
+                      shadowColor: '#1A1410',
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 0.06,
+                      shadowRadius: 18,
+                      elevation: 2,
                     }}
                   >
                     <X size={22} color={DANGER} />
@@ -206,10 +236,18 @@ export function OfferSheet({
                 </Tappable>
                 <Tappable onPress={onAccept} disabled={busy}>
                   <LinearGradient
-                    colors={[GLOW, EMERALD]}
+                    colors={[EMERALD, GLOW]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={{ borderRadius: 16 }}
+                    style={{
+                      borderRadius: 16,
+                      // sunset glow (--sh-glow)
+                      shadowColor: EMERALD,
+                      shadowOffset: { width: 0, height: 14 },
+                      shadowOpacity: 0.38,
+                      shadowRadius: 34,
+                      elevation: 6,
+                    }}
                   >
                     <View
                       style={{
@@ -222,11 +260,11 @@ export function OfferSheet({
                       }}
                     >
                       {busy ? (
-                        <ActivityIndicator color="#04140D" />
+                        <ActivityIndicator color="#fff" />
                       ) : (
                         <>
-                          <Navigation size={17} color="#04140D" />
-                          <Text style={{ fontWeight: '800', fontSize: 15.5, color: '#04140D', marginLeft: 8 }}>
+                          <Navigation size={17} color="#fff" />
+                          <Text style={{ fontWeight: '800', fontSize: 15.5, color: '#fff', marginLeft: 8 }}>
                             Accept · {job.totalDh} dh
                           </Text>
                         </>

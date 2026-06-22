@@ -6,21 +6,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useSignIn, useSignUp } from '@clerk/clerk-expo';
 import { ArrowLeft, LogIn, UserPlus, MailCheck, KeyRound, Bike } from 'lucide-react-native';
+import { BG, CARD, LINE, EMERALD, GLOW, CREAM, MUTED } from '../components/dr/ui';
 
 /**
  * Driver sign-in — same Clerk instance + flows as the customer app:
  * email/password sign-in, email-code sign-up, and reset-by-email-code.
  * The ClerkSupabaseBridge then exchanges the session for Supabase; useRoles
  * gates the dashboard to approved riders.
+ * Light cream surface, sunset-orange accent (shared dr/ui palette).
  */
-const BG = '#07140E';
-const CARD = 'rgba(255,255,255,0.05)';
-const LINE = 'rgba(255,255,255,0.10)';
-const EMERALD = '#10B981';
-const GLOW = '#34D399';
-const DEEP = '#0E7C5A';
-const CREAM = '#EAF3EE';
-const MUTED = '#7E948A';
+const PLACEHOLDER = '#A99C8E'; // muted warm placeholder on light inputs
 type Mode = 'signin' | 'signup';
 
 function clerkErr(e: unknown): string {
@@ -102,12 +97,30 @@ export default function SignIn() {
   const label = (t: string) => <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: MUTED, marginBottom: 7, textTransform: 'uppercase' }}>{t}</Text>;
   const inputProps = {
     style: { backgroundColor: CARD, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: LINE, color: CREAM },
-    placeholderTextColor: '#5E6F66',
+    placeholderTextColor: PLACEHOLDER,
   } as const;
   const GradientBtn = ({ icon, text, onPress }: { icon: React.ReactNode; text: string; onPress: () => void }) => (
     <Pressable onPress={onPress} disabled={busy}>
-      <LinearGradient colors={[GLOW, EMERALD]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 14, paddingVertical: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.6 : 1 }}>
-        {busy ? <ActivityIndicator color="#04140D" /> : <>{icon}<Text style={{ color: '#04140D', fontWeight: '800', fontSize: 15, marginLeft: 8 }}>{text}</Text></>}
+      <LinearGradient
+        colors={[EMERALD, GLOW]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{
+          borderRadius: 14,
+          paddingVertical: 15,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: busy ? 0.6 : 1,
+          // sunset glow (--sh-glow)
+          shadowColor: EMERALD,
+          shadowOffset: { width: 0, height: 14 },
+          shadowOpacity: 0.38,
+          shadowRadius: 34,
+          elevation: 6,
+        }}
+      >
+        {busy ? <ActivityIndicator color="#fff" /> : <>{icon}<Text style={{ color: '#fff', fontWeight: '800', fontSize: 15, marginLeft: 8 }}>{text}</Text></>}
       </LinearGradient>
     </Pressable>
   );
@@ -124,7 +137,25 @@ export default function SignIn() {
 
           <MotiView from={{ opacity: 0, translateY: 14 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 420 }}>
             <View style={{ marginTop: 26, marginBottom: 22, alignItems: 'flex-start' }}>
-              <LinearGradient colors={[EMERALD, DEEP]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <LinearGradient
+                colors={[EMERALD, GLOW]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                  // sunset glow (--sh-glow)
+                  shadowColor: EMERALD,
+                  shadowOffset: { width: 0, height: 14 },
+                  shadowOpacity: 0.38,
+                  shadowRadius: 34,
+                  elevation: 6,
+                }}
+              >
                 <Bike size={28} color="#fff" />
               </LinearGradient>
               <Text style={{ fontSize: 11.5, fontWeight: '800', letterSpacing: 1.6, color: EMERALD }}>ATLAASGO · DRIVER</Text>
@@ -147,7 +178,7 @@ export default function SignIn() {
                 <TextInput value={resetCode} onChangeText={setResetCode} keyboardType="number-pad" placeholder="123456" maxLength={6} {...inputProps} />
                 {label('New password')}
                 <TextInput value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="At least 8 characters" {...inputProps} />
-                <GradientBtn icon={<KeyRound size={16} color="#04140D" />} text="Reset & sign in" onPress={handleReset} />
+                <GradientBtn icon={<KeyRound size={16} color="#fff" />} text="Reset & sign in" onPress={handleReset} />
                 <Pressable onPress={() => { setPendingReset(false); setResetCode(''); setNewPassword(''); }} style={{ marginTop: 14 }}>
                   <Text style={{ textAlign: 'center', fontSize: 12.5, color: MUTED }}>Back to sign in</Text>
                 </Pressable>
@@ -156,7 +187,7 @@ export default function SignIn() {
               <>
                 {label('Verification code')}
                 <TextInput value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" maxLength={6} {...inputProps} />
-                <GradientBtn icon={<MailCheck size={16} color="#04140D" />} text="Verify & continue" onPress={handleVerify} />
+                <GradientBtn icon={<MailCheck size={16} color="#fff" />} text="Verify & continue" onPress={handleVerify} />
                 <Pressable onPress={() => { setPendingCode(false); setCode(''); }} style={{ marginTop: 14 }}>
                   <Text style={{ textAlign: 'center', fontSize: 12.5, color: MUTED }}>Use a different email</Text>
                 </Pressable>
@@ -166,7 +197,7 @@ export default function SignIn() {
                 <View style={{ flexDirection: 'row', padding: 4, borderRadius: 14, marginBottom: 20, backgroundColor: CARD, borderWidth: 1, borderColor: LINE }}>
                   {(['signin', 'signup'] as Mode[]).map((m) => (
                     <Pressable key={m} onPress={() => setMode(m)} style={{ flex: 1, paddingVertical: 10, borderRadius: 11, alignItems: 'center', backgroundColor: mode === m ? EMERALD : 'transparent' }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: mode === m ? '#04140D' : MUTED }}>{m === 'signin' ? 'Sign in' : 'Create account'}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: mode === m ? '#fff' : MUTED }}>{m === 'signin' ? 'Sign in' : 'Create account'}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -177,11 +208,11 @@ export default function SignIn() {
                 <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder={mode === 'signin' ? '••••••••' : 'At least 8 characters'} {...inputProps} />
                 {mode === 'signin' && (
                   <Pressable onPress={handleForgot} style={{ alignSelf: 'flex-end', marginTop: -4, marginBottom: 8 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: GLOW }}>Forgot password?</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: EMERALD }}>Forgot password?</Text>
                   </Pressable>
                 )}
                 <GradientBtn
-                  icon={mode === 'signin' ? <LogIn size={16} color="#04140D" /> : <UserPlus size={16} color="#04140D" />}
+                  icon={mode === 'signin' ? <LogIn size={16} color="#fff" /> : <UserPlus size={16} color="#fff" />}
                   text={mode === 'signin' ? 'Sign in' : 'Create account'}
                   onPress={mode === 'signin' ? handleSignIn : handleSignUp}
                 />

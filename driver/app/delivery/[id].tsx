@@ -1,8 +1,8 @@
 // AtlaasDriver — ACTIVE DELIVERY (full-screen pickup → dropoff flow).
 // Root stack route (no tab bar). Translates the design's screen-active.jsx onto
-// the dark emerald cockpit, but driven by REAL data: a live react-native-maps
-// view up top (pickup pin, dropoff pin, courier's own GPS) and a dark bottom
-// sheet whose slide-to-confirm maps to the real order lifecycle action.
+// the light + sunset-orange cockpit, but driven by REAL data: a live
+// react-native-maps view up top (pickup pin, dropoff pin, courier's own GPS)
+// and a cream bottom sheet whose slide-to-confirm maps to the real lifecycle.
 //
 //   status not-yet-picked-up  → "Slide — order collected" → markPickedUp
 //   picked up & not arriving   → "Slide — arriving"        → markArriving
@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import MapView, { Marker, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -23,7 +24,7 @@ import { useBroadcastLocation } from '../../hooks/useBroadcastLocation';
 import { OrderChat } from '../../components/dr/OrderChat';
 import { markPickedUp, markArriving, markDelivered } from '../../lib/orderActions';
 import {
-  BG, CARD, LINE, EMERALD, GLOW, CREAM, MUTED, AMBER,
+  BG, CARD, LINE, LINE2, EMERALD, GLOW, CREAM, MUTED, AMBER, ONLINE, FG_SOFT,
   LiveDot, SlideConfirm, ActionBtn,
 } from '../../components/dr/ui';
 
@@ -261,46 +262,60 @@ export default function DeliveryScreen() {
             >
               <ArrowLeft size={20} color={CREAM} />
             </Pressable>
-            {/* recenter / nav (top-right) */}
-            <Pressable onPress={recenter} hitSlop={10} style={[iconBtn, { backgroundColor: EMERALD, borderColor: GLOW }]}>
-              <Navigation size={19} color="#04140D" />
+            {/* recenter / nav (top-right) — sunset gradient pill */}
+            <Pressable onPress={recenter} hitSlop={10} style={navBtnWrap}>
+              <LinearGradient
+                colors={[EMERALD, GLOW]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={navBtnFill}
+              />
+              <Navigation size={19} color="#fff" />
             </Pressable>
           </View>
         </SafeAreaView>
       </View>
 
-      {/* ── SHEET (dark cockpit, overlaps the map) ── */}
+      {/* ── SHEET (cream sheet, overlaps the map) ── */}
       <View
         style={{
           flex: 1,
           backgroundColor: BG,
-          borderTopLeftRadius: 26,
-          borderTopRightRadius: 26,
+          borderTopLeftRadius: 30,
+          borderTopRightRadius: 30,
           marginTop: -24,
           overflow: 'hidden',
-          shadowColor: '#000',
-          shadowOpacity: 0.4,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: -8 },
+          shadowColor: '#1A1410',
+          shadowOpacity: 0.16,
+          shadowRadius: 40,
+          shadowOffset: { width: 0, height: -10 },
         }}
       >
         {/* grabber */}
         <View style={{ width: 40, height: 5, borderRadius: 999, backgroundColor: LINE, alignSelf: 'center', marginTop: 10, marginBottom: 6 }} />
 
-        {/* phase stepper */}
+        {/* phase stepper — done = sunset solid, now = sunset gradient, todo = hairline */}
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginTop: 4 }}>
           {(['pickup', 'pickedUp', 'arriving', 'delivered'] as Phase[]).map((p) => {
             const idx = PHASE_INDEX[p];
             const cur = PHASE_INDEX[phase];
             const state = idx < cur ? 'done' : idx === cur ? 'now' : 'todo';
-            return (
+            return state === 'now' ? (
+              <LinearGradient
+                key={p}
+                colors={[EMERALD, GLOW]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ flex: 1, height: 5, borderRadius: 999 }}
+              />
+            ) : (
               <View
                 key={p}
                 style={{
                   flex: 1,
                   height: 5,
                   borderRadius: 999,
-                  backgroundColor: state === 'done' ? EMERALD : state === 'now' ? GLOW : LINE,
+                  backgroundColor: state === 'done' ? EMERALD : LINE,
                 }}
               />
             );
@@ -310,8 +325,8 @@ export default function DeliveryScreen() {
         <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 12 }} showsVerticalScrollIndicator={false}>
           {/* current stage */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {!isDone ? <LiveDot size={7} /> : <Check size={14} color={EMERALD} />}
-            <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: EMERALD }}>
+            {!isDone ? <LiveDot size={7} color={EMERALD} /> : <Check size={14} color={ONLINE} />}
+            <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: isDone ? ONLINE : EMERALD }}>
               {stage.eyebrow.toUpperCase()} · #{delivery.orderId.slice(0, 8)}
             </Text>
           </View>
@@ -329,10 +344,11 @@ export default function DeliveryScreen() {
                 gap: 13,
                 backgroundColor: CARD,
                 borderWidth: 1,
-                borderColor: LINE,
-                borderRadius: 16,
+                borderColor: LINE2,
+                borderRadius: 18,
                 padding: 13,
                 marginTop: 18,
+                ...cardShadow,
               }}
             >
               <View
@@ -342,10 +358,10 @@ export default function DeliveryScreen() {
                   borderRadius: 14,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: isPickupSide ? 'rgba(251,191,36,0.14)' : 'rgba(52,211,153,0.14)',
+                  backgroundColor: isPickupSide ? 'rgba(255,183,77,0.16)' : 'rgba(255,87,34,0.12)',
                 }}
               >
-                {isPickupSide ? <Store size={20} color={AMBER} /> : <MapPin size={20} color={GLOW} />}
+                {isPickupSide ? <Store size={20} color={AMBER} /> : <MapPin size={20} color={EMERALD} />}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: 15.5, fontWeight: '800', color: CREAM }} numberOfLines={1}>
@@ -356,14 +372,14 @@ export default function DeliveryScreen() {
               <Pressable
                 onPress={() => setChatOpen(true)}
                 hitSlop={8}
-                style={iconBtn}
+                style={contactIconBtn}
               >
                 <MessageCircle size={19} color={EMERALD} />
               </Pressable>
               <Pressable
                 onPress={() => Linking.openURL('tel:')}
                 hitSlop={8}
-                style={iconBtn}
+                style={contactIconBtn}
               >
                 <Phone size={18} color={EMERALD} />
               </Pressable>
@@ -372,7 +388,7 @@ export default function DeliveryScreen() {
 
           {/* the bag (pickup) or drop note (dropoff) */}
           {!isDone && isPickupSide ? (
-            <View style={{ backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 16, padding: 16, marginTop: 12 }}>
+            <View style={{ backgroundColor: CARD, borderWidth: 1, borderColor: LINE2, borderRadius: 18, padding: 16, marginTop: 12, ...cardShadow }}>
               <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: MUTED, marginBottom: 10 }}>THE BAG</Text>
               {delivery.items.length === 0 ? (
                 <Text style={{ fontSize: 13.5, color: MUTED }}>No item details.</Text>
@@ -389,40 +405,58 @@ export default function DeliveryScreen() {
           ) : null}
 
           {!isDone && !isPickupSide ? (
-            <View style={{ flexDirection: 'row', gap: 11, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 16, padding: 16, marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 11, backgroundColor: CARD, borderWidth: 1, borderColor: LINE2, borderRadius: 18, padding: 16, marginTop: 12, ...cardShadow }}>
               <MapPin size={18} color={EMERALD} style={{ marginTop: 1 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: MUTED, marginBottom: 4 }}>DROP NOTE</Text>
-                <Text style={{ fontSize: 13.5, color: CREAM, lineHeight: 19 }}>
+                <Text style={{ fontSize: 13.5, color: FG_SOFT, lineHeight: 19 }}>
                   {delivery.dropoff.note || 'No drop note — confirm the handoff with the customer.'}
                 </Text>
               </View>
             </View>
           ) : null}
 
-          {/* delivered hero */}
+          {/* delivered hero — dark ink card, cream text, sunset corner glow */}
           {isDone ? (
             <View
               style={{
                 marginTop: 18,
-                borderRadius: 20,
+                borderRadius: 24,
                 padding: 22,
-                backgroundColor: 'rgba(16,185,129,0.12)',
-                borderWidth: 1,
-                borderColor: 'rgba(52,211,153,0.32)',
+                backgroundColor: CREAM,
+                overflow: 'hidden',
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Check size={16} color={EMERALD} />
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: GLOW }}>
-                  Delivered to {delivery.dropoff.label}
+              {/* sunset gradient blob in the top-right corner (.dr-earn-hero::after) */}
+              <LinearGradient
+                colors={[EMERALD, GLOW]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  position: 'absolute',
+                  right: -40,
+                  top: -40,
+                  width: 160,
+                  height: 160,
+                  borderRadius: 999,
+                  opacity: 0.9,
+                }}
+              />
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Check size={16} color="#fff" />
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: 'rgba(255,255,255,0.82)' }}>
+                    Delivered to {delivery.dropoff.label}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 44, fontWeight: '800', color: BG, letterSpacing: -1.2, marginTop: 8 }}>
+                  +{delivery.payoutDh}
+                  <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.65)' }}> dh</Text>
+                </Text>
+                <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+                  Added to today’s earnings
                 </Text>
               </View>
-              <Text style={{ fontSize: 44, fontWeight: '800', color: CREAM, letterSpacing: -1.2, marginTop: 8 }}>
-                +{delivery.payoutDh}
-                <Text style={{ fontSize: 20, color: MUTED }}> dh</Text>
-              </Text>
-              <Text style={{ fontSize: 12.5, color: MUTED, marginTop: 4 }}>Added to today’s earnings</Text>
             </View>
           ) : null}
         </ScrollView>
@@ -463,13 +497,59 @@ function CourierPin() {
 
 const SNOW_FILL = 'rgba(90,169,230,0.28)';
 
+// Soft elevation shared by the cream sheet cards (app.css --sh-1).
+const cardShadow = {
+  shadowColor: '#1A1410',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.06,
+  shadowRadius: 18,
+  elevation: 2,
+} as const;
+
+// Light pill icon button (.ag-iconbtn): white surface, dark ink icon, soft shadow.
 const iconBtn = {
   width: 42,
   height: 42,
   borderRadius: 21,
-  backgroundColor: 'rgba(7,20,14,0.82)',
+  backgroundColor: CARD,
   borderWidth: 1,
-  borderColor: LINE,
+  borderColor: LINE2,
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
+  ...cardShadow,
+};
+
+// Contact-card action button — white pill, sunset icon.
+const contactIconBtn = {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: CARD,
+  borderWidth: 1,
+  borderColor: LINE2,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+};
+
+// Map nav pill — sunset gradient fill (set via LinearGradient child).
+const navBtnWrap = {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  overflow: 'hidden' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  shadowColor: EMERALD,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.34,
+  shadowRadius: 18,
+  elevation: 5,
+};
+
+const navBtnFill = {
+  position: 'absolute' as const,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
 };

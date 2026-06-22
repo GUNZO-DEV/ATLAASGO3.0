@@ -1,8 +1,8 @@
 // AtlaasDriver 3.0 — DRIVE screen (home tab).
-// Ports the working dashboard logic (online toggle, KPIs, week-earned hero,
-// active deliveries, new requests, available-now pool with city filter, all the
+// Ports the working dashboard logic (online toggle, KPIs, active deliveries,
+// new requests, available-now pool with city filter, all the
 // accept/decline/pickup/arriving/delivered/claim handlers + location broadcast
-// + pull-to-refresh + focus polling) onto the 3.0 cockpit look. The active
+// + pull-to-refresh + focus polling) onto the 3.0 LIGHT cockpit look. The active
 // delivery uses the slide-to-confirm flow whose stages map to the real actions.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -10,9 +10,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
+import Svg, { G, Path, Rect, Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import {
-  Power, Wallet, Package, Star, MapPin, LogOut, Bike, XCircle, ArrowRight, Zap, TrendingUp, Navigation,
+  Power, Wallet, Package, Star, MapPin, LogOut, Bike, XCircle, ArrowRight, Zap, Navigation,
+  TrendingUp, Snowflake, Flame, MapPinned,
 } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { useRiderProfile, useRiderStats, type RiderStatus } from '../../hooks/useRiderProfile';
@@ -21,7 +23,7 @@ import { useAvailableOrders, type PoolOrder } from '../../hooks/useAvailableOrde
 import { useBroadcastLocation } from '../../hooks/useBroadcastLocation';
 import { acceptAssignment, rejectAssignment, markPickedUp, markArriving, markDelivered, claimOrder } from '../../lib/orderActions';
 import {
-  BG, CARD, LINE, EMERALD, GLOW, CREAM, MUTED, AMBER, DANGER,
+  BG, CARD, LINE, LINE2, EMERALD, GLOW, CREAM, MUTED, AMBER, DANGER, SNOW, ONLINE, BG2, FG_SOFT,
   Enter, Tappable, LiveDot, StatTile, RouteSummary, SlideConfirm, Section, ActionBtn,
 } from '../../components/dr/ui';
 import { OfferSheet } from '../../components/dr/OfferSheet';
@@ -32,6 +34,28 @@ const STATUS_LABEL: Record<RiderStatus, string> = {
   on_break: 'On break',
   busy: 'On a trip',
 };
+
+// Greeting that tracks the local time of day.
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// Derive a friendly first name + initials from the real Supabase user (email or
+// metadata). Falls back to "Driver" so the header never renders blank.
+function nameParts(email?: string | null, metaName?: string | null) {
+  const raw =
+    (metaName && metaName.trim()) ||
+    (email ? email.split('@')[0].replace(/[._-]+/g, ' ') : '') ||
+    'Driver';
+  const words = raw.split(/\s+/).filter(Boolean);
+  const first = words[0] ? words[0][0].toUpperCase() + words[0].slice(1) : 'Driver';
+  const initials =
+    (words[0]?.[0] ?? 'D').toUpperCase() + (words[1]?.[0] ?? '').toUpperCase();
+  return { first, initials: initials || 'D' };
+}
 
 export default function DriveScreen() {
   const router = useRouter();
@@ -54,6 +78,11 @@ export default function DriveScreen() {
   const isOnline = status === 'online' || status === 'busy';
   const pending = useMemo(() => jobs.filter((j) => !j.acceptedAt), [jobs]);
   const active = useMemo(() => jobs.filter((j) => !!j.acceptedAt), [jobs]);
+
+  const { first, initials } = useMemo(
+    () => nameParts(user?.email, (user?.user_metadata?.full_name as string | undefined) ?? null),
+    [user?.email, user?.user_metadata],
+  );
 
   // Surface the first non-dismissed pending job as the incoming OFFER ping.
   const offer = useMemo(
@@ -155,10 +184,22 @@ export default function DriveScreen() {
     if (user) void rejectAssignment(j.orderId, user.id, 'Declined');
   };
 
+  // The pool city the rider is currently scoped to (drives the AUTO order-zone
+  // card). Defaults to the most-represented pool city, else "Atlas region".
+  const zoneCity = useMemo(() => {
+    if (cityFilter !== 'All') return cityFilter;
+    const counts = new Map<string, number>();
+    for (const o of pool) if (o.city) counts.set(o.city, (counts.get(o.city) ?? 0) + 1);
+    let best: string | null = null;
+    let bestN = 0;
+    for (const [c, n] of counts) if (n > bestN) { best = c; bestN = n; }
+    return best;
+  }, [pool, cityFilter]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 46 }}
+        contentContainerStyle={{ paddingTop: 6, paddingBottom: 46 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -166,16 +207,29 @@ export default function DriveScreen() {
             onRefresh={onPullRefresh}
             tintColor={EMERALD}
             colors={[EMERALD]}
-            progressBackgroundColor={BG}
+            progressBackgroundColor={CARD}
           />
         }
       >
-        {/* Header */}
+        {/* Greeting header — avatar initials + greeting + name + bell/logout */}
         <Enter>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View>
-              <Text style={{ fontSize: 10.5, fontWeight: '800', letterSpacing: 1.8, color: EMERALD }}>ATLAASGO · DRIVER</Text>
-              <Text style={{ fontSize: 27, fontWeight: '800', color: CREAM, letterSpacing: -0.6, marginTop: 3 }}>Drive & earn</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 4 }}>
+            <LinearGradient
+              colors={[EMERALD, GLOW]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center',
+                shadowColor: EMERALD, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.38, shadowRadius: 34, elevation: 6,
+              }}
+            >
+              <Text style={{ fontWeight: '800', fontSize: 17, color: '#fff', letterSpacing: 0.5 }}>{initials}</Text>
+            </LinearGradient>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 12.5, color: MUTED, fontWeight: '500' }}>{greeting()}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: CREAM, letterSpacing: -0.3, marginTop: 1 }} numberOfLines={1}>
+                {first}
+              </Text>
             </View>
             <Pressable
               onPress={() => clerkSignOut()}
@@ -187,76 +241,186 @@ export default function DriveScreen() {
           </View>
         </Enter>
 
-        {/* Online toggle hero */}
-        <Enter delay={80}>
-          <Tappable onPress={toggleOnline} disabled={toggling}>
-            <View style={{ marginTop: 18, borderRadius: 26, overflow: 'hidden', borderWidth: 1, borderColor: isOnline ? 'rgba(52,211,153,0.45)' : LINE }}>
-              <LinearGradient
-                colors={isOnline ? ['#0E7C5A', '#0A5E44'] : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        {/* Big online power-toggle */}
+        <Enter delay={70}>
+          <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+            <Tappable onPress={toggleOnline} disabled={toggling}>
+              <View
+                style={{
+                  borderRadius: 26,
+                  padding: 18,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 16,
+                  borderWidth: 1,
+                  borderColor: isOnline ? 'rgba(47,163,107,0.40)' : LINE,
+                  backgroundColor: isOnline ? '#EAF6EF' : CARD,
+                  shadowColor: '#1A1410',
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 18,
+                  elevation: 2,
+                }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
-                    {isOnline &&
-                      [0, 1].map((i) => (
-                        <MotiView
-                          key={i}
-                          from={{ opacity: 0.5, scale: 0.8 }}
-                          animate={{ opacity: 0, scale: 1.9 }}
-                          transition={{ type: 'timing', duration: 2000, loop: true, repeatReverse: false, delay: i * 1000 }}
-                          style={{ position: 'absolute', width: 56, height: 56, borderRadius: 28, backgroundColor: GLOW }}
-                        />
-                      ))}
-                    <View style={{ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: isOnline ? GLOW : 'rgba(255,255,255,0.07)' }}>
-                      <Power size={24} color={isOnline ? '#04140D' : CREAM} />
-                    </View>
-                  </View>
-                  <View style={{ marginLeft: 16 }}>
-                    <Text style={{ fontSize: 19, fontWeight: '800', color: CREAM, letterSpacing: -0.3 }}>{STATUS_LABEL[status]}</Text>
-                    <Text style={{ fontSize: 12.5, color: isOnline ? 'rgba(234,243,238,0.8)' : MUTED, marginTop: 2 }}>
-                      {isOnline ? 'Receiving requests' : 'Tap to go online'}
-                    </Text>
+                {/* power knob — green w/ ping when online, sand when offline */}
+                <View style={{ width: 58, height: 58, alignItems: 'center', justifyContent: 'center' }}>
+                  {isOnline &&
+                    [0, 1].map((i) => (
+                      <MotiView
+                        key={i}
+                        from={{ opacity: 0.4, scale: 1 }}
+                        animate={{ opacity: 0, scale: 1.7 }}
+                        transition={{ type: 'timing', duration: 1800, loop: true, repeatReverse: false, delay: i * 900 }}
+                        style={{ position: 'absolute', width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: ONLINE }}
+                      />
+                    ))}
+                  <View
+                    style={{
+                      width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: isOnline ? ONLINE : BG2,
+                      ...(isOnline
+                        ? { shadowColor: ONLINE, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 4 }
+                        : null),
+                    }}
+                  >
+                    <Power size={26} color={isOnline ? '#fff' : MUTED} />
                   </View>
                 </View>
-                {toggling ? <ActivityIndicator color={isOnline ? '#04140D' : EMERALD} /> : isOnline ? <LiveDot size={9} /> : null}
-              </LinearGradient>
-            </View>
-          </Tappable>
-        </Enter>
 
-        {/* KPIs */}
-        <Enter delay={150}>
-          <View style={{ flexDirection: 'row', gap: 11, marginTop: 14 }}>
-            <StatTile icon={<Wallet size={15} color={GLOW} />} value={`${todayDh}`} unit="dh" label="Today" />
-            <StatTile icon={<Package size={15} color={GLOW} />} value={`${tripsToday}`} label="Trips" />
-            <StatTile icon={<Star size={15} color={AMBER} />} value={(profile?.rating ?? 5).toFixed(1)} label="Rating" />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 19, fontWeight: '800', color: CREAM, letterSpacing: -0.3 }}>
+                    {isOnline ? "You're online" : "You're offline"}
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+                    {isOnline
+                      ? zoneCity
+                        ? `Finding orders in ${zoneCity}…`
+                        : 'Receiving requests'
+                      : 'Go online to start receiving orders'}
+                  </Text>
+                </View>
+
+                {/* track switch */}
+                {toggling ? (
+                  <ActivityIndicator color={isOnline ? ONLINE : EMERALD} />
+                ) : (
+                  <View
+                    style={{
+                      width: 56, height: 32, borderRadius: 16, justifyContent: 'center',
+                      backgroundColor: isOnline ? ONLINE : BG2,
+                      borderWidth: 1, borderColor: isOnline ? 'transparent' : LINE,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+                        marginLeft: isOnline ? 29 : 3,
+                        shadowColor: '#1A1410', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 5, elevation: 3,
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
+            </Tappable>
           </View>
         </Enter>
 
-        {/* Week earnings hero */}
-        <Enter delay={210}>
-          <LinearGradient
-            colors={['rgba(16,185,129,0.16)', 'rgba(16,185,129,0.04)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ marginTop: 11, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(52,211,153,0.18)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-          >
-            <View>
-              <Text style={{ fontSize: 11.5, color: MUTED, fontWeight: '600' }}>Earned this week</Text>
-              <Text style={{ fontSize: 30, fontWeight: '800', color: CREAM, letterSpacing: -1, marginTop: 2 }}>
-                {weekDh} <Text style={{ fontSize: 15, color: MUTED }}>dh</Text>
-              </Text>
+        {/* Auto order-zone card (AUTO badge) */}
+        <Enter delay={130}>
+          <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 13, padding: 13,
+                backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2,
+                shadowColor: '#1A1410', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2,
+              }}
+            >
+              <LinearGradient
+                colors={[EMERALD, GLOW]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <MapPin size={20} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.6, color: MUTED, textTransform: 'uppercase' }}>
+                    Order zone
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 999, backgroundColor: 'rgba(255,87,34,0.12)' }}>
+                    <MotiView
+                      from={{ opacity: 0.5 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ type: 'timing', duration: 1400, loop: true }}
+                      style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: ONLINE }}
+                    />
+                    <Text style={{ fontSize: 9, fontWeight: '800', letterSpacing: 1.2, color: EMERALD }}>AUTO</Text>
+                  </View>
+                </View>
+                <Text style={{ fontWeight: '800', fontSize: 17, marginTop: 3, color: zoneCity ? CREAM : MUTED }} numberOfLines={1}>
+                  {zoneCity ?? 'Atlas region'}
+                </Text>
+                <Text style={{ fontSize: 11.5, color: MUTED, marginTop: 1 }}>Set from your location · Atlas region</Text>
+              </View>
             </View>
-            <TrendingUp size={30} color={GLOW} />
-          </LinearGradient>
+          </View>
+        </Enter>
+
+        {/* Snow-surge banner */}
+        <Enter delay={180}>
+          <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13,
+                borderRadius: 18, backgroundColor: '#EAF3FB',
+                borderWidth: 1, borderColor: 'rgba(90,169,230,0.35)',
+              }}
+            >
+              <LinearGradient
+                colors={[SNOW, '#2A6FA8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Snowflake size={20} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 14.5, fontWeight: '800', color: CREAM }}>Snow boost active</Text>
+                <Text style={{ fontSize: 12, color: MUTED, marginTop: 1 }}>Higher payouts while it snows in the Atlas</Text>
+              </View>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: SNOW }}>+20%</Text>
+            </View>
+          </View>
+        </Enter>
+
+        {/* Today — 4-stat grid */}
+        <Enter delay={230}>
+          <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+            <SecHead title="Today" action="Earnings ›" onAction={() => router.push('/earnings')} />
+            <View style={{ flexDirection: 'row', gap: 11 }}>
+              <StatTile icon={<Wallet size={15} color={EMERALD} />} value={`${todayDh}`} unit="DH" label="Earned" />
+              <StatTile icon={<Package size={15} color={EMERALD} />} value={`${tripsToday}`} label="Deliveries" />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 11, marginTop: 11 }}>
+              <StatTile icon={<TrendingUp size={15} color={EMERALD} />} value={`${weekDh}`} unit="DH" label="This week" />
+              <StatTile icon={<Star size={15} color={AMBER} />} value={(profile?.rating ?? 5).toFixed(1)} label="Rating" />
+            </View>
+          </View>
+        </Enter>
+
+        {/* Demand near you — stylized heat-zone decoration (not a real map) */}
+        <Enter delay={280}>
+          <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+            <SecHead title="Demand near you" />
+            <ZoneMap />
+          </View>
         </Enter>
 
         {/* Your delivery (active) — slide-to-confirm flow */}
         {active.length > 0 && (
-          <>
-            <Section icon={<Bike size={14} color={GLOW} />} title="Your delivery" />
+          <View style={{ paddingHorizontal: 20 }}>
+            <Section icon={<Bike size={14} color={EMERALD} />} title="Your delivery" />
             {active.map((j, i) => (
               <Enter key={j.assignmentId} delay={60 * i}>
                 <ActiveCard
@@ -269,52 +433,51 @@ export default function DriveScreen() {
                 />
               </Enter>
             ))}
-          </>
+          </View>
         )}
 
         {/* New requests (assigned) */}
         {pending.length > 0 && (
-          <>
+          <View style={{ paddingHorizontal: 20 }}>
             <Section icon={<Zap size={14} color={EMERALD} />} title={`New requests (${pending.length})`} />
             {pending.map((j, i) => (
               <Enter key={j.assignmentId} delay={60 * i}>
-                <View style={{ backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(52,211,153,0.28)', padding: 16, marginBottom: 11 }}>
+                <View style={{ backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,87,34,0.28)', padding: 16, marginBottom: 11 }}>
                   <JobRow job={j} />
                   <View style={{ flexDirection: 'row', gap: 9, marginTop: 13 }}>
-                    <ActionBtn primary label="Accept" icon={<Navigation size={15} color="#04140D" />} busy={busyId === j.orderId} onPress={() => onAccept(j)} />
+                    <ActionBtn primary label="Accept" icon={<Navigation size={15} color="#fff" />} busy={busyId === j.orderId} onPress={() => onAccept(j)} />
                     <ActionBtn label="Decline" icon={<XCircle size={15} color={DANGER} />} tint={DANGER} onPress={() => onDecline(j)} disabled={busyId === j.orderId} />
                   </View>
                 </View>
               </Enter>
             ))}
-          </>
+          </View>
         )}
 
         {/* Available now (pool) */}
-        <Section icon={<Zap size={14} color={AMBER} />} title="Available now" badge={visiblePool.length || undefined} />
+        <View style={{ paddingHorizontal: 20 }}>
+          <Section icon={<Zap size={14} color={AMBER} />} title="Available now" badge={visiblePool.length || undefined} />
 
-        {/* City filter */}
-        {cities.length > 1 && <CityFilter cities={cities} selected={cityFilter} onSelect={setCityFilter} />}
+          {/* City filter */}
+          {cities.length > 1 && <CityFilter cities={cities} selected={cityFilter} onSelect={setCityFilter} />}
 
-        {jobsLoading && pool.length === 0 ? (
-          <ActivityIndicator color={EMERALD} style={{ marginTop: 12 }} />
-        ) : visiblePool.length === 0 ? (
-          pool.length === 0 ? (
-            <Empty online={isOnline} />
+          {jobsLoading && pool.length === 0 ? (
+            <ActivityIndicator color={EMERALD} style={{ marginTop: 12 }} />
+          ) : visiblePool.length === 0 ? (
+            // Empty pool doubles as the "Looking for orders…" / break state.
+            <SearchState online={isOnline} onGoOnline={toggleOnline} busy={toggling} city={cityFilter} hasPool={pool.length > 0} />
           ) : (
-            <EmptyCity city={cityFilter} />
-          )
-        ) : (
-          visiblePool.map((o, i) => (
-            <Enter key={o.id} delay={50 * i}>
-              <PoolCard order={o} busy={busyId === o.id} onClaim={() => onClaim(o.id)} />
-            </Enter>
-          ))
-        )}
+            visiblePool.map((o, i) => (
+              <Enter key={o.id} delay={50 * i}>
+                <PoolCard order={o} busy={busyId === o.id} onClaim={() => onClaim(o.id)} />
+              </Enter>
+            ))
+          )}
 
-        <Text style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', marginTop: 24, lineHeight: 17 }}>
-          Claim a trip, deliver it, get paid — the customer sees every step live.
-        </Text>
+          <Text style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', marginTop: 24, lineHeight: 17 }}>
+            Claim a trip, deliver it, get paid — the customer sees every step live.
+          </Text>
+        </View>
       </ScrollView>
 
       {/* Incoming OFFER ping — one at a time, over the dashboard. */}
@@ -327,6 +490,85 @@ export default function DriveScreen() {
         />
       )}
     </SafeAreaView>
+  );
+}
+
+// Section heading with an optional action link (matches the design's SecHead).
+function SecHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+      <Text style={{ fontSize: 13, fontWeight: '800', color: CREAM, letterSpacing: 0.3 }}>{title}</Text>
+      {action ? (
+        <Pressable onPress={onAction} hitSlop={8}>
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: EMERALD }}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+// Stylized hot-zone decoration — a faux street grid + radial sunset heat blobs.
+// Purely decorative (NOT a real map); the live map lives in the delivery flow.
+function ZoneMap() {
+  const zones = [
+    { x: 28, y: 32, heat: 2 },
+    { x: 66, y: 26, heat: 3 },
+    { x: 44, y: 58, heat: 3 },
+    { x: 78, y: 66, heat: 1 },
+    { x: 18, y: 70, heat: 2 },
+  ];
+  return (
+    <View
+      style={{
+        height: 168, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: LINE2,
+        backgroundColor: '#DDE8EC',
+      }}
+    >
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0 }}>
+        <Defs>
+          {zones.map((z, i) => (
+            <RadialGradient key={i} id={`heat${i}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor="#FF5722" stopOpacity={0.12 + z.heat * 0.14} />
+              <Stop offset="70%" stopColor="#FF5722" stopOpacity={0} />
+            </RadialGradient>
+          ))}
+        </Defs>
+        {/* faint street grid + blocks */}
+        <G stroke="rgba(26,20,16,.10)" strokeWidth={2.4} strokeLinecap="round">
+          <Path d="M-5 40 H 105" />
+          <Path d="M-5 70 H 105" />
+          <Path d="M30 -5 V 105" />
+          <Path d="M70 -5 V 105" />
+        </G>
+        <G fill="rgba(26,20,16,.06)">
+          <Rect x={36} y={44} width={28} height={20} rx={3} />
+          <Rect x={8} y={8} width={16} height={22} rx={3} />
+          <Rect x={76} y={74} width={18} height={20} rx={3} />
+        </G>
+        {/* heat blobs */}
+        {zones.map((z, i) => {
+          const d = 16 + z.heat * 16;
+          return <Circle key={i} cx={z.x} cy={z.y} r={d / 2} fill={`url(#heat${i})`} />;
+        })}
+        {/* hot pins on the strongest zones */}
+        {zones.filter((z) => z.heat === 3).map((z, i) => (
+          <Circle key={`p${i}`} cx={z.x} cy={z.y} r={2.4} fill="#FF5722" stroke="#fff" strokeWidth={1.4} />
+        ))}
+        {/* you marker (snow blue) */}
+        <Circle cx={48} cy={50} r={3.2} fill="#5AA9E6" stroke="#fff" strokeWidth={2} />
+      </Svg>
+      {/* legend chip */}
+      <View
+        style={{
+          position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6,
+          backgroundColor: CARD, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11,
+          shadowColor: '#1A1410', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 30, elevation: 3,
+        }}
+      >
+        <Flame size={14} color={EMERALD} />
+        <Text style={{ fontSize: 11, fontWeight: '700', color: CREAM }}>3 hot zones near you</Text>
+      </View>
+    </View>
   );
 }
 
@@ -361,21 +603,25 @@ function ActiveCard({
   const stageLabel = stage === 'pickup' ? 'Heading to pickup' : stage === 'arriving' ? 'Delivering' : 'Arriving';
 
   return (
-    <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(52,211,153,0.30)', padding: 16, marginBottom: 11 }}>
+    <View
+      style={{
+        backgroundColor: '#EAF6EF', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(47,163,107,0.30)', padding: 16, marginBottom: 11,
+      }}
+    >
       {/* Tapping the card body opens the full-screen delivery flow (live map). */}
       <Tappable onPress={onOpen}>
         {/* stage chip + payout */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ marginRight: 7 }}>
-              <LiveDot size={7} />
+              <LiveDot size={7} color={ONLINE} />
             </View>
-            <View style={{ backgroundColor: 'rgba(52,211,153,0.14)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 10.5, fontWeight: '800', color: GLOW, letterSpacing: 0.4 }}>{stageLabel.toUpperCase()}</Text>
+            <View style={{ backgroundColor: 'rgba(47,163,107,0.14)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 10.5, fontWeight: '800', color: ONLINE, letterSpacing: 0.4 }}>{stageLabel.toUpperCase()}</Text>
             </View>
             <Text style={{ fontSize: 11.5, color: MUTED, marginLeft: 8 }}>#{job.orderId.slice(0, 8)}</Text>
           </View>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: GLOW }}>{job.totalDh} dh</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{job.totalDh} dh</Text>
         </View>
 
         {/* route rail */}
@@ -403,16 +649,16 @@ function JobRow({ job }: { job: DriverJob }) {
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <MapPin size={16} color={GLOW} />
+          <MapPin size={16} color={EMERALD} />
           <Text style={{ fontSize: 15.5, fontWeight: '700', color: CREAM, marginLeft: 8, flex: 1 }} numberOfLines={1}>
             {job.landmark}
           </Text>
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: GLOW }}>{job.totalDh} dh</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{job.totalDh} dh</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 9 }}>
-        <View style={{ backgroundColor: 'rgba(52,211,153,0.14)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
-          <Text style={{ fontSize: 10.5, fontWeight: '800', color: GLOW, letterSpacing: 0.4 }}>NEW REQUEST</Text>
+        <View style={{ backgroundColor: 'rgba(255,87,34,0.12)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 10.5, fontWeight: '800', color: EMERALD, letterSpacing: 0.4 }}>NEW REQUEST</Text>
         </View>
         <Text style={{ fontSize: 11.5, color: MUTED, marginLeft: 8 }}>#{job.orderId.slice(0, 8)}</Text>
       </View>
@@ -422,7 +668,12 @@ function JobRow({ job }: { job: DriverJob }) {
 
 function PoolCard({ order, busy, onClaim }: { order: PoolOrder; busy: boolean; onClaim: () => void }) {
   return (
-    <View style={{ backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(251,191,36,0.26)', padding: 16, marginBottom: 11 }}>
+    <View
+      style={{
+        backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2, padding: 16, marginBottom: 11,
+        shadowColor: '#1A1410', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2,
+      }}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
           <MapPin size={16} color={AMBER} />
@@ -430,15 +681,15 @@ function PoolCard({ order, busy, onClaim }: { order: PoolOrder; busy: boolean; o
             {order.landmark}
           </Text>
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: GLOW }}>{order.totalDh} dh</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{order.totalDh} dh</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <View style={{ backgroundColor: 'rgba(251,191,36,0.14)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
-          <Text style={{ fontSize: 10.5, fontWeight: '800', color: AMBER, letterSpacing: 0.4 }}>{order.city.toUpperCase()}</Text>
+        <View style={{ backgroundColor: 'rgba(255,183,77,0.18)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#A8731F', letterSpacing: 0.4 }}>{order.city.toUpperCase()}</Text>
         </View>
       </View>
       <View style={{ marginTop: 13 }}>
-        <ActionBtn primary label="Claim this trip" icon={<ArrowRight size={15} color="#04140D" />} busy={busy} onPress={onClaim} />
+        <ActionBtn primary label="Claim this trip" icon={<ArrowRight size={15} color="#fff" />} busy={busy} onPress={onClaim} />
       </View>
     </View>
   );
@@ -458,13 +709,13 @@ function CityFilter({ cities, selected, onSelect }: { cities: string[]; selected
                 borderRadius: 999,
                 paddingVertical: 8,
                 paddingHorizontal: 14,
-                backgroundColor: on ? 'rgba(52,211,153,0.16)' : CARD,
+                backgroundColor: on ? 'rgba(255,87,34,0.12)' : CARD,
                 borderWidth: 1,
-                borderColor: on ? 'rgba(52,211,153,0.55)' : LINE,
+                borderColor: on ? 'rgba(255,87,34,0.45)' : LINE,
               }}
             >
-              {c !== 'All' && <MapPin size={12} color={on ? GLOW : MUTED} />}
-              <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.2, marginLeft: c !== 'All' ? 5 : 0, color: on ? GLOW : MUTED }}>{c}</Text>
+              {c !== 'All' && <MapPin size={12} color={on ? EMERALD : MUTED} />}
+              <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.2, marginLeft: c !== 'All' ? 5 : 0, color: on ? EMERALD : FG_SOFT }}>{c}</Text>
             </View>
           </Pressable>
         );
@@ -473,28 +724,78 @@ function CityFilter({ cities, selected, onSelect }: { cities: string[]; selected
   );
 }
 
-function EmptyCity({ city }: { city: string }) {
-  return (
-    <View style={{ backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE, padding: 24, alignItems: 'center' }}>
-      <MapPin size={24} color={MUTED} />
-      <Text style={{ color: MUTED, marginTop: 10, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
-        No open orders in {city} right now — switch to “All” to see every available trip.
-      </Text>
-    </View>
-  );
-}
+// "Looking for orders…" (online) / "Taking a break" (offline) state — also the
+// empty-pool placeholder. Mirrors the design's searching/break card.
+function SearchState({
+  online,
+  onGoOnline,
+  busy,
+  city,
+  hasPool,
+}: {
+  online: boolean;
+  onGoOnline: () => void;
+  busy: boolean;
+  city: string;
+  hasPool: boolean;
+}) {
+  // Pool has trips but the selected city is empty → nudge back to "All".
+  if (online && hasPool && city !== 'All') {
+    return (
+      <View style={{ backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2, padding: 24, alignItems: 'center', shadowColor: '#1A1410', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2 }}>
+        <MapPinned size={24} color={MUTED} />
+        <Text style={{ color: MUTED, marginTop: 10, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
+          No open orders in {city} right now — switch to “All” to see every available trip.
+        </Text>
+      </View>
+    );
+  }
 
-function Empty({ online }: { online: boolean }) {
+  if (online) {
+    return (
+      <View
+        style={{
+          backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2, padding: 18,
+          flexDirection: 'row', alignItems: 'center', gap: 14,
+          shadowColor: '#1A1410', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2,
+        }}
+      >
+        <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <MotiView
+            from={{ opacity: 0.45, scale: 1 }}
+            animate={{ opacity: 0, scale: 1.8 }}
+            transition={{ type: 'timing', duration: 1800, loop: true, repeatReverse: false }}
+            style={{ position: 'absolute', width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: EMERALD }}
+          />
+          <LinearGradient
+            colors={[EMERALD, GLOW]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ width: 28, height: 28, borderRadius: 14 }}
+          />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: CREAM }}>Looking for orders…</Text>
+          <Text style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Stay near a hot zone for faster offers</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE, padding: 24, alignItems: 'center' }}>
-      <MotiView from={{ translateY: 0 }} animate={{ translateY: -6 }} transition={{ type: 'timing', duration: 1400, loop: true }}>
-        <Package size={26} color={MUTED} />
-      </MotiView>
-      <Text style={{ color: MUTED, marginTop: 10, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
-        {online
-          ? 'No open orders right now — new ones drop in here the moment a customer checks out.'
-          : 'Go online to see orders you can claim.'}
+    <View
+      style={{
+        backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2, padding: 18, alignItems: 'center',
+        shadowColor: '#1A1410', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 2,
+      }}
+    >
+      <Text style={{ fontSize: 15, fontWeight: '800', color: CREAM, marginBottom: 4 }}>You're taking a break</Text>
+      <Text style={{ fontSize: 12.5, color: MUTED, marginBottom: 14, textAlign: 'center', lineHeight: 18 }}>
+        Flip the switch above to come online and earn the snow boost.
       </Text>
+      <View style={{ alignSelf: 'stretch' }}>
+        <ActionBtn primary label="Go online" icon={<Power size={15} color="#fff" />} busy={busy} onPress={onGoOnline} />
+      </View>
     </View>
   );
 }

@@ -12,7 +12,7 @@ import { useClerk } from '@clerk/clerk-expo';
 import { LogIn, LogOut, Bike } from 'lucide-react-native';
 import { useAuth } from '../lib/auth';
 import { useRoles } from '../hooks/useRoles';
-import { BG, EMERALD, DEEP, GLOW, CREAM, MUTED, Enter, Tappable } from '../components/dr/ui';
+import { BG, EMERALD, GLOW, CREAM, MUTED, Enter, Tappable } from '../components/dr/ui';
 
 export default function Entry() {
   const { isLoaded, isSignedIn } = useClerkAuth();
@@ -50,10 +50,23 @@ function SignedOut() {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }}>
         <Enter>
           <LinearGradient
-            colors={[EMERALD, DEEP]}
+            colors={[EMERALD, GLOW]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={{ width: 84, height: 84, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 26,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 22,
+              // sunset glow (--sh-glow)
+              shadowColor: EMERALD,
+              shadowOffset: { width: 0, height: 14 },
+              shadowOpacity: 0.38,
+              shadowRadius: 34,
+              elevation: 6,
+            }}
           >
             <Bike size={40} color="#fff" />
           </LinearGradient>
@@ -70,13 +83,26 @@ function SignedOut() {
           <Link href="/sign-in" asChild>
             <Tappable>
               <LinearGradient
-                colors={[GLOW, EMERALD]}
+                colors={[EMERALD, GLOW]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={{ marginTop: 30, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 34, flexDirection: 'row', alignItems: 'center' }}
+                style={{
+                  marginTop: 30,
+                  borderRadius: 18,
+                  paddingVertical: 16,
+                  paddingHorizontal: 34,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  // sunset glow (--sh-glow)
+                  shadowColor: EMERALD,
+                  shadowOffset: { width: 0, height: 14 },
+                  shadowOpacity: 0.38,
+                  shadowRadius: 34,
+                  elevation: 6,
+                }}
               >
-                <LogIn size={18} color="#04140D" />
-                <Text style={{ color: '#04140D', fontWeight: '800', fontSize: 15.5, marginLeft: 9 }}>Sign in to drive</Text>
+                <LogIn size={18} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15.5, marginLeft: 9 }}>Sign in to drive</Text>
               </LinearGradient>
             </Tappable>
           </Link>

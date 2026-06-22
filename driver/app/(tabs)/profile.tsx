@@ -1,8 +1,9 @@
 // AtlaasDriver 3.0 — Profile / account screen.
 // Real data: useRiderProfile() (rating, status, vehicle, plate, totalTrips),
-// useAuth() (name / email), useRiderStats() (tripsToday). Dark cockpit surface,
-// emerald accents. Translation of screen-profile.jsx — never fabricates a metric:
-// fields the backend doesn't expose render as "—".
+// useAuth() (name / email), useRiderStats() (tripsToday). Light cream/white
+// surface, sunset-orange accent (green for the online/done state). Translation
+// of screen-profile.jsx — never fabricates a metric: fields the backend doesn't
+// expose render as "—".
 
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -29,16 +30,21 @@ import {
   BG,
   CARD,
   LINE,
+  LINE2,
   EMERALD,
-  GLOW,
   CREAM,
   MUTED,
+  FG_SOFT,
   AMBER,
   DANGER,
+  ONLINE,
   Enter,
   Section,
   TierRibbon,
 } from '../../components/dr/ui';
+
+// Soft sunset tint behind row-icon chips (mirrors --grad-soft in driver.css).
+const GRAD_SOFT = 'rgba(255,87,34,0.12)';
 
 // Derive a display name from the Supabase user — metadata first, then the
 // email local part. Never invent a name we don't have.
@@ -72,7 +78,7 @@ type StatusMeta = { label: string; color: string };
 function statusMeta(status: string | undefined): StatusMeta {
   switch (status) {
     case 'online':
-      return { label: 'Online', color: GLOW };
+      return { label: 'Online', color: ONLINE };
     case 'busy':
       return { label: 'On a trip', color: AMBER };
     case 'on_break':
@@ -124,7 +130,7 @@ function ListRow({
         paddingVertical: 15,
         paddingHorizontal: 16,
         borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: LINE,
+        borderBottomColor: LINE2,
         opacity: pressed ? 0.6 : 1,
       })}
     >
@@ -133,12 +139,12 @@ function ListRow({
           width: 34,
           height: 34,
           borderRadius: 10,
-          backgroundColor: 'rgba(255,255,255,0.05)',
+          backgroundColor: tint ? `${tint}1F` : GRAD_SOFT,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Icon size={18} color={tint ?? GLOW} />
+        <Icon size={18} color={tint ?? EMERALD} />
       </View>
       <Text style={{ flex: 1, marginLeft: 13, fontSize: 14.5, fontWeight: '600', color }}>{label}</Text>
       {detail ? <Text style={{ fontSize: 12.5, color: MUTED, marginRight: 8 }}>{detail}</Text> : null}
@@ -227,7 +233,7 @@ export default function ProfileScreen() {
         <Enter delay={80}>
           <View style={{ alignItems: 'center', marginTop: 22 }}>
             <LinearGradient
-              colors={[GLOW, EMERALD]}
+              colors={[EMERALD, AMBER]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -236,9 +242,15 @@ export default function ProfileScreen() {
                 borderRadius: 42,
                 alignItems: 'center',
                 justifyContent: 'center',
+                // sunset glow (--sh-glow)
+                shadowColor: EMERALD,
+                shadowOffset: { width: 0, height: 14 },
+                shadowOpacity: 0.38,
+                shadowRadius: 34,
+                elevation: 6,
               }}
             >
-              <Text style={{ fontSize: 30, fontWeight: '800', color: '#04140D', letterSpacing: -0.5 }}>
+              <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>
                 {initials}
               </Text>
             </LinearGradient>
@@ -264,11 +276,13 @@ export default function ProfileScreen() {
                   paddingVertical: 4,
                   paddingHorizontal: 9,
                   borderRadius: 999,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  backgroundColor: CARD,
+                  borderWidth: 1,
+                  borderColor: LINE,
                 }}
               >
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: status.color }} />
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: MUTED }}>{status.label}</Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: FG_SOFT }}>{status.label}</Text>
               </View>
             </View>
 
@@ -293,7 +307,7 @@ export default function ProfileScreen() {
               backgroundColor: CARD,
               borderRadius: 20,
               borderWidth: 1,
-              borderColor: LINE,
+              borderColor: LINE2,
               paddingVertical: 18,
             }}
           >
@@ -315,13 +329,13 @@ export default function ProfileScreen() {
               backgroundColor: CARD,
               borderRadius: 16,
               borderWidth: 1,
-              borderColor: LINE,
+              borderColor: LINE2,
               paddingVertical: 14,
               paddingHorizontal: 16,
               gap: 12,
             }}
           >
-            <Package size={18} color={GLOW} />
+            <Package size={18} color={EMERALD} />
             <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: CREAM }}>Trips today</Text>
             <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{tripsToday}</Text>
           </View>
@@ -329,7 +343,7 @@ export default function ProfileScreen() {
 
         {/* Verification / vehicle */}
         {profile?.documentsVerified ? (
-          <Section icon={<BadgeCheck size={14} color={GLOW} />} title="Verified courier" />
+          <Section icon={<BadgeCheck size={14} color={ONLINE} />} title="Verified courier" />
         ) : (
           <Section icon={<Clock size={14} color={AMBER} />} title="Account" />
         )}
@@ -339,7 +353,7 @@ export default function ProfileScreen() {
               backgroundColor: CARD,
               borderRadius: 18,
               borderWidth: 1,
-              borderColor: LINE,
+              borderColor: LINE2,
               overflow: 'hidden',
             }}
           >
@@ -350,14 +364,14 @@ export default function ProfileScreen() {
                 paddingVertical: 15,
                 paddingHorizontal: 16,
                 borderBottomWidth: vehicleLine ? 1 : 0,
-                borderBottomColor: LINE,
+                borderBottomColor: LINE2,
               }}
             >
-              <ShieldCheck size={18} color={profile?.documentsVerified ? GLOW : MUTED} />
+              <ShieldCheck size={18} color={profile?.documentsVerified ? ONLINE : MUTED} />
               <Text style={{ flex: 1, marginLeft: 13, fontSize: 14, fontWeight: '600', color: CREAM }}>
                 {profile?.documentsVerified ? 'Documents verified' : 'Verification pending'}
               </Text>
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: profile?.documentsVerified ? GLOW : AMBER }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: profile?.documentsVerified ? ONLINE : AMBER }}>
                 {profile?.documentsVerified ? 'Active' : 'Review'}
               </Text>
             </View>
@@ -365,7 +379,7 @@ export default function ProfileScreen() {
               <View
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 15, paddingHorizontal: 16 }}
               >
-                <Bike size={18} color={GLOW} />
+                <Bike size={18} color={EMERALD} />
                 <Text style={{ flex: 1, marginLeft: 13, fontSize: 14, fontWeight: '600', color: CREAM }}>
                   Vehicle
                 </Text>
@@ -378,14 +392,14 @@ export default function ProfileScreen() {
         </Enter>
 
         {/* Settings */}
-        <Section icon={<Settings size={14} color={GLOW} />} title="Settings" />
+        <Section icon={<Settings size={14} color={EMERALD} />} title="Settings" />
         <Enter delay={240}>
           <View
             style={{
               backgroundColor: CARD,
               borderRadius: 18,
               borderWidth: 1,
-              borderColor: LINE,
+              borderColor: LINE2,
               overflow: 'hidden',
             }}
           >
@@ -404,7 +418,7 @@ export default function ProfileScreen() {
               backgroundColor: CARD,
               borderRadius: 18,
               borderWidth: 1,
-              borderColor: LINE,
+              borderColor: LINE2,
               overflow: 'hidden',
             }}
           >

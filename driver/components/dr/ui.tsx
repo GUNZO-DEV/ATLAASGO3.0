@@ -1,7 +1,8 @@
-// AtlaasDriver 3.0 — shared "cockpit" theme + UI primitives.
+// AtlaasDriver 3.0 — shared design foundation + UI primitives.
 // Self-contained foundation file: every driver screen imports from here.
-// Dark cockpit surface, emerald accents (distinct from the customer app's
-// sunset-orange). React Native translation of the design JSX/CSS.
+// Light cream/white surface, sunset-orange accent (the SAME brand system as
+// the customer app); green for the online/done state, blue for snow boost.
+// React Native translation of the design JSX/CSS (driver.css + app.css).
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -17,18 +18,37 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { Snowflake, ChevronRight, Check } from 'lucide-react-native';
 
-// ── Palette ─────────────────────────────────────────────────────────────
-export const BG = '#07140E';
-export const CARD = 'rgba(255,255,255,0.045)';
-export const LINE = 'rgba(255,255,255,0.09)';
-export const EMERALD = '#10B981';
-export const DEEP = '#0E7C5A';
-export const GLOW = '#34D399';
-export const CREAM = '#EAF3EE';
-export const MUTED = '#7E948A';
-export const AMBER = '#FBBF24';
-export const SNOW = '#5AA9E6';
-export const DANGER = '#F87171';
+// ── Palette — light + sunset-orange (matches app/app.css --tokens) ──────
+// NOTE: the legacy export NAMES are preserved so no screen import breaks;
+// only their VALUES flipped dark→light / emerald→sunset. New light-theme
+// tokens are added below (SURFACE2, BG2, FG_SOFT, ONLINE, LINE2).
+export const BG = '#FBF7F2'; // cream page background
+export const CARD = '#ffffff'; // white cards
+export const LINE = 'rgba(26,20,16,.08)'; // hairline border
+export const EMERALD = '#FF5722'; // (name kept) now the sunset-orange accent
+export const DEEP = '#FF7849'; // (name kept) accent-2 / gradient mid
+export const GLOW = '#FFB74D'; // (name kept) amber / gradient end
+export const CREAM = '#1A1410'; // (name kept) now the dark ink text
+export const MUTED = '#8A7C70'; // warm muted text
+export const AMBER = '#FFB74D'; // amber
+export const SNOW = '#5AA9E6'; // snow-boost blue
+export const DANGER = '#E11D48'; // rose danger
+
+// New light-theme tokens
+export const SURFACE2 = '#FBF6EF'; // tinted secondary surface
+export const BG2 = '#F3ECE1'; // sand secondary background (inactive tracks)
+export const FG_SOFT = '#5A4F46'; // soft body text
+export const ONLINE = '#2FA36B'; // online toggle + success/done green
+export const LINE2 = 'rgba(26,20,16,.05)'; // softest hairline
+
+// Soft elevation shadow shared by white cards (app.css --sh-1).
+const SHADOW = {
+  shadowColor: '#1A1410',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.06,
+  shadowRadius: 18,
+  elevation: 2,
+} as const;
 
 // ── Animated primitives (extracted verbatim from app/index.tsx) ─────────
 export function Enter({ delay = 0, children }: { delay?: number; children: ReactNode }) {
@@ -114,8 +134,9 @@ export function StatTile({
         backgroundColor: CARD,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: LINE,
+        borderColor: LINE2,
         padding: 14,
+        ...SHADOW,
       }}
     >
       <View style={{ marginBottom: 8 }}>{icon}</View>
@@ -138,9 +159,10 @@ export function Surge({ temp, label }: { temp?: number; label: string }) {
         gap: 12,
         padding: 13,
         borderRadius: 16,
-        backgroundColor: 'rgba(90,169,230,0.12)',
+        backgroundColor: '#EAF3FB', // snow-blue tinted over white surface
         borderWidth: 1,
         borderColor: 'rgba(90,169,230,0.35)',
+        ...SHADOW,
       }}
     >
       <View
@@ -150,6 +172,7 @@ export function Surge({ temp, label }: { temp?: number; label: string }) {
           borderRadius: 12,
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
         }}
       >
         <LinearGradient
@@ -187,7 +210,7 @@ export function RouteSummary({ pickup, dropoff }: { pickup: RoutePoint; dropoff:
               width: 13,
               height: 13,
               borderRadius: 7,
-              backgroundColor: BG,
+              backgroundColor: CARD,
               borderWidth: 3,
               borderColor: AMBER,
             }}
@@ -342,10 +365,16 @@ export function SlideConfirm({
         overflow: 'hidden',
         justifyContent: 'center',
         opacity: disabled ? 0.6 : 1,
+        // sunset glow (--sh-glow); switches to a green glow when done
+        shadowColor: done ? ONLINE : EMERALD,
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: done ? 0.5 : 0.38,
+        shadowRadius: 34,
+        elevation: 6,
       }}
     >
       <LinearGradient
-        colors={done ? [EMERALD, EMERALD] : [GLOW, EMERALD]}
+        colors={done ? [ONLINE, ONLINE] : [EMERALD, GLOW]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={StyleFill}
@@ -390,9 +419,14 @@ export function SlideConfirm({
           alignItems: 'center',
           justifyContent: 'center',
           transform: [{ translateX: x }],
+          shadowColor: '#1A1410',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.25,
+          shadowRadius: 10,
+          elevation: 4,
         }}
       >
-        {done ? <Check size={22} color={EMERALD} /> : <ChevronRight size={22} color={EMERALD} />}
+        {done ? <Check size={22} color={ONLINE} /> : <ChevronRight size={22} color={EMERALD} />}
       </Animated.View>
     </View>
   );
@@ -428,12 +462,12 @@ export function WeekBars({ week }: { week: WeekDay[] }) {
                 borderBottomLeftRadius: 4,
                 borderBottomRightRadius: 4,
                 overflow: 'hidden',
-                backgroundColor: w.today ? 'transparent' : 'rgba(255,255,255,0.08)',
+                backgroundColor: w.today ? 'transparent' : BG2,
               }}
             >
               {w.today ? (
                 <LinearGradient
-                  colors={[GLOW, EMERALD]}
+                  colors={[EMERALD, GLOW]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0, y: 1 }}
                   style={StyleFill}
@@ -494,13 +528,13 @@ export function Section({ icon, title, badge }: { icon?: ReactNode; title: strin
             minWidth: 20,
             height: 20,
             borderRadius: 10,
-            backgroundColor: AMBER,
+            backgroundColor: EMERALD,
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: 6,
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: '800', color: '#04140D' }}>{badge}</Text>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{badge}</Text>
         </View>
       ) : null}
     </View>
@@ -535,11 +569,13 @@ export function ActionBtn({
         justifyContent: 'center',
         borderWidth: primary ? 0 : 1,
         borderColor: tint ? `${tint}55` : LINE,
+        backgroundColor: primary ? 'transparent' : CARD,
         opacity: busy || disabled ? 0.6 : 1,
+        ...(primary ? null : SHADOW),
       }}
     >
       {busy ? (
-        <ActivityIndicator color={primary ? '#04140D' : EMERALD} />
+        <ActivityIndicator color={primary ? '#fff' : tint ?? EMERALD} />
       ) : (
         <>
           {icon}
@@ -548,7 +584,7 @@ export function ActionBtn({
               fontWeight: '800',
               fontSize: 14,
               marginLeft: icon ? 7 : 0,
-              color: primary ? '#04140D' : tint ?? CREAM,
+              color: primary ? '#fff' : tint ?? CREAM,
             }}
           >
             {label}
@@ -560,7 +596,20 @@ export function ActionBtn({
   return (
     <Tappable onPress={onPress} disabled={busy || disabled}>
       {primary ? (
-        <LinearGradient colors={[GLOW, EMERALD]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 13 }}>
+        <LinearGradient
+          colors={[EMERALD, GLOW]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{
+            borderRadius: 13,
+            // sunset glow (--sh-glow)
+            shadowColor: EMERALD,
+            shadowOffset: { width: 0, height: 14 },
+            shadowOpacity: 0.38,
+            shadowRadius: 34,
+            elevation: 6,
+          }}
+        >
           {content}
         </LinearGradient>
       ) : (
