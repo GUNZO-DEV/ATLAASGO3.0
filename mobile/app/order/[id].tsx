@@ -208,6 +208,20 @@ export default function OrderScreen() {
   const riderPt = riderLive ? { lat: riderLive.lat, lng: riderLive.lng } : null;
   const orderTag = (id ?? '—').slice(0, 6).toUpperCase();
 
+  // Per-stage clock times, derived from the REAL order.createdAt + the 4-min/stage
+  // ETA model (no per-stage timestamps in the DB). Done/now stages → projected
+  // clock time; the live stage → "Now"; future stages → "~HH:MM".
+  const stageTimes = useMemo(() => {
+    const base = order?.createdAt ? new Date(order.createdAt).getTime() : Date.now();
+    const fmt = (ms: number) =>
+      new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return TIMELINE.map((_, i) => {
+      const at = base + i * 4 * 60 * 1000; // 4 min per stage, matching the ETA model
+      if (i === stageIdx && !isDelivered) return tr('tracking.timeNow');
+      return (i <= stageIdx ? '' : '~') + fmt(at);
+    });
+  }, [order?.createdAt, stageIdx, isDelivered, tr]);
+
   // ── Loading / not-found (real orders only) ───────────────────────────────
   if (!isDemo && loading) {
     return (
@@ -449,15 +463,26 @@ export default function OrderScreen() {
                         ) : null}
                       </View>
                       <View style={{ flex: 1, paddingBottom: 16, opacity: done || now ? 1 : 0.5 }}>
-                        <Text
-                          style={{
-                            fontWeight: now ? '800' : '700',
-                            fontSize: 14.5,
-                            color: now ? t.colors.primary : t.colors.fg,
-                          }}
-                        >
-                          {tr(`tracking.${s.labelKey}`)}
-                        </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                          <Text
+                            style={{
+                              fontWeight: now ? '800' : '700',
+                              fontSize: 14.5,
+                              color: now ? t.colors.primary : t.colors.fg,
+                            }}
+                          >
+                            {tr(`tracking.${s.labelKey}`)}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: now ? '800' : '600',
+                              color: now ? t.colors.primary : t.colors.muted,
+                            }}
+                          >
+                            {stageTimes[i]}
+                          </Text>
+                        </View>
                         <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>{tr(`tracking.${s.subKey}`)}</Text>
                       </View>
                     </View>

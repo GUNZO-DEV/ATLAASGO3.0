@@ -641,6 +641,7 @@
     "stageArrivingSub": "Votre livreur est tout près",
     "stageDeliveredLabel": "Livrée",
     "stageDeliveredSub": "Bon appétit",
+    "timeNow": "Maintenant",
     "itemCount": "{{n}} articles",
     "receipt": "Reçu",
     "orderAgain": "Commander à nouveau",

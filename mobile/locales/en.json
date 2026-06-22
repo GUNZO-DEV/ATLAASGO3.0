@@ -641,6 +641,7 @@
     "stageArrivingSub": "Your courier is nearby",
     "stageDeliveredLabel": "Delivered",
     "stageDeliveredSub": "Enjoy your order",
+    "timeNow": "Now",
     "itemCount": "{{n}} items",
     "receipt": "Receipt",
     "orderAgain": "Order again",
