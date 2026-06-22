@@ -311,7 +311,7 @@
     "placeholder": "Écrire un message…"
   },
   "checkout": {
-    "headerTitle": "Paiement",
+    "headerTitle": "Commander",
     "emptyTitle": "Rien à payer",
     "emptyBody": "Votre panier est vide. Ajoutez des articles d’un établissement pour commencer.",
     "browseSpots": "Parcourir les établissements",

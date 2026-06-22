@@ -311,7 +311,7 @@
     "placeholder": "اكتب رسالة…"
   },
   "checkout": {
-    "headerTitle": "الدفع",
+    "headerTitle": "إتمام الطلب",
     "emptyTitle": "لا شيء للدفع",
     "emptyBody": "سلتك فارغة. أضف عناصر من أحد المطاعم للبدء.",
     "browseSpots": "تصفح المطاعم",

@@ -311,7 +311,7 @@
     "placeholder": "Type a message…"
   },
   "checkout": {
-    "headerTitle": "Payment",
+    "headerTitle": "Checkout",
     "emptyTitle": "Nothing to check out",
     "emptyBody": "Your cart is empty. Add items from a spot to get started.",
     "browseSpots": "Browse spots",
