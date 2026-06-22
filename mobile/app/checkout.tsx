@@ -1,13 +1,18 @@
-// AtlaasGo 3.0 — Checkout / payment (the order-create + pay step).
+// AtlaasGo 3.0 — Combined Checkout (the whole order step on one screen).
 //
-// Native re-skin to the 3.0 design language (warm terracotta + amber on
-// cream/ink, sunset gradient header + CTA, rounded cards, dark Bill summary)
-// built on the ag3 foundation: useAg3Theme, components/ag3/icons,
-// components/ag3/primitives (Press, Rise). Dark-mode aware.
+// This screen merges what used to be TWO screens (app/cart.tsx + the old
+// app/checkout.tsx) into ONE, faithful to the live Claude Design
+// screen-checkout2.jsx: order-from, items + qty steppers, dorm-precise drop
+// with handoff, delivery speed, weather note, courier tip, payment, bill
+// summary and a sticky place-order footer — top to bottom.
 //
-// LOGIC PRESERVED EXACTLY (presentation-only re-skin) ──────────────────────────
-//   • Saved-address selection (supabase addresses read, auto-select default,
-//     selectAddress, "use a new address instead").
+// LOGIC PRESERVED EXACTLY (the cart-side selections are now LOCAL state) ───────
+//   • Line items + qty come from the LIVE zustand cart (lib/cart) — the qty
+//     steppers drive the same setQty, so totals stay in sync everywhere.
+//   • Speed / tip / handoff used to be passed cart→checkout via router params;
+//     they now live as useState ON this screen and feed the quote + order-create.
+//   • Saved-address selection (supabase addresses read with coords, auto-select
+//     default, selectAddress, "use a new address instead" / inline picker).
 //   • Landmark + GPS capture (LandmarkInput / useLocation), with the saved-coords
 //     shortcut that skips the manual GPS requirement.
 //   • Phone-on-file validation (isValidMoroccanPhone) + savePhone (profiles).
@@ -19,13 +24,12 @@
 //   • useCreateOrder + the server cart_quote pricing (quote state, the
 //     deliveryFee / priorityDh / weatherDh / tipAmount bill lines, the !!quote
 //     submit gate, tip / speed / handoff persistence).
-//   • expo-router params (category / speed / tipDh / handoff / addressId) and
-//     navigation (router.replace to /order/[id]).
-// None of the money math or order-create logic is touched.
+//   • Navigation: router.replace to /order/[id] after a successful order-create.
+// None of the money math, Stripe, wallet RPC or order-create logic is touched.
 import { MotiView } from 'moti';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -42,14 +46,19 @@ import { isStripeAvailable, payWithPaymentSheet } from '../lib/stripe';
 import { cancelOrder } from '../lib/orderActions';
 import type { CategoryKey, Coords } from '../lib/types';
 import { agApi, type Quote } from '../lib/ag3/agApi';
+import { useAsync } from '../lib/ag3/useAsync';
 
 import { useAg3Theme, type Ag3Theme } from '../components/ag3/theme';
-import { Press, Rise } from '../components/ag3/primitives';
+import { PhotoTile, Price, Press, Rise, foodEm, tileFor } from '../components/ag3/primitives';
 import {
   IBack,
   IPin,
   IHome,
   IPhone,
+  IBolt,
+  ISnow,
+  IClock,
+  IUser,
   ICheck,
   IClose,
   IWallet,
@@ -59,6 +68,14 @@ import {
 } from '../components/ag3/icons';
 
 const MIN_ORDER_DH = 30; // Minimum order subtotal — same as web (src/pages/Cart.tsx)
+
+// The mobile app is AUI / Ifrane-centric — that's the campus city the cart
+// quote + dorm drop key off. (CityProvider isn't mounted at the root, so we
+// resolve the city directly from agApi rather than from context.)
+const CITY_ID = 'ifrane';
+
+type Speed = 'standard' | 'priority';
+type Handoff = 'door' | 'hand' | 'lounge';
 
 /** Morocco-friendly phone check — starts +212 or 0, then 5/6/7 and 8 digits. */
 function isValidMoroccanPhone(raw: string): boolean {
@@ -82,21 +99,19 @@ export default function Checkout() {
   const t = useAg3Theme();
   const { t: tr } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams<{ category?: string; speed?: string; tipDh?: string; handoff?: string; addressId?: string }>();
+  const params = useLocalSearchParams<{ category?: string; speed?: string; tipDh?: string; handoff?: string }>();
   const categoryKey = (params.category as CategoryKey) ?? 'food';
-  // 3.0 cart selections carried over so the charge matches the displayed quote.
-  const speed: 'standard' | 'priority' = params.speed === 'priority' ? 'priority' : 'standard';
-  const tipDh = Math.max(0, parseInt(params.tipDh ?? '0', 10) || 0);
-  const handoff: 'door' | 'hand' | 'lounge' =
-    params.handoff === 'hand' ? 'hand' : params.handoff === 'lounge' ? 'lounge' : 'door';
 
   // Line items + subtotal from the live cart store; the fee breakdown (delivery,
-  // priority, winter surcharge, tip) now comes from the server cart_quote — the
-  // SAME source the 3.0 cart screen shows, so charged == displayed.
+  // priority, winter surcharge, tip) comes from the server cart_quote.
   const items = useCart((s) => s.items);
   const isCampusOrder = useCart((s) => s.isCampusOrder);
+  const setQty = useCart((s) => s.setQty);
   const clearCart = useCart((s) => s.clear);
   const subtotal = useCart((s) => s.subtotal());
+
+  const storeName = items[0]?.restaurantName ?? tr('cart.yourOrder');
+  const storeIdForTile = items[0]?.restaurantId ?? '';
 
   const { user } = useAuth();
   const [landmark, setLandmark] = useState('');
@@ -106,10 +121,25 @@ export default function Checkout() {
   const { balanceDh, loading: walletLoading } = useWallet();
   const promo = usePromotions();
 
+  // ── city + weather (campus gating, weather strip) ──
+  const { data: city } = useAsync(() => agApi.cities.get(CITY_ID), []);
+  const { data: weather } = useAsync(() => agApi.cities.weather(CITY_ID), []);
+  const isCampus = !!city?.campus || isCampusOrder;
+  const hasWeather = !!city?.weather && !!weather;
+
+  // ── 3.0 cart selections — now LOCAL state (were router params). Initial
+  // defaults still honour any params a stale link may carry. ──
+  const [speed, setSpeed] = useState<Speed>(params.speed === 'priority' ? 'priority' : 'standard');
+  const [tip, setTip] = useState<number>(Math.max(0, parseInt(params.tipDh ?? '10', 10) || 0));
+  const [handoff, setHandoff] = useState<Handoff>(
+    params.handoff === 'hand' ? 'hand' : params.handoff === 'lounge' ? 'lounge' : 'door',
+  );
+
   // ── Saved addresses (with coords — the shared hook omits them) ──
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [addrLoading, setAddrLoading] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [pickOpen, setPickOpen] = useState(false);
 
   // ── Phone on file ──
   const [phoneOnFile, setPhoneOnFile] = useState<string | null>(null);
@@ -163,6 +193,7 @@ export default function Checkout() {
   function selectAddress(a: SavedAddress) {
     setSelectedAddressId(a.id);
     setLandmark(a.landmark ?? a.label ?? '');
+    setPickOpen(false);
   }
 
   // A saved address with coords skips the GPS requirement; otherwise the
@@ -172,40 +203,61 @@ export default function Checkout() {
   const phoneOk = !!phoneOnFile && phoneOnFile.length >= 8;
   const subtotalOk = subtotal >= MIN_ORDER_DH;
 
-  // ── Server-priced bill (cart_quote): the SAME quote the 3.0 cart shows, so
-  // the amount charged equals the amount displayed. Re-fetched here for
-  // authority — never trust a client-passed total. ──
+  // Drop card display — saved address name/sub, falling back to the city default.
+  const dropName =
+    selectedAddress?.label ?? city?.defaultAddress ?? tr('cart.deliveryAddress');
+  const dropSub =
+    [selectedAddress?.line1, selectedAddress?.building, selectedAddress?.room ? tr('checkout.roomShort', { room: selectedAddress.room }) : null]
+      .filter(Boolean)
+      .join(' · ') ||
+    selectedAddress?.landmark ||
+    city?.defaultAddressSub ||
+    '';
+
+  // ── Server-priced bill (cart_quote): the SAME quote source as the old cart
+  // screen, so the amount charged equals the amount displayed. Re-fetched here
+  // for authority — never trust a client-passed total. Now re-quotes whenever
+  // the on-screen speed / tip / address changes. ──
   const storeId = items[0]?.restaurantId ?? null;
-  const quoteItems = items.map((i) => ({ itemId: i.id, qty: i.qty }));
+  const quoteItems = useMemo(() => items.map((i) => ({ itemId: i.id, qty: i.qty })), [items]);
   const itemsKey = quoteItems.map((q) => `${q.itemId}:${q.qty}`).join(',');
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoting, setQuoting] = useState(false);
   useEffect(() => {
     if (!storeId || quoteItems.length === 0) {
       setQuote(null);
       return;
     }
     let cancelled = false;
+    setQuoting(true);
     agApi.cart
-      .quote({ storeId, items: quoteItems, speed, tipDh, addressId: selectedAddress?.id })
+      .quote({ storeId, items: quoteItems, speed, tipDh: tip, addressId: selectedAddress?.id })
       .then((q) => !cancelled && setQuote(q))
-      .catch(() => !cancelled && setQuote(null));
+      .catch(() => !cancelled && setQuote(null))
+      .finally(() => !cancelled && setQuoting(false));
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, itemsKey, speed, tipDh, selectedAddress?.id]);
+  }, [storeId, itemsKey, speed, tip, selectedAddress?.id]);
 
   // ── Money (integer dirhams) — server quote is the source of truth ──
   const deliveryFee = quote?.deliveryFeeDh ?? 0;
-  const priorityDh = quote?.priorityDh ?? 0;
-  const weatherDh = quote?.weatherSurchargeDh ?? 0;
-  const tipAmount = quote?.tipDh ?? tipDh;
+  const priorityDh = quote?.priorityDh ?? (speed === 'priority' ? 9 : 0);
+  const weatherDh = quote?.weatherSurchargeDh ?? (hasWeather ? 3 : 0);
+  const tipAmount = quote?.tipDh ?? tip;
   const promoDiscount = promo.applied?.discountDh ?? 0;
   const grossTotal = quote ? quote.totalDh : subtotal + deliveryFee + priorityDh + weatherDh + tipAmount;
   const totalBeforeWallet = Math.max(0, grossTotal - promoDiscount);
   const walletCredit = payMethod === 'wallet' ? Math.min(balanceDh, totalBeforeWallet) : 0;
   const finalTotal = Math.max(0, totalBeforeWallet - walletCredit);
   const fullyCoveredByWallet = walletCredit > 0 && finalTotal === 0;
+
+  const etaLabel = quote
+    ? `${quote.etaMinutes[0]}–${quote.etaMinutes[1]}`
+    : speed === 'priority'
+      ? '14–18'
+      : '18–24';
 
   const canSubmit =
     !!user &&
@@ -371,31 +423,11 @@ export default function Checkout() {
     clearCart();
   };
 
-  // ── 3.0 sunset header ──
-  function Header() {
-    return (
-      <MotiView
-        from={{ opacity: 0, translateX: -8 }}
-        animate={{ opacity: 1, translateX: 0 }}
-        transition={{ type: 'timing', duration: 240 }}
-        style={styles.header}
-      >
-        <Press onPress={() => router.back()} scaleTo={0.9}>
-          <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
-            <IBack size={20} color={t.colors.fg} />
-          </View>
-        </Press>
-        <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>{tr('checkout.headerTitle')}</Text>
-        <View style={{ width: 42 }} />
-      </MotiView>
-    );
-  }
-
   // ── Empty cart ──
   if (items.length === 0) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
-        <Header />
+        <Header t={t} onBack={() => router.back()} />
         <View style={styles.emptyWrap}>
           <View style={[styles.emptyIcon, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
             <IBag size={28} color={t.colors.muted} />
@@ -423,218 +455,395 @@ export default function Checkout() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
-      <Header />
+      <Header t={t} onBack={() => router.back()} />
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 168 }}
+        contentContainerStyle={{ paddingBottom: 176 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── order from ── */}
         <Rise>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginTop: 6 }]}>
-            {tr('checkout.categoryDeliveryEyebrow', { category: tr(`checkout.category_${categoryKey}`).toUpperCase() })}
-          </Text>
-          <Text style={[styles.disp, { fontSize: 27, color: t.colors.fg, marginTop: 3, lineHeight: 31 }]}>
-            {tr('checkout.dropHeading')}
-          </Text>
+          <View style={[styles.pad, { flexDirection: 'row', alignItems: 'center', gap: 11 }]}>
+            <PhotoTile
+              tile={tileFor(storeIdForTile || storeName)}
+              em={foodEm(storeIdForTile)}
+              radius={14}
+              style={{ width: 46, height: 46 }}
+            />
+            <View>
+              <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('cart.orderFrom')}</Text>
+              <Text style={[styles.disp, { fontSize: 16, color: t.colors.fg }]} numberOfLines={1}>
+                {storeName}
+              </Text>
+            </View>
+          </View>
         </Rise>
+
+        {/* ── your items ── */}
+        <Section
+          t={t}
+          title={tr('cart.yourItems')}
+          right={
+            <Pressable onPress={() => router.back()} hitSlop={8}>
+              <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>{tr('cart.addMore')}</Text>
+            </Pressable>
+          }
+        >
+          <View style={[card(t), { paddingHorizontal: 16, paddingVertical: 4 }]}>
+            {items.map((c, i) => (
+              <View key={c.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 }}>
+                  <PhotoTile tile={tileFor(c.id)} em={foodEm(c.id)} radius={12} style={{ width: 48, height: 48 }} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }} numberOfLines={1}>
+                      {c.name}
+                    </Text>
+                    <Price v={c.priceDh} />
+                  </View>
+                  <Stepper t={t} qty={c.qty} onDec={() => setQty(c.id, c.qty - 1)} onInc={() => setQty(c.id, c.qty + 1)} />
+                </View>
+                {i < items.length - 1 && <View style={[styles.hr, { backgroundColor: t.colors.line }]} />}
+              </View>
+            ))}
+          </View>
+        </Section>
 
         {/* ── Signed-out note ── */}
         {!user && (
-          <View
-            style={[
-              styles.softNote,
-              { backgroundColor: 'rgba(255,87,34,0.08)', borderColor: 'rgba(255,87,34,0.3)', borderStyle: 'dashed' },
-            ]}
-          >
-            <Text style={{ fontSize: 12, color: t.colors.fgSoft, lineHeight: 18 }}>
-              {tr('checkout.signInNote')}
-            </Text>
+          <View style={[styles.pad, { marginTop: 18 }]}>
+            <View
+              style={[
+                styles.softNote,
+                { backgroundColor: 'rgba(255,87,34,0.08)', borderColor: 'rgba(255,87,34,0.3)', borderStyle: 'dashed' },
+              ]}
+            >
+              <Text style={{ fontSize: 12, color: t.colors.fgSoft, lineHeight: 18 }}>{tr('checkout.signInNote')}</Text>
+            </View>
           </View>
         )}
 
-        {/* ── Saved addresses ── */}
-        {user && (addrLoading ? (
-          <View style={{ marginTop: 22, paddingVertical: 16, alignItems: 'center' }}>
-            <ActivityIndicator color={t.colors.primary} />
-          </View>
-        ) : addresses.length > 0 ? (
-          <Rise style={{ marginTop: 22 }}>
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.savedAddresses')}</Text>
-            <View style={{ gap: 10 }}>
-              {addresses.map((a) => {
-                const active = selectedAddressId === a.id;
-                return (
-                  <Press key={a.id} onPress={() => selectAddress(a)}>
-                    <View
-                      style={[
-                        card(t),
-                        styles.addrCard,
-                        {
-                          borderColor: active ? t.colors.primary : t.colors.line2,
-                          borderWidth: active ? 1.5 : 1,
-                          backgroundColor: active ? 'rgba(255,87,34,0.06)' : t.colors.surface,
-                        },
-                      ]}
-                    >
-                      {active ? (
-                        <LinearGradient
-                          colors={t.gradients.sunset}
-                          start={t.gradients.start}
-                          end={t.gradients.end}
-                          style={[styles.addrIcon, t.shadows.glow]}
-                        >
-                          {a.is_campus ? <IHome size={17} color="#fff" /> : <IPin size={17} color="#fff" />}
-                        </LinearGradient>
-                      ) : (
-                        <View style={[styles.addrIcon, { backgroundColor: t.colors.surface2 }]}>
-                          {a.is_campus ? <IHome size={17} color={t.colors.fg} /> : <IPin size={17} color={t.colors.fg} />}
-                        </View>
-                      )}
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.colors.fg }} numberOfLines={1}>
-                          {a.label ?? tr('checkout.addressFallback')}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>
-                          {[a.line1, a.building, a.room ? tr('checkout.roomShort', { room: a.room }) : null].filter(Boolean).join(' · ') ||
-                            a.landmark ||
-                            '—'}
-                        </Text>
-                      </View>
-                      {active && <ICheck size={18} color={t.colors.primary} />}
-                    </View>
-                  </Press>
-                );
-              })}
-              {selectedAddressId && (
-                <Press onPress={() => setSelectedAddressId(null)}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.primary, paddingHorizontal: 2, paddingVertical: 4 }}>
-                    {tr('checkout.useNewAddress')}
-                  </Text>
-                </Press>
-              )}
-            </View>
-          </Rise>
-        ) : null)}
-
-        {/* ── Landmark + GPS ── */}
-        <Rise style={{ marginTop: 22 }}>
-          {selectedAddress?.coords ? (
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-                <IPin size={14} color={t.colors.primary} strokeWidth={2.5} />
-                <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>{tr('checkout.landmarkRequiredEyebrow')}</Text>
-              </View>
-              <View
-                style={[
-                  styles.inputWrap,
-                  {
-                    borderColor: landmarkValid || !landmark ? t.colors.line : '#EF4444',
-                    backgroundColor: t.colors.surface2,
-                    borderWidth: 1.5,
-                  },
-                ]}
-              >
-                <TextInput
-                  value={landmark}
-                  onChangeText={setLandmark}
-                  placeholder={tr('checkout.landmarkPlaceholder')}
-                  placeholderTextColor={t.colors.muted}
-                  multiline
-                  style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: t.colors.fg, minHeight: 64 }}
-                />
-              </View>
-              <View
-                style={[
-                  styles.okStrip,
-                  { backgroundColor: 'rgba(47,163,107,0.10)', borderColor: 'rgba(47,163,107,0.24)' },
-                ]}
-              >
-                <ICheck size={14} color={t.colors.ok} />
-                <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
-                  {tr('checkout.savedGpsNote', { address: selectedAddress.label ?? tr('checkout.thisAddress') })}
+        {/* ── delivery drop (saved address + handoff + courier note) ── */}
+        <Section
+          t={t}
+          title={isCampus ? tr('cart.dormPreciseDrop') : tr('cart.deliveryAddress')}
+          right={
+            user && addresses.length > 0 ? (
+              <Pressable onPress={() => setPickOpen((o) => !o)} hitSlop={8}>
+                <Text style={{ color: t.colors.primary, fontWeight: '700', fontSize: 13.5 }}>
+                  {pickOpen ? tr('cart.done') : tr('cart.change')}
                 </Text>
-              </View>
+              </Pressable>
+            ) : null
+          }
+        >
+          {user && addrLoading ? (
+            <View style={[card(t), { paddingVertical: 18, alignItems: 'center' }]}>
+              <ActivityIndicator color={t.colors.primary} />
             </View>
           ) : (
-            <LandmarkInput
-              value={landmark}
-              onChange={setLandmark}
-              coords={gpsCoords}
-              onCaptureCoords={capture}
-              capturing={locStatus === 'requesting'}
-            />
-          )}
-        </Rise>
-
-        {locError && !selectedAddress?.coords && (
-          <Text style={{ marginTop: 12, fontSize: 12, color: '#EF4444' }}>{locError}</Text>
-        )}
-
-        {/* ── Phone on file ── */}
-        {user && !profileLoading && !phoneOk && (
-          <Rise style={[styles.warnCard, { backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <IPhone size={15} color={t.colors.warn} />
-              <Text style={{ marginLeft: 8, fontSize: 13, fontWeight: '700', color: t.colors.warn, flex: 1 }}>
-                {tr('checkout.addPhonePrompt')}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-              <TextInput
-                value={phoneInput}
-                onChangeText={setPhoneInput}
-                keyboardType="phone-pad"
-                placeholder={tr('checkout.phonePlaceholder')}
-                placeholderTextColor={t.colors.muted}
-                style={{
-                  flex: 1,
-                  backgroundColor: t.colors.surface,
-                  borderWidth: 1,
-                  borderColor: t.colors.line,
-                  borderRadius: 14,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  fontSize: 14,
-                  color: t.colors.fg,
-                }}
-              />
-              <Press onPress={savePhone} disabled={phoneSaving || !phoneInput.trim()}>
+            <View style={card(t)}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 15 }}>
                 <LinearGradient
                   colors={t.gradients.sunset}
                   start={t.gradients.start}
                   end={t.gradients.end}
-                  style={[styles.smallBtn, t.shadows.glow, { opacity: phoneSaving || !phoneInput.trim() ? 0.6 : 1 }]}
+                  style={[styles.pinTile, t.shadows.glow]}
                 >
-                  {phoneSaving ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{tr('checkout.save')}</Text>
-                  )}
+                  {selectedAddress?.is_campus ? <IHome size={22} color="#fff" /> : <IPin size={22} color="#fff" />}
                 </LinearGradient>
-              </Press>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.disp, { fontSize: 16, color: t.colors.fg }]} numberOfLines={1}>
+                    {dropName}
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: t.colors.muted }} numberOfLines={1}>
+                    {dropSub}
+                  </Text>
+                </View>
+                {selectedAddress && (
+                  <View style={[styles.badge, { backgroundColor: 'rgba(47,163,107,0.14)' }]}>
+                    <ICheck size={13} color={t.colors.ok} />
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: t.colors.ok }}>{tr('cart.pinned')}</Text>
+                  </View>
+                )}
+              </View>
+
+              {pickOpen && addresses.length > 0 && (
+                <MotiView
+                  from={{ opacity: 0, translateY: 6 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 240 }}
+                  style={{ borderTopWidth: 1, borderColor: t.colors.line, paddingHorizontal: 8, paddingVertical: 6 }}
+                >
+                  {addresses.map((opt) => {
+                    const active = opt.id === selectedAddressId;
+                    return (
+                      <Pressable
+                        key={opt.id}
+                        onPress={() => selectAddress(opt)}
+                        style={[styles.addrRow, active && { backgroundColor: 'rgba(255,87,34,0.10)' }]}
+                      >
+                        {opt.is_campus ? (
+                          <IHome size={19} color={active ? t.colors.primary : t.colors.muted} />
+                        ) : (
+                          <IPin size={19} color={active ? t.colors.primary : t.colors.muted} />
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: '700', fontSize: 14, color: t.colors.fg }} numberOfLines={1}>
+                            {opt.label ?? tr('checkout.addressFallback')}
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: t.colors.muted }} numberOfLines={1}>
+                            {[opt.line1, opt.building].filter(Boolean).join(' · ') || opt.landmark || '—'}
+                          </Text>
+                        </View>
+                        {active && <ICheck size={18} color={t.colors.primary} />}
+                      </Pressable>
+                    );
+                  })}
+                  {selectedAddressId && (
+                    <Press onPress={() => { setSelectedAddressId(null); setPickOpen(false); }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.colors.primary, paddingHorizontal: 12, paddingVertical: 8 }}>
+                        {tr('checkout.useNewAddress')}
+                      </Text>
+                    </Press>
+                  )}
+                </MotiView>
+              )}
+
+              <View style={{ borderTopWidth: 1, borderColor: t.colors.line, padding: 13 }}>
+                <Segmented
+                  t={t}
+                  value={handoff}
+                  onChange={setHandoff}
+                  options={[
+                    ['door', tr('cart.handoffDoor')],
+                    ['hand', tr('cart.handoffHand')],
+                    ['lounge', isCampus ? tr('cart.handoffLounge') : tr('cart.handoffConcierge')],
+                  ]}
+                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 11, paddingHorizontal: 2 }}>
+                  <IUser size={15} color={t.colors.muted} />
+                  <Text style={{ fontSize: 12.5, color: t.colors.muted }}>
+                    {tr('cart.noteForCourier', { note: notes.trim() || tr('cart.leaveAtTheDoor') })}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </Section>
+
+        {/* ── Landmark + GPS (real wiring — required for order-create) ── */}
+        <View style={styles.pad}>
+          <Rise style={{ marginTop: 18 }}>
+            {selectedAddress?.coords ? (
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                  <IPin size={14} color={t.colors.primary} strokeWidth={2.5} />
+                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>{tr('checkout.landmarkRequiredEyebrow')}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    {
+                      borderColor: landmarkValid || !landmark ? t.colors.line : '#EF4444',
+                      backgroundColor: t.colors.surface2,
+                      borderWidth: 1.5,
+                    },
+                  ]}
+                >
+                  <TextInput
+                    value={landmark}
+                    onChangeText={setLandmark}
+                    placeholder={tr('checkout.landmarkPlaceholder')}
+                    placeholderTextColor={t.colors.muted}
+                    multiline
+                    style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: t.colors.fg, minHeight: 64 }}
+                  />
+                </View>
+                <View style={[styles.okStrip, { backgroundColor: 'rgba(47,163,107,0.10)', borderColor: 'rgba(47,163,107,0.24)' }]}>
+                  <ICheck size={14} color={t.colors.ok} />
+                  <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
+                    {tr('checkout.savedGpsNote', { address: selectedAddress.label ?? tr('checkout.thisAddress') })}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <LandmarkInput
+                value={landmark}
+                onChange={setLandmark}
+                coords={gpsCoords}
+                onCaptureCoords={capture}
+                capturing={locStatus === 'requesting'}
+              />
+            )}
+          </Rise>
+
+          {locError && !selectedAddress?.coords && (
+            <Text style={{ marginTop: 12, fontSize: 12, color: '#EF4444' }}>{locError}</Text>
+          )}
+
+          {/* ── Phone on file ── */}
+          {user && !profileLoading && !phoneOk && (
+            <Rise style={[styles.warnCard, { backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <IPhone size={15} color={t.colors.warn} />
+                <Text style={{ marginLeft: 8, fontSize: 13, fontWeight: '700', color: t.colors.warn, flex: 1 }}>
+                  {tr('checkout.addPhonePrompt')}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <TextInput
+                  value={phoneInput}
+                  onChangeText={setPhoneInput}
+                  keyboardType="phone-pad"
+                  placeholder={tr('checkout.phonePlaceholder')}
+                  placeholderTextColor={t.colors.muted}
+                  style={{
+                    flex: 1,
+                    backgroundColor: t.colors.surface,
+                    borderWidth: 1,
+                    borderColor: t.colors.line,
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 14,
+                    color: t.colors.fg,
+                  }}
+                />
+                <Press onPress={savePhone} disabled={phoneSaving || !phoneInput.trim()}>
+                  <LinearGradient
+                    colors={t.gradients.sunset}
+                    start={t.gradients.start}
+                    end={t.gradients.end}
+                    style={[styles.smallBtn, t.shadows.glow, { opacity: phoneSaving || !phoneInput.trim() ? 0.6 : 1 }]}
+                  >
+                    {phoneSaving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{tr('checkout.save')}</Text>
+                    )}
+                  </LinearGradient>
+                </Press>
+              </View>
+            </Rise>
+          )}
+
+          {/* ── Driver notes (wired to orders.delivery_notes) ── */}
+          <Rise style={{ marginTop: 22 }}>
+            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.driverNotesEyebrow')}</Text>
+            <View style={[card(t), styles.inputWrap]}>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder={tr('checkout.driverNotesPlaceholder')}
+                placeholderTextColor={t.colors.muted}
+                multiline
+                style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: t.colors.fg, minHeight: 56 }}
+              />
             </View>
           </Rise>
-        )}
+        </View>
 
-        {/* ── Driver notes (wired to orders.delivery_notes) ── */}
-        <Rise style={{ marginTop: 22 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.driverNotesEyebrow')}</Text>
-          <View style={[card(t), styles.inputWrap]}>
-            <TextInput
-              value={notes}
-              onChangeText={setNotes}
-              placeholder={tr('checkout.driverNotesPlaceholder')}
-              placeholderTextColor={t.colors.muted}
-              multiline
-              style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: t.colors.fg, minHeight: 56 }}
-            />
+        {/* ── delivery speed ── */}
+        <Section t={t} title={tr('cart.deliverySpeed')}>
+          <View style={{ gap: 10 }}>
+            {(
+              [
+                {
+                  k: 'standard' as Speed,
+                  title: tr('cart.speedStandard'),
+                  sub: hasWeather ? tr('cart.speedStandardSubWeather') : tr('cart.speedStandardSub'),
+                  price: tr('cart.free'),
+                },
+                {
+                  k: 'priority' as Speed,
+                  title: tr('cart.speedPriority'),
+                  sub: tr('cart.speedPrioritySub'),
+                  price: tr('cart.priorityPrice'),
+                },
+              ]
+            ).map((o) => {
+              const active = speed === o.k;
+              return (
+                <Press key={o.k} onPress={() => setSpeed(o.k)}>
+                  <View
+                    style={[
+                      card(t),
+                      styles.speedRow,
+                      { borderColor: active ? t.colors.primary : t.colors.line2, borderWidth: 1.5 },
+                    ]}
+                  >
+                    <Radio t={t} active={active} />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                        <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>{o.title}</Text>
+                        {o.k === 'priority' && <IBolt size={14} color={t.colors.primary} />}
+                      </View>
+                      <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 1 }}>{o.sub}</Text>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        fontVariant: ['tabular-nums'],
+                        color: o.k === 'standard' ? t.colors.ok : t.colors.fg,
+                      }}
+                    >
+                      {o.price}
+                    </Text>
+                  </View>
+                </Press>
+              );
+            })}
           </View>
-        </Rise>
 
-        {/* ── Promo code ── */}
-        <Rise style={{ marginTop: 22 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.promoCodeEyebrow')}</Text>
+          {hasWeather && (
+            <View style={[styles.snowStrip, { backgroundColor: 'rgba(62,134,199,0.09)', borderColor: 'rgba(62,134,199,0.2)' }]}>
+              <ISnow size={19} color={t.colors.snow} />
+              <Text style={{ fontSize: 12, color: t.colors.fgSoft, flex: 1, lineHeight: 17 }}>
+                {tr('cart.snowStripBefore')}{' '}
+                <Text style={{ fontWeight: '800', color: t.colors.fg }}>
+                  {weatherDh ? `${weatherDh} dh` : `~${weather?.etaAddMinutes ?? 4} min`}
+                </Text>{' '}
+                {tr('cart.snowStripAfter')}
+              </Text>
+            </View>
+          )}
+        </Section>
+
+        {/* ── tip ── */}
+        <Section t={t} title={tr('cart.tipYourCourier')}>
+          <View style={{ flexDirection: 'row', gap: 9 }}>
+            {[0, 5, 10, 15].map((amt) => {
+              const active = tip === amt;
+              return (
+                <Press key={amt} onPress={() => setTip(amt)} style={{ flex: 1 }}>
+                  <View
+                    style={[
+                      card(t),
+                      styles.tipPill,
+                      { borderColor: active ? t.colors.primary : t.colors.line2, borderWidth: 1.5 },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        fontWeight: '700',
+                        fontSize: 14,
+                        fontVariant: ['tabular-nums'],
+                        color: active ? t.colors.primary : t.colors.fg,
+                      }}
+                    >
+                      {amt === 0 ? tr('cart.tipNone') : `${amt} dh`}
+                    </Text>
+                  </View>
+                </Press>
+              );
+            })}
+          </View>
+        </Section>
+
+        {/* ── promo code (real wiring) ── */}
+        <Section t={t} title={tr('checkout.promoCodeEyebrow')}>
           {promo.applied ? (
             <View
               style={[
@@ -660,12 +869,7 @@ export default function Checkout() {
             </View>
           ) : (
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View
-                style={[
-                  card(t),
-                  { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
-                ]}
-              >
+              <View style={[card(t), { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }]}>
                 <IGift size={15} color={t.colors.muted} />
                 <TextInput
                   value={promoInput}
@@ -678,12 +882,7 @@ export default function Checkout() {
                 />
               </View>
               <Press onPress={applyPromo} disabled={!promoInput.trim() || promo.checking}>
-                <View
-                  style={[
-                    styles.applyBtn,
-                    { backgroundColor: t.colors.fg, opacity: !promoInput.trim() || promo.checking ? 0.5 : 1 },
-                  ]}
-                >
+                <View style={[styles.applyBtn, { backgroundColor: t.colors.fg, opacity: !promoInput.trim() || promo.checking ? 0.5 : 1 }]}>
                   {promo.checking ? (
                     <ActivityIndicator color={t.colors.bg} size="small" />
                   ) : (
@@ -696,11 +895,10 @@ export default function Checkout() {
           {promo.error && !promo.applied && (
             <Text style={{ marginTop: 8, fontSize: 12, color: '#EF4444' }}>{promo.error}</Text>
           )}
-        </Rise>
+        </Section>
 
-        {/* ── Payment method ── */}
-        <Rise style={{ marginTop: 22 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 10 }]}>{tr('checkout.payWithEyebrow')}</Text>
+        {/* ── Payment method (real cash / wallet / card + Stripe gating) ── */}
+        <Section t={t} title={tr('checkout.payWithEyebrow')}>
           <View style={{ gap: 10 }}>
             {/* Cash on delivery — default */}
             <Press onPress={() => setPayMethod('cash')}>
@@ -804,61 +1002,64 @@ export default function Checkout() {
               </Text>
             </View>
           )}
-        </Rise>
+        </Section>
 
         {/* ── Min-order warning ── */}
         {!subtotalOk && (
-          <View style={[styles.warnStrip, { marginTop: 18, backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.warn, lineHeight: 18 }}>
-              {tr('checkout.minOrderWarning', { min: MIN_ORDER_DH, more: MIN_ORDER_DH - subtotal })}
-            </Text>
+          <View style={styles.pad}>
+            <View style={[styles.warnStrip, { marginTop: 18, backgroundColor: 'rgba(232,169,59,0.10)', borderColor: 'rgba(232,169,59,0.24)' }]}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: t.colors.warn, lineHeight: 18 }}>
+                {tr('checkout.minOrderWarning', { min: MIN_ORDER_DH, more: MIN_ORDER_DH - subtotal })}
+              </Text>
+            </View>
           </View>
         )}
 
-        {/* ── Order summary — dark Bill card (3.0 tokens) ── */}
-        <Rise style={[styles.billCard, t.shadows.lift]}>
-          <LinearGradient
-            colors={t.isDark ? ['#231910', '#19120C'] : ['#211913', '#100B07']}
-            start={t.gradients.start}
-            end={t.gradients.end}
-            style={StyleSheet.absoluteFill}
-          />
-          <BillRow label={tr('checkout.billSubtotal')} value={`${subtotal} dh`} />
-          <BillRow label={tr('checkout.billDelivery')} value={deliveryFee === 0 ? tr('checkout.billFree') : `${deliveryFee} dh`} />
-          {priorityDh > 0 && <BillRow label={tr('checkout.billPriority')} value={`${priorityDh} dh`} />}
-          {weatherDh > 0 && <BillRow label={tr('checkout.billWinterSurcharge')} value={`${weatherDh} dh`} />}
-          {tipAmount > 0 && <BillRow label={tr('checkout.billCourierTip')} value={`${tipAmount} dh`} />}
-          {promoDiscount > 0 && (
-            <BillRow label={tr('checkout.billPromo', { code: promo.applied?.code })} value={`−${promoDiscount} dh`} accent="#3FD08A" />
-          )}
-          {walletCredit > 0 && <BillRow label={tr('checkout.billWalletCredit')} value={`−${walletCredit} dh`} accent="#A99DFF" />}
-          <View style={styles.billTotalRow}>
-            <Text style={[styles.disp, { fontSize: 15, color: '#fff' }]}>{tr('checkout.billTotal')}</Text>
-            <Text style={[styles.disp, { fontSize: 19, color: '#fff', fontVariant: ['tabular-nums'] }]}>
-              {finalTotal} dh
-            </Text>
+        {/* ── Bill summary (server-priced light card) ── */}
+        <Section t={t} title={tr('cart.billSummary')}>
+          <View style={[card(t), { paddingHorizontal: 16, paddingVertical: 15 }]}>
+            <BillRow t={t} label={tr('cart.subtotal')} value={`${subtotal} dh`} />
+            {deliveryFee ? (
+              <BillRow t={t} label={tr('cart.deliveryFee')} value={`${deliveryFee} dh`} />
+            ) : (
+              <BillRow t={t} label={tr('cart.deliveryFee')} value={tr('cart.free')} ok />
+            )}
+            {speed === 'priority' && priorityDh ? <BillRow t={t} label={tr('cart.priority')} value={`${priorityDh} dh`} /> : null}
+            {hasWeather && weatherDh ? <BillRow t={t} label={tr('cart.winterSurcharge')} value={`${weatherDh} dh`} /> : null}
+            {tipAmount > 0 ? <BillRow t={t} label={tr('cart.courierTip')} value={`${tipAmount} dh`} /> : null}
+            {promoDiscount > 0 ? (
+              <BillRow t={t} label={tr('checkout.billPromo', { code: promo.applied?.code })} value={`−${promoDiscount} dh`} ok />
+            ) : null}
+            {walletCredit > 0 ? <BillRow t={t} label={tr('checkout.billWalletCredit')} value={`−${walletCredit} dh`} ok /> : null}
+
+            <View style={[styles.hr, { backgroundColor: t.colors.line, marginVertical: 9 }]} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg }]}>{tr('cart.total')}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                {quoting && <ActivityIndicator size="small" color={t.colors.muted} />}
+                <Text style={[styles.disp, { fontSize: 21, color: t.colors.fg, fontVariant: ['tabular-nums'] }]}>
+                  {finalTotal} dh
+                </Text>
+              </View>
+            </View>
           </View>
-        </Rise>
+        </Section>
 
         {createError && (
-          <Text style={{ marginTop: 12, fontSize: 12, color: '#EF4444' }}>{createError.message}</Text>
+          <Text style={[styles.pad, { marginTop: 12, fontSize: 12, color: '#EF4444' }]}>{createError.message}</Text>
         )}
       </ScrollView>
 
       {/* ── Sticky 3.0 gradient "Place order" ── */}
       <View style={[styles.sticky, { backgroundColor: t.colors.bg, borderColor: t.colors.line }]}>
-        {quote && (
-          <View style={styles.etaLine}>
-            <Clock size={13} color={t.colors.muted} />
-            <Text style={{ fontSize: 12, color: t.colors.muted }}>
-              {tr('checkout.arrivesIn')}{' '}
-              <Text style={{ fontWeight: '800', color: t.colors.fg }}>
-                {tr('checkout.etaRange', { min: quote.etaMinutes[0], max: quote.etaMinutes[1] })}
-              </Text>
-              {selectedAddress?.label ? tr('checkout.etaToAddress', { address: selectedAddress.label }) : ''}
-            </Text>
-          </View>
-        )}
+        <View style={styles.etaLine}>
+          <Clock size={13} color={t.colors.muted} />
+          <Text style={{ fontSize: 12, color: t.colors.muted }}>
+            {tr('cart.arrivesIn')}{' '}
+            <Text style={{ fontWeight: '800', color: t.colors.fg }}>{tr('cart.etaMin', { eta: etaLabel })}</Text>{' '}
+            {tr('cart.arrivesTo', { name: dropName })}
+          </Text>
+        </View>
         <Press onPress={handleSubmit} disabled={!!user && !canSubmit}>
           {canSubmit || !user ? (
             <LinearGradient
@@ -917,20 +1118,112 @@ export default function Checkout() {
   }
 }
 
-/* ── dark Bill summary row ─────────────────────────────────────────────────── */
-function BillRow({ label, value, accent }: { label: string; value: string; accent?: string }) {
+/* ── sub-components ───────────────────────────────────────────────────────── */
+
+type Theme = Ag3Theme;
+
+function Header({ t, onBack }: { t: Theme; onBack: () => void }) {
+  const { t: tr } = useTranslation();
   return (
-    <View style={styles.billRow}>
-      <Text style={{ fontSize: 12.5, fontWeight: '600', color: accent ?? 'rgba(255,255,255,0.62)' }}>{label}</Text>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: accent ?? '#fff', fontVariant: ['tabular-nums'] }}>
+    <MotiView
+      from={{ opacity: 0, translateX: -8 }}
+      animate={{ opacity: 1, translateX: 0 }}
+      transition={{ type: 'timing', duration: 240 }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 12 }}
+    >
+      <Press onPress={onBack} scaleTo={0.9}>
+        <View style={[styles.iconBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line2 }]}>
+          <IBack size={20} color={t.colors.fg} />
+        </View>
+      </Press>
+      <Text style={[styles.disp, { fontWeight: '800', fontSize: 20, color: t.colors.fg }]}>{tr('checkout.headerTitle')}</Text>
+    </MotiView>
+  );
+}
+
+function Section({ t, title, right, children }: { t: Theme; title: string; right?: ReactNode; children: ReactNode }) {
+  return (
+    <Rise style={[styles.pad, { marginTop: 22 }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 11 }}>
+        <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg }]}>{title}</Text>
+        {right}
+      </View>
+      {children}
+    </Rise>
+  );
+}
+
+function Stepper({ t, qty, onDec, onInc }: { t: Theme; qty: number; onDec: () => void; onInc: () => void }) {
+  return (
+    <View style={[styles.stepper, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+      <Pressable onPress={onDec} hitSlop={6} style={styles.stepBtn}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: t.colors.fg, lineHeight: 20 }}>–</Text>
+      </Pressable>
+      <Text style={{ fontWeight: '800', fontSize: 14, color: t.colors.fg, minWidth: 16, textAlign: 'center', fontVariant: ['tabular-nums'] }}>
+        {qty}
+      </Text>
+      <Pressable onPress={onInc} hitSlop={6} style={styles.stepBtn}>
+        <Text style={{ fontSize: 17, fontWeight: '700', color: t.colors.fg, lineHeight: 20 }}>+</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function Segmented<T extends string>({
+  t,
+  value,
+  onChange,
+  options,
+}: {
+  t: Theme;
+  value: T;
+  onChange: (v: T) => void;
+  options: [T, string][];
+}) {
+  return (
+    <View style={[styles.seg, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+      {options.map(([k, label]) => {
+        const active = value === k;
+        return (
+          <Pressable
+            key={k}
+            onPress={() => onChange(k)}
+            style={[styles.segBtn, active && [{ backgroundColor: t.colors.surface }, t.shadows.card]]}
+          >
+            <Text
+              numberOfLines={1}
+              style={{ fontSize: 12.5, fontWeight: active ? '700' : '600', color: active ? t.colors.fg : t.colors.muted }}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function Radio({ t, active }: { t: Theme; active: boolean }) {
+  return (
+    <View style={[styles.radio, { borderColor: active ? t.colors.primary : t.colors.line }]}>
+      {active && <View style={[styles.radioDot, { backgroundColor: t.colors.primary }]} />}
+    </View>
+  );
+}
+
+function BillRow({ t, label, value, ok }: { t: Theme; label: string; value: string; ok?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+      <Text style={{ fontSize: 13.5, color: t.colors.fgSoft }}>{label}</Text>
+      <Text style={{ fontSize: 13.5, fontWeight: '600', fontVariant: ['tabular-nums'], color: ok ? t.colors.ok : t.colors.fg }}>
         {value}
       </Text>
     </View>
   );
 }
 
-/* ── shared card base (matches cart.tsx / account.tsx) ─────────────────────── */
-function card(t: Ag3Theme) {
+/* ── shared card base (matches account.tsx) ────────────────────────────────── */
+function card(t: Theme) {
   return {
     backgroundColor: t.colors.surface,
     borderRadius: t.radii.md,
@@ -943,26 +1236,24 @@ function card(t: Ag3Theme) {
 /* ── styles ────────────────────────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   disp: { fontWeight: '800', letterSpacing: -0.4 },
-  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700', marginBottom: 2 },
+  eyebrow: { fontSize: 9.5, letterSpacing: 1.6, textTransform: 'uppercase', fontWeight: '700', marginBottom: 2 },
+  pad: { paddingHorizontal: 18 },
+  hr: { height: 1, width: '100%' },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 6,
-    paddingBottom: 12,
-  },
   iconBtn: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 },
   emptyIcon: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   browseBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 30, marginTop: 24 },
 
-  softNote: { marginTop: 20, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
+  softNote: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
 
-  addrCard: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14 },
-  addrIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  pinTile: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999 },
+  addrRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 11, borderRadius: 14 },
+
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1, paddingHorizontal: 4, paddingVertical: 3 },
+  stepBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
 
   inputWrap: { borderRadius: 18, overflow: 'hidden' },
   okStrip: { flexDirection: 'row', alignItems: 'center', marginTop: 12, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1 },
@@ -974,38 +1265,21 @@ const styles = StyleSheet.create({
   closeBtn: { width: 32, height: 32, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   applyBtn: { borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, height: 46 },
 
+  speedRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: 15, paddingVertical: 14 },
+  radio: { width: 22, height: 22, borderRadius: 999, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 11, height: 11, borderRadius: 999 },
+
+  snowStrip: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 11, paddingHorizontal: 13, paddingVertical: 11, borderRadius: 18, borderWidth: 1 },
+
+  tipPill: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+
   payOption: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14 },
   payIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 
-  billCard: { marginTop: 22, borderRadius: 26, padding: 20, overflow: 'hidden' },
-  billRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
-  billTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    paddingTop: 13,
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.12)',
-  },
+  seg: { flexDirection: 'row', gap: 4, borderRadius: 14, borderWidth: 1, padding: 4 },
+  segBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 11 },
 
   etaLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 },
-  sticky: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-  },
-  placeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 22,
-  },
+  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 28, borderTopWidth: 1 },
+  placeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 16, paddingHorizontal: 22 },
 });

@@ -208,7 +208,7 @@ export default function OrdersScreen() {
         line.qty,
       );
     }
-    router.push('/cart');
+    router.push('/checkout');
   }
 
   const active = useMemo(() => orders.filter((o) => ACTIVE.has(o.status)), [orders]);

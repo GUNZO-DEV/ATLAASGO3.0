@@ -258,9 +258,9 @@ export default function RestaurantScreen() {
   const { data: menu } = useAsync(() => agApi.catalog.menu(id), [id]);
   const sections: MenuSection[] = useMemo(() => menu ?? [], [menu]);
 
-  // PRESERVED native plumbing: the existing zustand cart drives /cart → Stripe
-  // checkout / wallet / order-create. It is the single source of truth for the
-  // View-cart bar count/total (app/cart.tsx reads the same store).
+  // PRESERVED native plumbing: the existing zustand cart drives the combined
+  // /checkout → Stripe / wallet / order-create. It is the single source of truth
+  // for the View-cart bar count/total (the combined checkout reads the same store).
   const legacyCart = useCart();
   const cartCount = legacyCart.count();
   const cartTotal = legacyCart.subtotal();
@@ -486,7 +486,7 @@ export default function RestaurantScreen() {
           transition={{ type: 'timing', duration: 240 }}
           style={{ position: 'absolute', left: 18, right: 18, bottom: insets.bottom ? insets.bottom + 8 : 24 }}
         >
-          <Press onPress={() => router.push('/cart')} scaleTo={0.98}>
+          <Press onPress={() => router.push('/checkout')} scaleTo={0.98}>
             <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={[styles.cartBar, t.shadows.glow]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
                 <View style={styles.cartCountPill}>

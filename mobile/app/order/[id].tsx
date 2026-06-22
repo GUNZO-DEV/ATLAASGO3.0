@@ -201,7 +201,7 @@ export default function OrderScreen() {
         idx === 0 ? !!receipt?.is_campus : undefined,
       );
     });
-    router.push('/cart');
+    router.push('/checkout');
   }
 
   const dest = order?.coords ? { lat: order.coords.lat, lng: order.coords.lng } : null;
