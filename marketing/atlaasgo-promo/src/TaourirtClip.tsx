@@ -432,32 +432,15 @@ const S4: React.FC = () => {
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: 80 }}>
       <div
         style={{
-          ...fadeUp(frame, 2, 14, 30),
+          ...fadeUp(frame, 4, 16, 36),
           color: "#fff",
-          fontSize: 104,
+          fontSize: 110,
           fontWeight: 900,
           fontFamily: FONT,
           letterSpacing: -3,
           textAlign: "center",
-          lineHeight: 1.06,
+          lineHeight: 1.08,
           textShadow: "0 14px 40px rgba(40,16,8,0.4)",
-        }}
-      >
-        machi ghir
-        <br />
-        lekbar.
-      </div>
-      <div
-        style={{
-          ...fadeUp(frame, 16, 16, 36),
-          marginTop: 40,
-          color: "#FFE3CF",
-          fontSize: 96,
-          fontWeight: 900,
-          fontFamily: FONT,
-          letterSpacing: -2,
-          textAlign: "center",
-          lineHeight: 1.06,
         }}
       >
         Taourirt
