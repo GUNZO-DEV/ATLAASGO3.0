@@ -52,6 +52,20 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
   return ok();
 }
 
+/**
+ * Customer-side cancel. Goes through the `cancel_order` SECURITY DEFINER RPC,
+ * which (atomically) enforces ownership + that the order is still cancelable
+ * (ordered/preparing, before pickup), refunds any wallet charge, flags a
+ * Stripe-paid order for refund, notifies the customer, and flips status to
+ * cancelled. A bare `update` never refunds and can silently no-op under RLS —
+ * the RPC is the correct single entry point.
+ */
+export async function cancelOrderAsCustomer(orderId: string): Promise<ActionResult> {
+  const { error } = await supabase.rpc('cancel_order', { p_order_id: orderId });
+  if (error) return fail(error);
+  return ok();
+}
+
 /** Admin: assign an order to a rider (rider_id = the rider's auth user id).
  *  Status stays at preparing until the rider accepts in Driver mode. */
 export async function assignRider(orderId: string, riderUserId: string): Promise<ActionResult> {

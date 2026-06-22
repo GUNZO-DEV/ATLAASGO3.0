@@ -203,16 +203,15 @@ export default function Checkout() {
   const phoneOk = !!phoneOnFile && phoneOnFile.length >= 8;
   const subtotalOk = subtotal >= MIN_ORDER_DH;
 
-  // Drop card display — saved address name/sub, falling back to the city default.
-  const dropName =
-    selectedAddress?.label ?? city?.defaultAddress ?? tr('cart.deliveryAddress');
+  // Drop card display — the user's selected/saved address only. With no saved
+  // address we show an "add address" prompt, never a fabricated city default.
+  const dropName = selectedAddress?.label ?? tr('checkout.addAddressTitle');
   const dropSub =
     [selectedAddress?.line1, selectedAddress?.building, selectedAddress?.room ? tr('checkout.roomShort', { room: selectedAddress.room }) : null]
       .filter(Boolean)
       .join(' · ') ||
     selectedAddress?.landmark ||
-    city?.defaultAddressSub ||
-    '';
+    (selectedAddress ? '' : tr('checkout.addAddressSub'));
 
   // ── Server-priced bill (cart_quote): the SAME quote source as the old cart
   // screen, so the amount charged equals the amount displayed. Re-fetched here

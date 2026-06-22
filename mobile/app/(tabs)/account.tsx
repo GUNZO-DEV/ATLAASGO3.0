@@ -273,16 +273,19 @@ export default function AccountScreen() {
   const addrMore = addrCount > 1 ? ` · ${tr('account.addressMore', { n: addrCount - 1 })}` : '';
   const addrLabel = defaultAddr
     ? `${defaultAddr.building || defaultAddr.label}${addrMore}`
-    : city?.defaultAddress ?? tr('account.noSavedAddress');
+    : tr('account.noSavedAddress');
 
   const activePromos = (promos ?? []).filter((p) => p.active);
   const promoSub = activePromos.length
     ? `${tr('account.activeCount', { n: activePromos.length })} · ${activePromos[0].label}`
     : tr('account.noActivePromos');
 
-  const identitySub = city?.campus
-    ? `AUI · ${defaultAddr?.building || city.defaultAddress} · ${tr('account.since', { year: memberSince })}`
-    : `${city?.name ?? 'Ifrane'} · ${tr('account.since', { year: memberSince })}`;
+  // Identity subline: city · real saved address (if any) · member-since. Never
+  // a fabricated city default — only the user's own saved address surfaces here.
+  const identityAddr = defaultAddr?.building || defaultAddr?.label;
+  const identitySub = [city?.name, identityAddr, tr('account.since', { year: memberSince })]
+    .filter(Boolean)
+    .join(' · ');
 
   // One dense Account group (the compact design merges everything into a single card).
   const accountRows: RowData[] = [
@@ -290,7 +293,7 @@ export default function AccountScreen() {
     { icon: IPin, title: tr('account.savedAddresses'), sub: addrLabel, color: t.colors.fgSoft, href: '/addresses' },
     { icon: IHeart, title: tr('account.favouritesTitle'), sub: tr('account.placesCount', { n: favCount }), color: '#E0526D', href: '/favorites' },
     { icon: IGift, title: tr('account.promosCredits'), sub: promoSub, color: t.colors.amber, href: '/prime' },
-    ...(city?.campus ? [{ icon: IGroup, title: tr('account.groupOrders'), sub: city.defaultAddressSub || city.defaultAddress, href: '/campus' }] : []),
+    { icon: IGroup, title: tr('account.groupOrders'), sub: tr('account.groupOrdersSub'), href: '/campus' },
     { icon: IReceipt, title: tr('account.orderHistory'), sub: tr('account.ordersCount', { n: ordersCount }), color: t.colors.fgSoft, href: '/orders' },
     { icon: IUser, title: tr('account.notificationsTitle'), sub: tr('account.notificationsSub'), color: '#3E86C7', href: '/notifications' },
   ];

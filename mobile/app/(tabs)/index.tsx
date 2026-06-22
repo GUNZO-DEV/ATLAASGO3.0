@@ -135,6 +135,9 @@ export default function Home() {
 
   // Greeting + taxonomy (ported from src/app3 Home).
   const { data: me } = useAsync(() => agApi.me.get(), [user?.id]);
+  // Real saved addresses — the deliver-to pill must reflect the user's own
+  // default address, never a fabricated city default.
+  const { data: addresses } = useAsync(() => agApi.me.addresses(), [user?.id]);
   const { data: verticals } = useAsync(() => agApi.catalog.verticals(), []);
   const { data: foodCats } = useAsync(() => agApi.catalog.categories('food', city?.name), [city?.id]);
 
@@ -191,6 +194,11 @@ export default function Home() {
 
   const greetingName = me?.name?.split(' ')[0] || tr('home.greetingFallback');
   const initials = me?.initials || (user ? 'A' : 'S');
+
+  // Deliver-to line: the user's real default saved address, else a prompt to
+  // pick a city / add an address. Never a fabricated city default.
+  const defaultAddr = addresses?.find((a) => a.isDefault) ?? addresses?.[0];
+  const deliverToLabel = defaultAddr?.building || defaultAddr?.label || tr('home.pickCity');
 
   const vObj = (verticals ?? []).find((v) => v.id === vert);
   // agApi categories omit the "All" chip — prepend it (prototype parity).
@@ -257,7 +265,7 @@ export default function Home() {
                 </Text>
                 <View style={styles.deliverAddr}>
                   <Text style={[styles.disp, { fontSize: 15.5, color: t.colors.fg }]} numberOfLines={1}>
-                    {city?.defaultAddress ?? tr('home.pickCity')}
+                    {deliverToLabel}
                   </Text>
                   <IChevD size={16} color={t.colors.fg} />
                 </View>
@@ -455,8 +463,8 @@ export default function Home() {
           </View>
         )}
 
-        {/* ══ Group-order nudge — campus + food only ══ */}
-        {city?.campus && vert === 'food' && (
+        {/* ══ Group-order nudge — food, all cities ══ */}
+        {vert === 'food' && (
           <View style={[styles.pad, { marginTop: 14 }]}>
             <Press scaleTo={0.985} style={{ width: '100%' }}>
               <View style={[styles.groupCard, { borderColor: 'rgba(255,87,34,0.16)' }]}>
@@ -596,7 +604,7 @@ export default function Home() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.disp, { fontSize: 15.5, color: t.colors.fg }]}>{c.name}</Text>
                   <Text style={{ fontSize: 12.5, color: t.colors.muted }} numberOfLines={1}>
-                    {disabled ? tr('home.comingSoon') : c.defaultAddress}
+                    {disabled ? tr('home.comingSoon') : tr('home.available')}
                     {!disabled && c.campus ? ` · ${tr('home.campus')}` : ''}
                   </Text>
                 </View>

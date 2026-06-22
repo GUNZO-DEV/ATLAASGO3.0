@@ -57,7 +57,7 @@ import { agApi } from '../../lib/ag3/agApi';
 import { useAsync } from '../../lib/ag3/useAsync';
 import { useAuth } from '../../lib/auth';
 import { useCart } from '../../lib/cart';
-import { cancelOrder } from '../../lib/orderActions';
+import { cancelOrderAsCustomer } from '../../lib/orderActions';
 import { supabase } from '../../lib/supabase';
 import { ORDER_STAGES, type OrderStage } from '../../lib/types';
 
@@ -137,7 +137,10 @@ export default function OrderScreen() {
   const isDelivered = status === 'delivered';
   const isTerminal = isCancelled || isDelivered;
   const isMine = !!user && !!order && order.customerId === user.id;
-  const canCancel = !isDemo && isMine && status === 'ordered';
+  // Cancelable before the rider takes over — the backend allows ordered AND
+  // preparing (orders flip to 'preparing' within seconds of auto-assign, so
+  // gating on 'ordered' alone hid the button almost immediately).
+  const canCancel = !isDemo && isMine && (status === 'ordered' || status === 'preparing');
   const canReorder = !isDemo && isTerminal && (receipt?.items?.length ?? 0) > 0;
 
   const headerLandmark = order?.driverPayload?.headerLandmark ?? tr('tracking.nearGrandMosque');
@@ -176,7 +179,7 @@ export default function OrderScreen() {
         style: 'destructive',
         onPress: async () => {
           setCancelBusy(true);
-          const res = await cancelOrder(id);
+          const res = await cancelOrderAsCustomer(id);
           setCancelBusy(false);
           if (!res.ok) Alert.alert(tr('tracking.couldNotCancel'), res.error);
         },

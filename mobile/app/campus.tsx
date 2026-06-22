@@ -94,6 +94,14 @@ const AUI_BUILDINGS: Record<string, string[]> = {
   ],
 };
 
+// Map the AUI_BUILDINGS group keys (kept in English so they double as React keys
+// and match the web data shape) to their i18n labels.
+const BUILDING_GROUP_KEYS: Record<string, string> = {
+  'Residence Halls': 'campus.groupResidence',
+  'Academic Buildings': 'campus.groupAcademic',
+  Facilities: 'campus.groupFacilities',
+};
+
 const QUICK_PICKS = [
   'Café Hassan tagine',
   'Boulangerie croissant',
@@ -453,7 +461,9 @@ export default function CampusScreen() {
       <BottomSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title={tr('campus.buildingLabel')}>
         {Object.entries(AUI_BUILDINGS).map(([group, buildings]) => (
           <View key={group} style={{ marginBottom: 16 }}>
-            <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 8 }]}>{group}</Text>
+            <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 8 }]}>
+              {tr(BUILDING_GROUP_KEYS[group] ?? '', { defaultValue: group })}
+            </Text>
             <View style={{ gap: 8 }}>
               {buildings.map((b) => {
                 const active = building === b;

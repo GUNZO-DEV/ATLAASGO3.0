@@ -11,8 +11,13 @@
 //       random password to satisfy the instance }) → prepareEmailAddressVerification
 //       (email_code) → attemptEmailAddressVerification → setActive. The password is
 //       never shown; the user always returns via an email code (passwordless UX).
-//   PHONE tab + Apple/Google are rendered but gated ("coming soon") until SMS /
-//   OAuth are enabled in Clerk — they alert instead of throwing.
+//   EMAIL also supports a classic PASSWORD path: a "Sign in with password
+//   instead" affordance reveals a password field and uses the proven
+//   signIn.create({ identifier, password }) → setActive → '/' flow, so existing
+//   password users can log in. The OTP path stays the default.
+//   GOOGLE is wired to Clerk OAuth via useSSO().startSSOFlow (redirectUrl =
+//   Linking.createURL('/')) → setActive → '/'. It works once Google is enabled
+//   in the Clerk instance. PHONE tab + Apple stay gated ("coming soon").
 //   "Browse as guest" → home (the app browses signed-out).
 //
 // On a completed session the ClerkSupabaseBridge exchanges the Clerk token for a
@@ -34,11 +39,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { createURL } from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { useSignIn, useSignUp } from '@clerk/clerk-expo';
-import { Zap, Clock, ChevronRight, Mail, Check, ArrowLeft, Apple } from 'lucide-react-native';
+import { useSignIn, useSignUp, useSSO } from '@clerk/clerk-expo';
+import { Zap, Clock, ChevronRight, Mail, Lock, Check, ArrowLeft, Apple } from 'lucide-react-native';
 
 import { useAg3Theme, type Ag3Theme } from '../components/ag3/theme';
+
+// Completes any pending OAuth/SSO web-browser session on app focus (required for
+// the redirect-based Clerk Google flow to settle on native).
+WebBrowser.maybeCompleteAuthSession();
 
 type Step = 'entry' | 'otp' | 'done';
 type ModeT = 'phone' | 'email';
@@ -84,12 +95,15 @@ export default function CustomerLoginScreen() {
   const insets = useSafeAreaInsets();
   const { signIn, setActive: setSignInActive, isLoaded: signInLoaded } = useSignIn();
   const { signUp, setActive: setSignUpActive, isLoaded: signUpLoaded } = useSignUp();
+  const { startSSOFlow } = useSSO();
 
   const [step, setStep] = useState<Step>('entry');
   const [mode, setMode] = useState<ModeT>('email'); // email is the wired path → default to it
   const [flow, setFlow] = useState<Flow>('signin');
+  const [usePassword, setUsePassword] = useState(false); // email path: classic password vs OTP
   const [digits, setDigits] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [secs, setSecs] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -97,6 +111,8 @@ export default function CustomerLoginScreen() {
 
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const valid = mode === 'phone' ? digits.length >= PHONE_MAX : emailOk;
+  // Password sign-in needs a valid email + a non-empty password; otherwise use `valid`.
+  const ctaReady = mode === 'email' && usePassword ? emailOk && password.length > 0 : valid;
   const dest = mode === 'phone' ? `+212 ${fmtPhone(digits)}` : email.trim();
   const otpFull = otp.every((d) => d !== '');
 
@@ -148,12 +164,62 @@ export default function CustomerLoginScreen() {
     }
   }
 
+  // ── Email path: classic email + password sign-in (proven flow) ──
+  async function startPassword() {
+    if (!signInLoaded || busy) return;
+    const id = email.trim();
+    if (!id || !password) {
+      Alert.alert(tr('auth.missingDetailsTitle'), tr('auth.missingDetailsBody'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const attempt = await signIn.create({ identifier: id, password });
+      if (attempt.status === 'complete') {
+        await setSignInActive({ session: attempt.createdSessionId });
+        succeed();
+      } else {
+        Alert.alert(tr('auth.almostThereTitle'), tr('auth.signInVerifyBody'));
+      }
+    } catch (e) {
+      Alert.alert(tr('auth.signInFailedTitle'), clerkErr(e, tr('auth.genericError')));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── Google OAuth via Clerk SSO (works once Google is enabled in Clerk) ──
+  async function startGoogle() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { createdSessionId, setActive } = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: createURL('/'),
+      });
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+        succeed();
+      }
+      // No session → user cancelled the browser, or further steps are required
+      // (e.g. MFA/transfer); stay on the screen silently.
+    } catch (e) {
+      Alert.alert(tr('auth.googleFailedTitle'), clerkErr(e, tr('auth.genericError')));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function onContinue() {
-    if (!valid) return;
     if (mode === 'phone') {
       comingSoon();
       return;
     }
+    if (usePassword) {
+      void startPassword();
+      return;
+    }
+    if (!valid) return;
     void startEmail();
   }
 
@@ -326,20 +392,53 @@ export default function CustomerLoginScreen() {
                         keyboardType="email-address"
                         placeholder="you@email.com"
                         placeholderTextColor={t.colors.muted}
-                        onSubmitEditing={onContinue}
+                        onSubmitEditing={usePassword ? undefined : onContinue}
                         style={[styles.input, { color: t.colors.fg, fontWeight: '600' }]}
                       />
                     </View>
+
+                    {usePassword && (
+                      <>
+                        <Text style={[styles.label, { color: t.colors.muted }]}>{tr('auth.passwordLabel')}</Text>
+                        <View style={[styles.field, { backgroundColor: t.colors.surface, borderColor: t.colors.line }]}>
+                          <View style={[styles.cc, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, paddingHorizontal: 13 }]}>
+                            <Lock size={18} color={t.colors.muted} />
+                          </View>
+                          <TextInput
+                            value={password}
+                            onChangeText={setPassword}
+                            autoCapitalize="none"
+                            autoComplete="password"
+                            secureTextEntry
+                            placeholder={tr('auth.passwordPlaceholder')}
+                            placeholderTextColor={t.colors.muted}
+                            onSubmitEditing={onContinue}
+                            style={[styles.input, { color: t.colors.fg, fontWeight: '600' }]}
+                          />
+                        </View>
+                      </>
+                    )}
+
+                    {/* Toggle between the email-OTP default and classic password sign-in */}
+                    <Pressable
+                      onPress={() => setUsePassword((v) => !v)}
+                      style={{ marginTop: 12, alignSelf: 'flex-start' }}
+                      hitSlop={8}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: t.colors.primary }}>
+                        {usePassword ? tr('auth.useEmailCodeInstead') : tr('auth.usePasswordInstead')}
+                      </Text>
+                    </Pressable>
                   </>
                 )}
 
-                <Pressable onPress={onContinue} disabled={!valid || busy}>
-                  <LinearGradient colors={t.gradients.sunset} start={t.gradients.start} end={t.gradients.end} style={[styles.cta, t.shadows.glow, { opacity: !valid || busy ? 0.45 : 1 }]}>
+                <Pressable onPress={onContinue} disabled={!ctaReady || busy}>
+                  <LinearGradient colors={t.gradients.sunset} start={t.gradients.start} end={t.gradients.end} style={[styles.cta, t.shadows.glow, { opacity: !ctaReady || busy ? 0.45 : 1 }]}>
                     {busy ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
                       <>
-                        <Text style={styles.ctaTxt}>{tr('auth.continueBtn')}</Text>
+                        <Text style={styles.ctaTxt}>{usePassword && mode === 'email' ? tr('auth.signIn') : tr('auth.continueBtn')}</Text>
                         <ChevronRight size={19} color="#fff" />
                       </>
                     )}
@@ -356,7 +455,7 @@ export default function CustomerLoginScreen() {
                   <Apple size={17} color={t.colors.fg} fill={t.colors.fg} />
                   <Text style={[styles.altTxt, { color: t.colors.fg }]}>{tr('auth.continueApple')}</Text>
                 </Pressable>
-                <Pressable onPress={comingSoon} style={[styles.alt, { backgroundColor: t.colors.surface, borderColor: t.colors.line, marginTop: 10 }, t.shadows.card]}>
+                <Pressable onPress={() => void startGoogle()} disabled={busy} style={[styles.alt, { backgroundColor: t.colors.surface, borderColor: t.colors.line, marginTop: 10, opacity: busy ? 0.55 : 1 }, t.shadows.card]}>
                   <Svg width={18} height={18} viewBox="0 0 18 18">
                     <Path fill={t.colors.primary} d="M9 7.4v3.4h4.8c-.2 1.2-1.5 3.6-4.8 3.6A5.4 5.4 0 1 1 12.5 5l2.4-2.3A8.7 8.7 0 1 0 9 17.7c5 0 8.4-3.6 8.4-8.6 0-.6 0-1-.1-1.7H9Z" />
                   </Svg>
