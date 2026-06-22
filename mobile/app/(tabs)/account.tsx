@@ -1,27 +1,28 @@
-// AtlaasGo 3.0 — Account hub. Native re-skin of the Profile export in
+// AtlaasGo 3.0 — Account hub. Native re-skin of the COMPACT Profile export in
 // screen-tabs2.jsx, wired to the live ag3 foundation (agApi + useAg3Theme).
+//
+// Compact layout: tight identity row + inline 3-stat card, compact AtlaasGo+
+// banner, and DENSE grouped-list cards (Account, Preferences) — instead of the
+// older spread-out separate cards. The name/phone edit moved behind the identity
+// icon button (modal) so the page stays compact.
 //
 // Logic ported from src/app3/screens/Profile.tsx: identity header + stats
 // (agApi.me.get / .wallet), Appearance dark-mode toggle, Language segmented
 // control (en/fr/ar via agApi.me.setLanguage), AtlaasGo+ banner, action rows
 // (Wallet / Addresses / Favourites / Promos / Group-orders on campus).
 //
-// PRESERVED native plumbing from the previous account.tsx (no global
-// ThemeProvider / i18n / CityProvider exists in this app, so this screen is
-// self-contained):
+// PRESERVED native plumbing (no global ThemeProvider / i18n / CityProvider):
 //   - profiles display_name/phone read + save (supabase.from('profiles'))
 //   - sign out (useAuth().signOut + Clerk signOut)
 //   - delete-account edge function (App Store 5.1.1(v))
 //   - role-gated entry points (Driver / Restaurant POS / Admin) via useRoles
 //   - rider/partner application status via useMyApplications
 //   - signed-out CTA → /sign-in
-// New state (theme + language) is persisted to AsyncStorage and mirrored to the
-// server via agApi.me.setTheme / setLanguage; both ignore failures when signed
-// out, exactly like the web port.
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,7 +36,7 @@ import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useClerk } from '@clerk/clerk-expo';
-import { Bike, Shield, Store, Trash2, LogOut } from 'lucide-react-native';
+import { Bike, Shield, Store, Trash2, LogOut, X } from 'lucide-react-native';
 
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
@@ -66,10 +67,11 @@ import {
 const THEME_KEY = 'ag3-theme';
 const LANG_KEY = 'ag_lang';
 
-const LANGS: [Lang, string][] = [
-  ['en', 'English'],
-  ['fr', 'Français'],
-  ['ar', 'العربية'],
+// Compact segmented control mirrors the design's ag2-seg (EN / FR / ع).
+const LANG_SEG: [Lang, string][] = [
+  ['en', 'EN'],
+  ['fr', 'FR'],
+  ['ar', 'ع'],
 ];
 
 type RowData = {
@@ -88,7 +90,6 @@ export default function AccountScreen() {
   const { apps: myApps } = useMyApplications();
 
   // ── Appearance: self-contained dark-mode override (no global ThemeProvider).
-  // null = follow system until rehydrated; once set we pin the ag3 scheme.
   const [scheme, setScheme] = useState<Scheme | null>(null);
   const t = useAg3Theme(scheme ?? undefined);
   const { t: tr } = useTranslation();
@@ -97,12 +98,13 @@ export default function AccountScreen() {
   // ── Language: self-contained segmented control (no global i18n provider).
   const [lang, setLangState] = useState<Lang>('en');
 
-  // ── Editable profile fields (preserved from the old screen).
+  // ── Editable profile fields (now behind the identity icon button → modal).
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [profileLoading, setProfileLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // ── Live 3.0 data via the ag3 foundation.
   const { data: me } = useAsync(() => agApi.me.get(), [user?.id]);
@@ -114,8 +116,7 @@ export default function AccountScreen() {
   const city: City | null =
     cities?.find((c) => c.id === (me?.campusId ?? 'ifrane')) ?? cities?.find((c) => c.id === 'ifrane') ?? cities?.[0] ?? null;
 
-  // Rehydrate persisted theme + language. Seed from the server profile too so a
-  // returning user keeps their saved appearance/language.
+  // Rehydrate persisted theme + language. Seed from the server profile too.
   useEffect(() => {
     let cancelled = false;
     AsyncStorage.multiGet([THEME_KEY, LANG_KEY])
@@ -135,7 +136,6 @@ export default function AccountScreen() {
 
   useEffect(() => {
     if (!me) return;
-    // Only adopt the server values if the user hasn't already chosen locally.
     setScheme((prev) => prev ?? me.theme);
     setLangState((prev) => prev ?? me.language);
   }, [me]);
@@ -168,15 +168,12 @@ export default function AccountScreen() {
     const next: Scheme = dark ? 'light' : 'dark';
     setScheme(next);
     void AsyncStorage.setItem(THEME_KEY, next).catch(() => {});
-    // mirror to the server profile; ignore when signed out (web parity)
     agApi.me.setTheme(next).catch(() => {});
   }
 
   function setLanguage(next: Lang) {
     setLangState(next);
     agApi.me.setLanguage(next).catch(() => {});
-    // Apply across the whole app. Text updates live; switching to/from Arabic
-    // flips the layout direction, which only takes effect after a restart.
     void setAppLanguage(next).then(({ needsRestart }) => {
       if (needsRestart) {
         Alert.alert(tr('account.restartTitle'), tr('account.restartBody', { lang: LANG_LABELS[next] }));
@@ -193,14 +190,15 @@ export default function AccountScreen() {
       .eq('id', user.id);
     setSaving(false);
     if (error) Alert.alert(tr('account.saveFailedTitle'), error.message);
-    else Alert.alert(tr('account.savedTitle'), tr('account.savedBody'));
+    else {
+      setEditOpen(false);
+      Alert.alert(tr('account.savedTitle'), tr('account.savedBody'));
+    }
   }
 
   async function handleDeleteAccount() {
     setDeleting(true);
     try {
-      // Server-authoritative: deletes the Clerk user, all Supabase data, and the
-      // auth identity. The caller is identified by their own JWT.
       const { error } = await supabase.functions.invoke('delete-account', { body: {} });
       if (error) throw new Error(error.message);
       try { await clerkSignOut(); } catch {}
@@ -260,7 +258,7 @@ export default function AccountScreen() {
     );
   }
 
-  // ── Derived identity / stats (spec-faithful, mirrors Profile.tsx) ─────────
+  // ── Derived identity / stats (mirrors Profile.tsx) ─────────────────────────
   const fullName = me?.name || name || tr('account.guest');
   const initials = me?.initials || fullName.trim().charAt(0).toUpperCase() || 'A';
   const parts = fullName.split(' ');
@@ -286,37 +284,37 @@ export default function AccountScreen() {
     ? `AUI · ${defaultAddr?.building || city.defaultAddress} · ${tr('account.since', { year: memberSince })}`
     : `${city?.name ?? 'Ifrane'} · ${tr('account.since', { year: memberSince })}`;
 
-  const rows1: RowData[] = [
+  // One dense Account group (the compact design merges everything into a single card).
+  const accountRows: RowData[] = [
     { icon: IWallet, title: tr('account.walletTitle'), sub: tr('account.walletBalance', { n: walletDh }), color: t.colors.primary, href: '/wallet' },
     { icon: IPin, title: tr('account.savedAddresses'), sub: addrLabel, color: t.colors.fgSoft, href: '/addresses' },
     { icon: IHeart, title: tr('account.favouritesTitle'), sub: tr('account.placesCount', { n: favCount }), color: '#E0526D', href: '/favorites' },
     { icon: IGift, title: tr('account.promosCredits'), sub: promoSub, color: t.colors.amber, href: '/prime' },
-  ];
-  const rows2: RowData[] = [
     ...(city?.campus ? [{ icon: IGroup, title: tr('account.groupOrders'), sub: city.defaultAddressSub || city.defaultAddress, href: '/campus' }] : []),
-    { icon: IReceipt, title: tr('account.orderHistory'), sub: tr('account.ordersCount', { n: ordersCount }), href: '/orders' },
+    { icon: IReceipt, title: tr('account.orderHistory'), sub: tr('account.ordersCount', { n: ordersCount }), color: t.colors.fgSoft, href: '/orders' },
     { icon: IUser, title: tr('account.notificationsTitle'), sub: tr('account.notificationsSub'), color: '#3E86C7', href: '/notifications' },
   ];
 
-  // ── Role-gated + growth entries (preserved) ───────────────────────────────
+  // Role-gated + growth entries (preserved) → their own dense "More" group.
   const roleRows: RowData[] = [];
   if (isRider) roleRows.push({ icon: Bike, title: tr('account.driverMode'), sub: tr('account.driverModeSub'), href: '/driver', color: t.colors.fg });
   if (isMerchant) roleRows.push({ icon: Store, title: tr('account.restaurantPos'), sub: tr('account.restaurantPosSub'), href: '/merchant', color: '#0891B2' });
   if (isAdmin) roleRows.push({ icon: Shield, title: tr('account.adminTitle'), sub: tr('account.adminSub'), href: '/admin', color: '#7C3AED' });
 
-  const Row = ({ r }: { r: RowData }) => {
+  // Dense grouped-list row (compact): 34px icon tile, title + sub, chevron, hairline divider.
+  const DenseRow = ({ r, first }: { r: RowData; first?: boolean }) => {
     const Icon = r.icon;
     return (
       <Press onPress={r.href ? () => router.push(r.href as never) : undefined}>
-        <View style={[card(t), styles.row]}>
-          <View style={[styles.rowIcon, { backgroundColor: t.colors.surface2 }]}>
-            <Icon size={20} color={r.color || t.colors.fgSoft} />
+        <View style={[styles.denseRow, !first && { borderTopWidth: 1, borderTopColor: t.colors.line }]}>
+          <View style={[styles.denseIcon, { backgroundColor: t.colors.surface2 }]}>
+            <Icon size={18} color={r.color || t.colors.fgSoft} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>{r.title}</Text>
-            <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>{r.sub}</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontWeight: '700', fontSize: 14, color: t.colors.fg }}>{r.title}</Text>
+            <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 1 }} numberOfLines={1}>{r.sub}</Text>
           </View>
-          <IChevR size={20} color={t.colors.muted} />
+          <IChevR size={18} color={t.colors.muted} />
         </View>
       </Press>
     );
@@ -324,25 +322,28 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.colors.bg }} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 44, paddingTop: 8 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 44, paddingTop: 6 }}>
         <Rise>
-          {/* ── identity ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15, marginTop: 6 }}>
+          {/* ── identity (compact) + edit button ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 8 }}>
             <LinearGradient
               colors={gradients.sunset}
               start={gradients.start}
               end={gradients.end}
               style={[styles.avatar, t.shadows.glow]}
             >
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 28 }}>{initials}</Text>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 23 }}>{initials}</Text>
             </LinearGradient>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.disp, { fontSize: 22, color: t.colors.fg }]} numberOfLines={1}>{firstName}</Text>
-              <Text style={{ fontSize: 13, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>{identitySub}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.disp, { fontSize: 19, color: t.colors.fg }]} numberOfLines={1}>{firstName}</Text>
+              <Text style={{ fontSize: 12.5, color: t.colors.muted, marginTop: 2 }} numberOfLines={1}>{identitySub}</Text>
             </View>
+            <Pressable onPress={() => setEditOpen(true)} hitSlop={8} style={[styles.identityBtn, { backgroundColor: t.colors.surface, borderColor: t.colors.line }]}>
+              <IUser size={19} color={t.colors.fg} />
+            </Pressable>
           </View>
 
-          {/* ── stats ── */}
+          {/* ── inline stats card ── */}
           <View style={[card(t), styles.stats]}>
             {(
               [
@@ -355,137 +356,101 @@ export default function AccountScreen() {
                 key={key}
                 style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? 1 : 0, borderLeftColor: t.colors.line }}
               >
-                <Text style={[styles.disp, { fontSize: 19, color: t.colors.fg }]}>{v}</Text>
-                <Text style={{ fontSize: 11, color: t.colors.muted, marginTop: 2 }}>{label}</Text>
+                <Text style={[styles.disp, { fontSize: 17, color: t.colors.fg }]}>{v}</Text>
+                <Text style={{ fontSize: 10.5, color: t.colors.muted, marginTop: 2 }}>{label}</Text>
               </View>
             ))}
           </View>
         </Rise>
 
-        {/* ── editable profile (preserved native save) ── */}
-        <View style={{ marginTop: 18 }}>
-          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('account.profile')}</Text>
-          {profileLoading ? (
-            <View style={[card(t), { padding: 18, alignItems: 'center', marginTop: 10 }]}>
-              <ActivityIndicator color={t.colors.primary} />
-            </View>
-          ) : (
-            <View style={[card(t), { padding: 16, marginTop: 10, gap: 4 }]}>
-              <Text style={[styles.fieldLabel, { color: t.colors.muted }]}>{tr('account.displayName')}</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder={tr('account.yourName')}
-                placeholderTextColor={t.colors.muted}
-                style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
-              />
-              <Text style={[styles.fieldLabel, { color: t.colors.muted, marginTop: 12 }]}>{tr('account.phone')}</Text>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                placeholder="+212…"
-                placeholderTextColor={t.colors.muted}
-                style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
-              />
-              <Press onPress={save} disabled={saving} style={{ marginTop: 14 }}>
-                <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={[styles.saveBtn, t.shadows.glow, { opacity: saving ? 0.7 : 1 }]}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{tr('account.saveProfile')}</Text>}
-                </LinearGradient>
-              </Press>
-            </View>
-          )}
-        </View>
-
-        {/* ── appearance: dark-mode toggle ── */}
-        <View style={{ marginTop: 18 }}>
-          <View style={styles.eyebrowRow}>
-            {dark ? <IMoon size={13} color={t.colors.primary} /> : <ISun size={13} color={t.colors.primary} />}
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>{tr('account.appearance')}</Text>
-          </View>
-          <Press onPress={toggleTheme} style={{ marginTop: 10 }}>
-            <View style={[card(t), styles.row]}>
-              {dark ? (
-                <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={[styles.rowIcon, t.shadows.glow]}>
-                  <IMoon size={20} color="#fff" />
-                </LinearGradient>
-              ) : (
-                <View style={[styles.rowIcon, { backgroundColor: t.colors.surface2 }]}>
-                  <ISun size={20} color={t.colors.amber} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>{tr('account.darkMode')}</Text>
-                <Text style={{ fontSize: 12, color: t.colors.muted, marginTop: 2 }}>
-                  {dark ? tr('account.darkModeOn') : tr('account.darkModeOff')}
-                </Text>
-              </View>
-              <View style={[styles.track, { backgroundColor: dark ? t.colors.primary : t.colors.line }]}>
-                <View style={[styles.knob, { left: dark ? 23 : 3 }]} />
-              </View>
-            </View>
-          </Press>
-        </View>
-
-        {/* ── language segmented control ── */}
-        <View style={{ marginTop: 18 }}>
-          <View style={styles.eyebrowRow}>
-            <IGlobe size={13} color={t.colors.primary} />
-            <Text style={[styles.eyebrow, { color: t.colors.primary, marginBottom: 0 }]}>{tr('account.language')}</Text>
-          </View>
-          <View style={[styles.seg, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
-            {LANGS.map(([k, label]) => {
-              const active = lang === k;
-              return (
-                <Pressable key={k} onPress={() => setLanguage(k)} style={{ flex: 1 }}>
-                  <View style={[styles.segBtn, active && [{ backgroundColor: t.colors.surface }, t.shadows.card]]}>
-                    <Text style={{ fontWeight: '700', fontSize: 13, color: active ? t.colors.fg : t.colors.muted }}>{label}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ── AtlaasGo+ banner ── */}
-        <View style={{ marginTop: 16 }}>
+        {/* ── AtlaasGo+ banner (compact, horizontal) ── */}
+        <Press onPress={() => router.push('/prime')} style={{ marginTop: 14 }}>
           <View style={[styles.plusBanner, t.shadows.lift]}>
             <LinearGradient colors={['#1A1410', '#3A2A1E']} start={gradients.start} end={gradients.end} style={StyleSheet.absoluteFill} />
             <View style={styles.plusGlow}>
               <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={StyleSheet.absoluteFill} />
             </View>
-            <View>
-              <View style={styles.eyebrowRow}>
-                <IBolt size={13} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />
-                <Text style={[styles.eyebrow, { color: t.colors.amber, marginBottom: 0 }]}>AtlaasGo+</Text>
-              </View>
-              <Text style={[styles.disp, { fontSize: 19, color: '#fff', marginTop: 6 }]}>{tr('account.plusTagline')}</Text>
-              <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.82)', marginTop: 3 }}>
-                {tr('account.plusSubline')}
-              </Text>
-              <Press onPress={() => router.push('/prime')} style={{ marginTop: 14, alignSelf: 'flex-start' }}>
-                <View style={styles.plusCta}>
-                  <Text style={{ color: '#1A1410', fontWeight: '800', fontSize: 14 }}>{tr('account.plusCta')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={styles.eyebrowRow}>
+                  <IBolt size={12} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />
+                  <Text style={[styles.eyebrow, { color: t.colors.amber, marginBottom: 0 }]}>AtlaasGo+</Text>
                 </View>
-              </Press>
+                <Text style={[styles.disp, { fontSize: 15.5, color: '#fff', marginTop: 3 }]} numberOfLines={1}>{tr('account.plusTagline')}</Text>
+                <Text style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.8)', marginTop: 1 }} numberOfLines={1}>
+                  {tr('account.plusSubline')}
+                </Text>
+              </View>
+              <View style={styles.plusCta}>
+                <Text style={{ color: '#1A1410', fontWeight: '800', fontSize: 12.5 }}>{tr('account.plusCta')}</Text>
+              </View>
+            </View>
+          </View>
+        </Press>
+
+        {/* ── Account — dense grouped list ── */}
+        <View style={{ marginTop: 16 }}>
+          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('account.sectionAccount')}</Text>
+          <View style={[card(t), styles.group]}>
+            {accountRows.map((r, i) => <DenseRow key={r.title} r={r} first={i === 0} />)}
+          </View>
+        </View>
+
+        {/* ── Preferences — dense grouped card (dark mode + language) ── */}
+        <View style={{ marginTop: 16 }}>
+          <Text style={[styles.eyebrow, { color: t.colors.primary }]}>{tr('account.sectionPreferences')}</Text>
+          <View style={[card(t), styles.group]}>
+            {/* dark mode */}
+            <Press onPress={toggleTheme}>
+              <View style={styles.denseRow}>
+                {dark ? (
+                  <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={styles.denseIcon}>
+                    <IMoon size={18} color="#fff" />
+                  </LinearGradient>
+                ) : (
+                  <View style={[styles.denseIcon, { backgroundColor: t.colors.surface2 }]}>
+                    <ISun size={18} color={t.colors.amber} />
+                  </View>
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontWeight: '700', fontSize: 14, color: t.colors.fg }}>{tr('account.darkMode')}</Text>
+                  <Text style={{ fontSize: 11.5, color: t.colors.muted, marginTop: 1 }}>
+                    {dark ? tr('account.darkModeOn') : tr('account.darkModeOff')}
+                  </Text>
+                </View>
+                <View style={[styles.track, { backgroundColor: dark ? t.colors.primary : t.colors.line }]}>
+                  <View style={[styles.knob, { left: dark ? 21 : 3 }]} />
+                </View>
+              </View>
+            </Press>
+            {/* language */}
+            <View style={[styles.denseRow, { borderTopWidth: 1, borderTopColor: t.colors.line }]}>
+              <View style={[styles.denseIcon, { backgroundColor: t.colors.surface2 }]}>
+                <IGlobe size={18} color={t.colors.fgSoft} />
+              </View>
+              <Text style={{ fontWeight: '700', fontSize: 14, color: t.colors.fg }}>{tr('account.language')}</Text>
+              <View style={[styles.seg, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, marginLeft: 'auto' }]}>
+                {LANG_SEG.map(([k, label]) => {
+                  const active = lang === k;
+                  return (
+                    <Pressable key={k} onPress={() => setLanguage(k)}>
+                      <View style={[styles.segBtn, active && [{ backgroundColor: t.colors.surface }, t.shadows.card]]}>
+                        <Text style={{ fontWeight: '700', fontSize: 12.5, color: active ? t.colors.fg : t.colors.muted }}>{label}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           </View>
         </View>
 
-        {/* ── action rows ── */}
-        <View style={{ marginTop: 18, gap: 10 }}>
-          {rows1.map((r) => <Row key={r.title} r={r} />)}
-        </View>
-        <View style={{ marginTop: 12, gap: 10 }}>
-          {rows2.map((r) => <Row key={r.title} r={r} />)}
-        </View>
-
-        {/* ── role-gated + growth entries (preserved) ── */}
+        {/* ── More (role-gated entries, preserved) — dense group ── */}
         {roleRows.length > 0 && (
-          <View style={{ marginTop: 18 }}>
+          <View style={{ marginTop: 16 }}>
             <Text style={[styles.eyebrow, { color: t.colors.muted }]}>{tr('account.more')}</Text>
-            <View style={{ marginTop: 10, gap: 10 }}>
-              {roleRows.map((r) => <Row key={r.href} r={r} />)}
+            <View style={[card(t), styles.group]}>
+              {roleRows.map((r, i) => <DenseRow key={r.href} r={r} first={i === 0} />)}
             </View>
           </View>
         )}
@@ -554,6 +519,50 @@ export default function AccountScreen() {
           {tr('account.deleteFooter')}
         </Text>
       </ScrollView>
+
+      {/* ── edit-profile modal (name + phone), opened from the identity button ── */}
+      <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
+        <View style={styles.modalScrim}>
+          <View style={[styles.modalCard, { backgroundColor: t.colors.surface }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={[styles.disp, { fontSize: 18, color: t.colors.fg }]}>{tr('account.profile')}</Text>
+              <Pressable onPress={() => setEditOpen(false)} hitSlop={8} style={[styles.identityBtn, { backgroundColor: t.colors.surface2, borderColor: t.colors.line }]}>
+                <X size={17} color={t.colors.fg} />
+              </Pressable>
+            </View>
+            {profileLoading ? (
+              <View style={{ padding: 18, alignItems: 'center' }}>
+                <ActivityIndicator color={t.colors.primary} />
+              </View>
+            ) : (
+              <>
+                <Text style={[styles.fieldLabel, { color: t.colors.muted, marginTop: 8 }]}>{tr('account.displayName')}</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={tr('account.yourName')}
+                  placeholderTextColor={t.colors.muted}
+                  style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
+                />
+                <Text style={[styles.fieldLabel, { color: t.colors.muted, marginTop: 12 }]}>{tr('account.phone')}</Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  placeholder="+212…"
+                  placeholderTextColor={t.colors.muted}
+                  style={[styles.input, { backgroundColor: t.colors.surface2, borderColor: t.colors.line, color: t.colors.fg }]}
+                />
+                <Press onPress={save} disabled={saving} style={{ marginTop: 16 }}>
+                  <LinearGradient colors={gradients.sunset} start={gradients.start} end={gradients.end} style={[styles.saveBtn, t.shadows.glow, { opacity: saving ? 0.7 : 1 }]}>
+                    {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{tr('account.saveProfile')}</Text>}
+                  </LinearGradient>
+                </Press>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -570,22 +579,26 @@ function card(t: ReturnType<typeof useAg3Theme>) {
 
 const styles = StyleSheet.create({
   disp: { fontWeight: '800', letterSpacing: -0.4 },
-  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700', marginBottom: 2 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', fontWeight: '700', marginBottom: 9 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  avatar: { width: 70, height: 70, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  stats: { flexDirection: 'row', marginTop: 16, paddingVertical: 15 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14 },
-  rowIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 56, height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  identityBtn: { width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  stats: { flexDirection: 'row', marginTop: 13, paddingVertical: 12 },
+  group: { padding: 0, overflow: 'hidden', marginTop: 9 },
+  denseRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 },
+  denseIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   fieldLabel: { fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: '700' },
   input: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginTop: 6 },
   saveBtn: { borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   signInBtn: { borderRadius: 999, paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center' },
-  track: { width: 50, height: 30, borderRadius: 999, justifyContent: 'center' },
-  knob: { position: 'absolute', top: 3, width: 24, height: 24, borderRadius: 999, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3 },
-  seg: { flexDirection: 'row', borderRadius: 999, padding: 4, borderWidth: 1, marginTop: 10 },
-  segBtn: { paddingVertical: 10, paddingHorizontal: 8, borderRadius: 999, alignItems: 'center' },
-  plusBanner: { borderRadius: 26, padding: 18, overflow: 'hidden' },
-  plusGlow: { position: 'absolute', right: -20, top: -20, width: 110, height: 110, borderRadius: 999, opacity: 0.5 },
-  plusCta: { backgroundColor: '#fff', borderRadius: 999, paddingVertical: 12, paddingHorizontal: 20 },
+  track: { width: 46, height: 28, borderRadius: 999, justifyContent: 'center' },
+  knob: { position: 'absolute', top: 3, width: 22, height: 22, borderRadius: 999, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3 },
+  seg: { flexDirection: 'row', borderRadius: 999, padding: 3, borderWidth: 1 },
+  segBtn: { paddingVertical: 7, paddingHorizontal: 13, borderRadius: 999, alignItems: 'center' },
+  plusBanner: { borderRadius: 22, padding: 15, overflow: 'hidden' },
+  plusGlow: { position: 'absolute', right: -24, top: -24, width: 96, height: 96, borderRadius: 999, opacity: 0.5 },
+  plusCta: { backgroundColor: '#fff', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 15 },
   signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 16, paddingVertical: 14, borderWidth: 1 },
+  modalScrim: { flex: 1, backgroundColor: 'rgba(26,20,16,0.45)', justifyContent: 'center', paddingHorizontal: 24 },
+  modalCard: { borderRadius: 24, padding: 20 },
 });

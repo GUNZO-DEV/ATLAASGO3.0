@@ -17,6 +17,8 @@
   "account": {
     "title": "Account",
     "appearance": "Appearance",
+    "sectionAccount": "Account",
+    "sectionPreferences": "Preferences",
     "darkMode": "Dark mode",
     "darkModeHint": "Easier on the eyes at night",
     "language": "Language",

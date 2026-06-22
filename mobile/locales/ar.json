@@ -17,6 +17,8 @@
   "account": {
     "title": "الحساب",
     "appearance": "المظهر",
+    "sectionAccount": "الحساب",
+    "sectionPreferences": "التفضيلات",
     "darkMode": "الوضع الداكن",
     "darkModeHint": "أسهل على العين ليلاً",
     "language": "اللغة",

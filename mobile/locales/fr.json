@@ -17,6 +17,8 @@
   "account": {
     "title": "Compte",
     "appearance": "Apparence",
+    "sectionAccount": "Compte",
+    "sectionPreferences": "Préférences",
     "darkMode": "Mode sombre",
     "darkModeHint": "Plus reposant pour les yeux la nuit",
     "language": "Langue",
