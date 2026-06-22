@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
@@ -24,6 +24,7 @@ import {
   BG, CARD, LINE, EMERALD, GLOW, CREAM, MUTED, AMBER, DANGER,
   Enter, Tappable, LiveDot, StatTile, RouteSummary, SlideConfirm, Section, ActionBtn,
 } from '../../components/dr/ui';
+import { OfferSheet } from '../../components/dr/OfferSheet';
 
 const STATUS_LABEL: Record<RiderStatus, string> = {
   online: 'Online',
@@ -33,6 +34,7 @@ const STATUS_LABEL: Record<RiderStatus, string> = {
 };
 
 export default function DriveScreen() {
+  const router = useRouter();
   const { signOut: clerkSignOut } = useClerkAuth();
   const { user } = useAuth();
   const { profile, setStatus } = useRiderProfile();
@@ -44,11 +46,20 @@ export default function DriveScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [cityFilter, setCityFilter] = useState<string>('All');
+  // Offers (assigned, not yet accepted) the rider dismissed this session — so a
+  // declined ping never re-surfaces while it lingers in the assignments feed.
+  const [dismissedOffers, setDismissedOffers] = useState<string[]>([]);
 
   const status: RiderStatus = profile?.status ?? 'offline';
   const isOnline = status === 'online' || status === 'busy';
   const pending = useMemo(() => jobs.filter((j) => !j.acceptedAt), [jobs]);
   const active = useMemo(() => jobs.filter((j) => !!j.acceptedAt), [jobs]);
+
+  // Surface the first non-dismissed pending job as the incoming OFFER ping.
+  const offer = useMemo(
+    () => pending.find((j) => !dismissedOffers.includes(j.assignmentId)) ?? null,
+    [pending, dismissedOffers],
+  );
 
   // Distinct cities present in the current pool, "All" first.
   const cities = useMemo(() => {
@@ -123,6 +134,25 @@ export default function DriveScreen() {
     if (!user) return;
     await run(orderId, () => claimOrder(orderId, user.id), 'Could not claim');
     refreshPool();
+  };
+
+  // OFFER ping — accept opens the full-screen delivery flow; decline (incl. the
+  // 18s auto-timeout) sends it back to dispatch and hides it for this session.
+  const onOfferAccept = async (j: DriverJob) => {
+    if (!user || busyId) return;
+    setBusyId(j.orderId);
+    const res = await acceptAssignment(j.orderId, user.id);
+    setBusyId(null);
+    if (!res.ok) {
+      Alert.alert('Could not accept', res.error);
+      return;
+    }
+    setDismissedOffers((d) => (d.includes(j.assignmentId) ? d : [...d, j.assignmentId]));
+    router.push(`/delivery/${j.orderId}`);
+  };
+  const onOfferDecline = (j: DriverJob) => {
+    setDismissedOffers((d) => (d.includes(j.assignmentId) ? d : [...d, j.assignmentId]));
+    if (user) void rejectAssignment(j.orderId, user.id, 'Declined');
   };
 
   return (
@@ -229,7 +259,14 @@ export default function DriveScreen() {
             <Section icon={<Bike size={14} color={GLOW} />} title="Your delivery" />
             {active.map((j, i) => (
               <Enter key={j.assignmentId} delay={60 * i}>
-                <ActiveCard job={j} busy={busyId === j.orderId} onPickup={() => onPickup(j)} onArriving={() => onArriving(j)} onDelivered={() => onDelivered(j)} />
+                <ActiveCard
+                  job={j}
+                  busy={busyId === j.orderId}
+                  onOpen={() => router.push(`/delivery/${j.orderId}`)}
+                  onPickup={() => onPickup(j)}
+                  onArriving={() => onArriving(j)}
+                  onDelivered={() => onDelivered(j)}
+                />
               </Enter>
             ))}
           </>
@@ -279,6 +316,16 @@ export default function DriveScreen() {
           Claim a trip, deliver it, get paid — the customer sees every step live.
         </Text>
       </ScrollView>
+
+      {/* Incoming OFFER ping — one at a time, over the dashboard. */}
+      {offer && (
+        <OfferSheet
+          job={offer}
+          busy={busyId === offer.orderId}
+          onAccept={() => onOfferAccept(offer)}
+          onDecline={() => onOfferDecline(offer)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -288,12 +335,14 @@ export default function DriveScreen() {
 function ActiveCard({
   job,
   busy,
+  onOpen,
   onPickup,
   onArriving,
   onDelivered,
 }: {
   job: DriverJob;
   busy: boolean;
+  onOpen: () => void;
   onPickup: () => void;
   onArriving: () => void;
   onDelivered: () => void;
@@ -313,25 +362,33 @@ function ActiveCard({
 
   return (
     <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(52,211,153,0.30)', padding: 16, marginBottom: 11 }}>
-      {/* stage chip + payout */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ marginRight: 7 }}>
-            <LiveDot size={7} />
+      {/* Tapping the card body opens the full-screen delivery flow (live map). */}
+      <Tappable onPress={onOpen}>
+        {/* stage chip + payout */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ marginRight: 7 }}>
+              <LiveDot size={7} />
+            </View>
+            <View style={{ backgroundColor: 'rgba(52,211,153,0.14)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 10.5, fontWeight: '800', color: GLOW, letterSpacing: 0.4 }}>{stageLabel.toUpperCase()}</Text>
+            </View>
+            <Text style={{ fontSize: 11.5, color: MUTED, marginLeft: 8 }}>#{job.orderId.slice(0, 8)}</Text>
           </View>
-          <View style={{ backgroundColor: 'rgba(52,211,153,0.14)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 10.5, fontWeight: '800', color: GLOW, letterSpacing: 0.4 }}>{stageLabel.toUpperCase()}</Text>
-          </View>
-          <Text style={{ fontSize: 11.5, color: MUTED, marginLeft: 8 }}>#{job.orderId.slice(0, 8)}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: GLOW }}>{job.totalDh} dh</Text>
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: GLOW }}>{job.totalDh} dh</Text>
-      </View>
 
-      {/* route rail */}
-      <RouteSummary
-        pickup={{ name: 'Restaurant', area: pickedUp ? 'Collected' : 'Collect the order' }}
-        dropoff={{ name: job.landmark, area: 'Customer drop-off' }}
-      />
+        {/* route rail */}
+        <RouteSummary
+          pickup={{ name: 'Restaurant', area: pickedUp ? 'Collected' : 'Collect the order' }}
+          dropoff={{ name: job.landmark, area: 'Customer drop-off' }}
+        />
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, gap: 5 }}>
+          <Navigation size={12} color={EMERALD} />
+          <Text style={{ fontSize: 11.5, color: EMERALD, fontWeight: '700' }}>Tap for live map</Text>
+        </View>
+      </Tappable>
 
       {/* slide to confirm the current stage */}
       <View style={{ marginTop: 14, opacity: busy ? 0.6 : 1 }}>
