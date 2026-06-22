@@ -462,7 +462,7 @@ const S4: React.FC = () => {
       >
         bladek
         <br />
-        tysta7el. 🇲🇦
+        tstahl. 🇲🇦
       </div>
     </AbsoluteFill>
   );
