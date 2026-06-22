@@ -423,7 +423,13 @@
     "comingSoon": "Bientôt disponible",
     "campus": "Campus",
     "soon": "Bientôt",
-    "inCity": "à {{city}}"
+    "inCity": "à {{city}}",
+    "vert_food": "Repas",
+    "vert_grocery": "Épicerie",
+    "vert_pharmacy": "Pharmacie",
+    "vertBlurb_food": "Restaurants, cafés et pâtisseries",
+    "vertBlurb_grocery": "Marchés et essentiels du quotidien",
+    "vertBlurb_pharmacy": "Médicaments et soins, pharmacien dans l’app"
   },
   "landmark": {
     "label": "Repère · requis",

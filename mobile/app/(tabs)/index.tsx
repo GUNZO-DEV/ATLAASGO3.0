@@ -203,7 +203,7 @@ export default function Home() {
 
   const listTitle =
     vert !== 'food'
-      ? vObj?.label ?? ''
+      ? (vObj ? tr(`home.vert_${vObj.id}`) : '')
       : cat === 'all'
         ? tr('home.allRestaurants')
         : categories.find((c) => c.id === cat)?.label ?? '';
@@ -356,10 +356,10 @@ export default function Home() {
                       />
                     ) : null}
                     <Text style={[styles.disp, { fontSize: 13.5, color: on ? t.colors.primary : t.colors.fg }]}>
-                      {v.label}
+                      {tr(`home.vert_${v.id}`)}
                     </Text>
                     <Text style={{ fontSize: 10.5, color: t.colors.muted }} numberOfLines={1}>
-                      {v.blurb}
+                      {tr(`home.vertBlurb_${v.id}`)}
                     </Text>
                   </View>
                 </View>
@@ -534,7 +534,7 @@ export default function Home() {
                       city: cityName || tr('home.thisCity'),
                     })
                   : tr('home.emptyStore', {
-                      what: vObj?.label ?? tr('home.stores'),
+                      what: vObj ? tr(`home.vert_${vObj.id}`) : tr('home.stores'),
                       city: cityName || tr('home.thisCity'),
                     })}
               </Text>

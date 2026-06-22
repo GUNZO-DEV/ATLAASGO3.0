@@ -423,7 +423,13 @@
     "comingSoon": "Coming soon",
     "campus": "Campus",
     "soon": "Soon",
-    "inCity": "in {{city}}"
+    "inCity": "in {{city}}",
+    "vert_food": "Food",
+    "vert_grocery": "Grocery",
+    "vert_pharmacy": "Pharmacy",
+    "vertBlurb_food": "Restaurants, cafés & pastries",
+    "vertBlurb_grocery": "Markets & daily essentials",
+    "vertBlurb_pharmacy": "Meds & care, pharmacist in-app"
   },
   "landmark": {
     "label": "Landmark · required",

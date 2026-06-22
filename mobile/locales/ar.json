@@ -423,7 +423,13 @@
     "comingSoon": "قريبًا",
     "campus": "الحرم الجامعي",
     "soon": "قريبًا",
-    "inCity": "في {{city}}"
+    "inCity": "في {{city}}",
+    "vert_food": "طعام",
+    "vert_grocery": "بقالة",
+    "vert_pharmacy": "صيدلية",
+    "vertBlurb_food": "مطاعم ومقاهٍ وحلويات",
+    "vertBlurb_grocery": "أسواق ومستلزمات يومية",
+    "vertBlurb_pharmacy": "أدوية وعناية، وصيدلي في التطبيق"
   },
   "landmark": {
     "label": "علامة مميزة · مطلوبة",
