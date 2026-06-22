@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../lib/auth';
 import { useActiveDelivery, type LatLng } from '../../hooks/useActiveDelivery';
 import { useBroadcastLocation } from '../../hooks/useBroadcastLocation';
+import { OrderChat } from '../../components/dr/OrderChat';
 import { markPickedUp, markArriving, markDelivered } from '../../lib/orderActions';
 import {
   BG, CARD, LINE, EMERALD, GLOW, CREAM, MUTED, AMBER,
@@ -76,6 +77,7 @@ export default function DeliveryScreen() {
 
   const [me, setMe] = useState<LatLng | null>(null);
   const [busy, setBusy] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const mapRef = useRef<MapView>(null);
 
   // Keep streaming the rider's GPS to the customer for the whole screen.
@@ -221,6 +223,7 @@ export default function DeliveryScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
+      {chatOpen && orderId ? <OrderChat orderId={orderId} onClose={() => setChatOpen(false)} /> : null}
       {/* ── MAP (top ~42%) ── */}
       <View style={{ height: '42%' }}>
         <MapView
@@ -351,7 +354,7 @@ export default function DeliveryScreen() {
                 <Text style={{ fontSize: 12.5, color: MUTED }} numberOfLines={1}>{contactArea}</Text>
               </View>
               <Pressable
-                onPress={() => Alert.alert('Message', 'In-app messaging is coming soon.')}
+                onPress={() => setChatOpen(true)}
                 hitSlop={8}
                 style={iconBtn}
               >
