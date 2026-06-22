@@ -384,7 +384,7 @@ export default function RestaurantScreen() {
                 <IBack size={20} color="#1A1410" />
               </Pressable>
               <Pressable onPress={toggleFav} hitSlop={8} style={[styles.heroIconBtn, { backgroundColor: 'rgba(255,255,255,0.92)' }]}>
-                <IHeart size={20} color={t.colors.primary} fill={fav ? t.colors.primary : 'transparent'} />
+                <IHeart size={20} color={fav ? t.colors.primary : '#1A1410'} fill={fav ? t.colors.primary : 'transparent'} />
               </Pressable>
             </View>
           </PhotoTile>

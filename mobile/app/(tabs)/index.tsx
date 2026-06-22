@@ -422,7 +422,7 @@ export default function Home() {
         {vert === 'food' && hero && (
           <View style={[styles.pad, { marginTop: 20 }]}>
             <Press onPress={() => openStore(hero)} scaleTo={0.985} style={{ width: '100%' }}>
-              <View style={[styles.heroCard, { borderColor: t.colors.line2 }, t.shadows.card]}>
+              <View style={[styles.heroCard, t.shadows.card]}>
                 <PhotoTile
                   tile={VERTICAL_TILE.food}
                   em={hero.emoji || foodEm(hero.id)}
@@ -700,8 +700,8 @@ const styles = StyleSheet.create({
   catTokenInner: { alignItems: 'center', justifyContent: 'center' },
   catEmoji: { fontSize: 27 },
 
-  // hero
-  heroCard: { borderRadius: 26, borderWidth: 1, overflow: 'hidden' },
+  // hero — design sets the ag2-card to border:none (photo bleeds edge-to-edge)
+  heroCard: { borderRadius: 26, overflow: 'hidden' },
   heroTile: { height: 178, padding: 16, justifyContent: 'space-between', alignItems: 'flex-start' },
   heroBadge: {
     flexDirection: 'row',

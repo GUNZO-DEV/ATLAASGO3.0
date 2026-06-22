@@ -376,10 +376,13 @@ export default function OrderScreen() {
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     {rider?.rating != null ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <IStar size={12} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />
-                        <Text style={{ fontSize: 12, color: t.colors.fgSoft, fontWeight: '700' }}>{rider.rating}</Text>
-                      </View>
+                      <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <IStar size={12} color={t.colors.amber} fill={t.colors.amber} strokeWidth={0} />
+                          <Text style={{ fontSize: 12, color: t.colors.fgSoft, fontWeight: '700' }}>{rider.rating}</Text>
+                        </View>
+                        <View style={{ width: 3, height: 3, borderRadius: 999, backgroundColor: t.colors.muted }} />
+                      </>
                     ) : null}
                     <Text style={{ fontSize: 12, color: t.colors.muted }} numberOfLines={1}>
                       {courierMeta}

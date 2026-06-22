@@ -456,9 +456,14 @@ export default function CartScreen() {
         <Section t={t} title={tr('cart.payment')}>
           <Press onPress={placeOrder}>
             <View style={[card(t), styles.payRow]}>
-              <View style={[styles.payIcon, { backgroundColor: 'rgba(255,87,34,0.12)' }]}>
+              <LinearGradient
+                colors={t.gradients.soft}
+                start={t.gradients.start}
+                end={t.gradients.end}
+                style={styles.payIcon}
+              >
                 <IWallet size={21} color={t.colors.primary} />
-              </View>
+              </LinearGradient>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: '700', fontSize: 14.5, color: t.colors.fg }}>
                   {payment?.label ?? tr('cart.walletLabel')}
