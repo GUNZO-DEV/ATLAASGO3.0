@@ -29,7 +29,11 @@ export type CreateOrderInput = {
   customerId: string;
   category?: CategoryKey;
   coords: Coords;
-  landmark: string;
+  /** Reverse-geocoded address line for the GPS drop point (replaces the old
+   *  manual "landmark"); stored as orders.landmark (NOT NULL) for display. */
+  address?: string;
+  /** Legacy manual landmark — optional now that the drop point is the GPS pin. */
+  landmark?: string;
   /** Cart line items, snapshotted onto the order row. */
   items?: OrderItemSnapshot[];
   /** Money is integer dirhams everywhere. */
@@ -68,12 +72,19 @@ export function useCreateOrder() {
     setSubmitting(true);
     setError(null);
     try {
-      const landmark = (input.landmark ?? '').trim();
-      if (landmark.length < 3) {
-        throw new Error('Please enter a landmark (at least 3 characters).');
+      // The delivery point is the GPS pin now, not a typed landmark — require a
+      // valid location instead. The address label is display-only.
+      const coords = { lat: input.coords?.lat, lng: input.coords?.lng };
+      if (
+        typeof coords.lat !== 'number' ||
+        typeof coords.lng !== 'number' ||
+        coords.lat < -90 || coords.lat > 90 ||
+        coords.lng < -180 || coords.lng > 180
+      ) {
+        throw new Error('Please set your delivery location.');
       }
-
-      const coords = { lat: input.coords.lat, lng: input.coords.lng };
+      // orders.landmark is NOT NULL — store the resolved address (or a fallback).
+      const landmark = (input.address ?? input.landmark ?? '').trim() || 'Pinned location';
 
       // Resolve the order's city. Prefer an explicit value; otherwise look it
       // up from the chosen restaurant (the cart's first line carries its id).

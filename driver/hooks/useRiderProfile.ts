@@ -82,11 +82,13 @@ export function useRiderProfile() {
   }, [refresh]);
 
   const setStatus = useCallback(
-    async (status: RiderStatus): Promise<{ ok: true } | { ok: false; error: string }> => {
+    // `city` (the rider's detected zone) is stamped on go-online so dispatch only
+    // matches them to orders in that city. Omit it to leave the column untouched.
+    async (status: RiderStatus, city?: string | null): Promise<{ ok: true } | { ok: false; error: string }> => {
       if (!user) return { ok: false, error: 'Not signed in' };
-      const { error: err } = await supabase
-        .from('riders')
-        .upsert({ user_id: user.id, status, last_seen_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      const row: Record<string, unknown> = { user_id: user.id, status, last_seen_at: new Date().toISOString() };
+      if (city != null && city !== '') row.city = city;
+      const { error: err } = await supabase.from('riders').upsert(row, { onConflict: 'user_id' });
       if (err) return { ok: false, error: err.message };
       await refresh();
       return { ok: true };

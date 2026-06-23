@@ -129,6 +129,16 @@ export default function DriveScreen() {
     if (cityFilter !== 'All' && !cities.includes(cityFilter)) setCityFilter('All');
   }, [cities, cityFilter]);
 
+  // Default the pool to the rider's OWN city once detected (one-time; they can
+  // still switch to "All" or another city).
+  const autoCityRef = useRef(false);
+  useEffect(() => {
+    if (!autoCityRef.current && detectedCity && cities.includes(detectedCity)) {
+      autoCityRef.current = true;
+      setCityFilter(detectedCity);
+    }
+  }, [detectedCity, cities]);
+
   // Guaranteed refresh path that does not depend on the realtime socket.
   const refreshAll = useCallback(async () => {
     await Promise.allSettled([refreshPool(), refreshJobs(), refreshStats()]);
@@ -161,7 +171,9 @@ export default function DriveScreen() {
   async function toggleOnline() {
     if (toggling) return;
     setToggling(true);
-    const res = await setStatus(isOnline ? 'offline' : 'online');
+    // Stamp the rider's detected city on go-online so dispatch only sends them
+    // same-city orders (cleared implicitly by going offline).
+    const res = await setStatus(isOnline ? 'offline' : 'online', isOnline ? undefined : detectedCity || undefined);
     if (!res.ok) Alert.alert('Could not update status', res.error);
     setToggling(false);
   }

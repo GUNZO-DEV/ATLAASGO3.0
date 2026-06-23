@@ -263,7 +263,8 @@ export default function Checkout() {
     items.length > 0 &&
     subtotalOk &&
     phoneOk &&
-    landmarkValid &&
+    // Placement is gated on a real LOCATION (saved-address coords or a GPS fix),
+    // not a typed landmark.
     !!effectiveCoords &&
     !!quote &&
     !submitting;
@@ -315,10 +316,6 @@ export default function Checkout() {
       Alert.alert(tr('checkout.locationRequiredTitle'), tr('checkout.locationRequiredBody'));
       return;
     }
-    if (!landmarkValid) {
-      Alert.alert(tr('checkout.landmarkRequiredTitle'), tr('checkout.landmarkRequiredBody'));
-      return;
-    }
     if (!quote) {
       Alert.alert(tr('checkout.oneMomentTitle'), tr('checkout.oneMomentBody'));
       return;
@@ -328,7 +325,9 @@ export default function Checkout() {
       customerId: user.id,
       category: categoryKey,
       coords: effectiveCoords,
-      landmark: landmark.trim(),
+      // Location is the drop point; the address line is display-only, landmark optional.
+      address: (dropSub || selectedAddress?.label || '').trim() || undefined,
+      landmark: landmark.trim() || undefined,
       items: items.map((i) => ({
         id: i.id,
         restaurantId: i.restaurantId,
@@ -631,49 +630,37 @@ export default function Checkout() {
           )}
         </Section>
 
-        {/* ── Landmark + GPS (real wiring — required for order-create) ── */}
+        {/* ── Delivery location (GPS pin — based on location, no landmark) ── */}
         <View style={styles.pad}>
           <Rise style={{ marginTop: 18 }}>
-            {selectedAddress?.coords ? (
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-                  <IPin size={14} color={t.colors.primary} strokeWidth={2.5} />
-                  <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>{tr('checkout.landmarkRequiredEyebrow')}</Text>
-                </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+              <IPin size={14} color={t.colors.primary} strokeWidth={2.5} />
+              <Text style={[styles.eyebrow, { color: t.colors.muted, marginBottom: 0 }]}>{tr('checkout.dropLocationEyebrow')}</Text>
+            </View>
+            {effectiveCoords ? (
+              <View style={[styles.okStrip, { backgroundColor: 'rgba(47,163,107,0.10)', borderColor: 'rgba(47,163,107,0.24)' }]}>
+                <ICheck size={14} color={t.colors.ok} />
+                <Text style={{ marginLeft: 8, fontSize: 12.5, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
+                  {selectedAddress?.coords
+                    ? tr('checkout.savedGpsNote', { address: selectedAddress.label ?? tr('checkout.thisAddress') })
+                    : tr('checkout.locationPinned')}
+                </Text>
+              </View>
+            ) : (
+              <Press onPress={() => void capture()} scaleTo={0.97}>
                 <View
                   style={[
                     styles.inputWrap,
-                    {
-                      borderColor: landmarkValid || !landmark ? t.colors.line : '#EF4444',
-                      backgroundColor: t.colors.surface2,
-                      borderWidth: 1.5,
-                    },
+                    { borderColor: t.colors.primary, backgroundColor: t.colors.surface2, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 16 },
                   ]}
                 >
-                  <TextInput
-                    value={landmark}
-                    onChangeText={setLandmark}
-                    placeholder={tr('checkout.landmarkPlaceholder')}
-                    placeholderTextColor={t.colors.muted}
-                    multiline
-                    style={{ paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: t.colors.fg, minHeight: 64 }}
-                  />
-                </View>
-                <View style={[styles.okStrip, { backgroundColor: 'rgba(47,163,107,0.10)', borderColor: 'rgba(47,163,107,0.24)' }]}>
-                  <ICheck size={14} color={t.colors.ok} />
-                  <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: t.colors.ok, flex: 1 }}>
-                    {tr('checkout.savedGpsNote', { address: selectedAddress.label ?? tr('checkout.thisAddress') })}
+                  <IPin size={18} color={t.colors.primary} strokeWidth={2.5} />
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.colors.fg, flex: 1 }}>
+                    {locStatus === 'requesting' ? tr('checkout.locating') : tr('checkout.useMyLocation')}
                   </Text>
+                  {locStatus === 'requesting' ? <ActivityIndicator color={t.colors.primary} /> : null}
                 </View>
-              </View>
-            ) : (
-              <LandmarkInput
-                value={landmark}
-                onChange={setLandmark}
-                coords={gpsCoords}
-                onCaptureCoords={capture}
-                capturing={locStatus === 'requesting'}
-              />
+              </Press>
             )}
           </Rise>
 
@@ -1103,9 +1090,7 @@ export default function Checkout() {
                 ? tr('checkout.addPhoneFirst')
                 : !effectiveCoords
                   ? tr('checkout.captureGpsFirst')
-                  : !landmarkValid
-                    ? tr('checkout.addLandmark')
-                    : !quote
+                  : !quote
                       ? tr('checkout.pricing')
                       : fullyCoveredByWallet
                         ? tr('checkout.placeOrderWallet')
