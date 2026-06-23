@@ -83,15 +83,19 @@ export function useApplications() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    // Pending = not yet decided (excludes approved/rejected).
+    const PENDING = ['submitted', 'reviewing', 'needs_info'];
     const [{ data: r }, { data: rest }] = await Promise.all([
       supabase
         .from('rider_applications')
         .select('id,applicant_id,full_name,contact_phone,email,vehicle,plate,status,created_at')
+        .in('status', PENDING)
         .order('created_at', { ascending: false })
         .limit(40),
       supabase
         .from('restaurant_applications')
         .select('id,applicant_id,business_name,contact_email,contact_phone,cuisine,status,created_at')
+        .in('status', PENDING)
         .order('created_at', { ascending: false })
         .limit(40),
     ]);
@@ -120,59 +124,26 @@ export function useApplications() {
     refresh();
   }, [refresh]);
 
-  /** Approve / reject an application. On approval, best-effort grants the role
-   *  and bootstraps the rider/restaurant profile (requires super_admin for the
-   *  role grant; status update alone works for any admin). */
+  /** Approve / reject an application. On approval the DB approval trigger
+   *  (on_rider_app_approved / on_restaurant_app_approved, SECURITY DEFINER)
+   *  atomically grants the role and bootstraps the rider/restaurant profile —
+   *  so the client only updates the application status + stamps the reviewer.
+   *  The old client-side user_roles/riders/restaurants writes were RLS-blocked
+   *  for plain admins and are intentionally removed. */
   const decide = useCallback(
     async (kind: 'rider' | 'restaurant', id: string, next: 'approved' | 'rejected') => {
       const table = kind === 'rider' ? 'rider_applications' : 'restaurant_applications';
+      const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase
         .from(table)
-        .update({ status: next, reviewed_at: new Date().toISOString() })
+        .update({
+          status: next,
+          reviewer_id: auth.user?.id ?? null,
+          reviewed_at: new Date().toISOString(),
+        })
         .eq('id', id);
       if (error) return { ok: false as const, error: error.message };
 
-      if (next === 'approved') {
-        const { data: app } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
-        const a = app as any;
-        if (a?.applicant_id) {
-          const role = kind === 'rider' ? 'rider' : 'merchant';
-          await supabase.from('user_roles').upsert({ user_id: a.applicant_id, role }, { onConflict: 'user_id,role' });
-          if (kind === 'rider') {
-            await supabase.from('riders').upsert(
-              {
-                user_id: a.applicant_id,
-                vehicle: a.vehicle ?? null,
-                plate: a.plate ?? null,
-                status: 'offline',
-                rating: 5.0,
-                total_trips: 0,
-                total_earnings_dh: 0,
-                documents_verified: true,
-              },
-              { onConflict: 'user_id' },
-            );
-          } else {
-            const slug =
-              (a.business_name as string)
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/(^-|-$)/g, '')
-                .slice(0, 48) +
-              '-' +
-              Date.now().toString(36);
-            await supabase.from('restaurants').insert({
-              slug,
-              name: a.business_name,
-              cuisine: a.cuisine ?? 'General',
-              cuisine_tags: a.cuisine ? [a.cuisine] : [],
-              emoji: '🍽️',
-              owner_id: a.applicant_id,
-              status: 'draft',
-            });
-          }
-        }
-      }
       await refresh();
       return { ok: true as const };
     },
