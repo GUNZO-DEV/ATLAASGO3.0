@@ -39,7 +39,20 @@ export const SURFACE2 = '#FBF6EF'; // tinted secondary surface
 export const BG2 = '#F3ECE1'; // sand secondary background (inactive tracks)
 export const FG_SOFT = '#5A4F46'; // soft body text
 export const ONLINE = '#2FA36B'; // online toggle + success/done green
+export const OFFLINE = '#8A7C70'; // offline / muted-warm semantic token
 export const LINE2 = 'rgba(26,20,16,.05)'; // softest hairline
+
+// ── Brand gradient — 135° diagonal sunset (EMERALD→GLOW) ────────────────
+// Single source of truth for every primary gradient surface; replaces the
+// flat x:0→x:1 (left→right) gradients that used to be inlined per primitive.
+export const GRAD = {
+  colors: [EMERALD, GLOW] as readonly [string, string],
+  start: { x: 0, y: 0 },
+  end: { x: 1, y: 1 },
+} as const;
+
+// ── Radius scale (app.css --r-*) ───────────────────────────────────────
+export const R = { sm: 12, md: 18, lg: 24, xl: 30 } as const;
 
 // Soft elevation shadow shared by white cards (app.css --sh-1).
 const SHADOW = {
@@ -48,6 +61,15 @@ const SHADOW = {
   shadowOpacity: 0.06,
   shadowRadius: 18,
   elevation: 2,
+} as const;
+
+// Elevated shadow for modals / sheets / lifted surfaces (app.css --sh-2).
+export const SHADOW_2 = {
+  shadowColor: '#1A1410',
+  shadowOffset: { width: 0, height: 18 },
+  shadowOpacity: 0.14,
+  shadowRadius: 38,
+  elevation: 10,
 } as const;
 
 // ── Animated primitives (extracted verbatim from app/index.tsx) ─────────
@@ -236,6 +258,7 @@ export function RouteSummary({ pickup, dropoff }: { pickup: RoutePoint; dropoff:
       {/* Dropoff row */}
       <View style={{ flexDirection: 'row', gap: 13 }}>
         <View style={{ alignItems: 'center', paddingTop: 4 }}>
+          {/* drop node with a soft sunset focus ring (≈ rgba(255,87,34,.18) 4px) */}
           <View
             style={{
               width: 13,
@@ -244,6 +267,11 @@ export function RouteSummary({ pickup, dropoff }: { pickup: RoutePoint; dropoff:
               backgroundColor: EMERALD,
               borderWidth: 3,
               borderColor: EMERALD,
+              shadowColor: EMERALD,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.18,
+              shadowRadius: 4,
+              elevation: 3,
             }}
           />
         </View>
@@ -374,9 +402,9 @@ export function SlideConfirm({
       }}
     >
       <LinearGradient
-        colors={done ? [ONLINE, ONLINE] : [EMERALD, GLOW]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+        colors={done ? [ONLINE, ONLINE] : GRAD.colors}
+        start={GRAD.start}
+        end={GRAD.end}
         style={StyleFill}
       />
       <Animated.Text
@@ -466,8 +494,9 @@ export function WeekBars({ week }: { week: WeekDay[] }) {
               }}
             >
               {w.today ? (
+                // vertical bar-fill (top→bottom); shares GRAD's color stops
                 <LinearGradient
-                  colors={[EMERALD, GLOW]}
+                  colors={GRAD.colors}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0, y: 1 }}
                   style={StyleFill}
@@ -541,6 +570,44 @@ export function Section({ icon, title, badge }: { icon?: ReactNode; title: strin
   );
 }
 
+// ── Section header — baseline title + right-aligned primary action link ─
+// Shared across screens (distinct from Section above, which carries an
+// icon/badge). Baseline-aligned so the action link sits on the title's
+// type baseline. onAction is optional; the link only renders with `action`.
+export function SecHead({
+  title,
+  action,
+  onAction,
+}: {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        marginTop: 26,
+        marginBottom: 12,
+      }}
+    >
+      <Text style={{ fontSize: 15, fontWeight: '800', color: CREAM, letterSpacing: -0.2 }}>
+        {title}
+      </Text>
+      {action ? (
+        <Text
+          onPress={onAction}
+          style={{ fontSize: 13, fontWeight: '700', color: EMERALD }}
+        >
+          {action}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 // ── Action button — gradient (primary) / outline ───────────────────────
 export function ActionBtn({
   label,
@@ -597,9 +664,9 @@ export function ActionBtn({
     <Tappable onPress={onPress} disabled={busy || disabled}>
       {primary ? (
         <LinearGradient
-          colors={[EMERALD, GLOW]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          colors={GRAD.colors}
+          start={GRAD.start}
+          end={GRAD.end}
           style={{
             borderRadius: 13,
             // sunset glow (--sh-glow)

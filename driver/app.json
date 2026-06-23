@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "AtlaasGo Driver",
+    "slug": "atlaasgo-driver",
+    "scheme": "atlaasgodriver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.atlaasgo.driver",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "AtlaasGo Driver uses your location to share live position with customers during deliveries.",
+        "UIBackgroundModes": [
+          "location"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.atlaasgo.driver",
+      "googleServicesFile": "./google-services.json",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "AtlaasGo Driver shares your location with customers while you deliver."
+        }
+      ],
+      "expo-notifications"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1b4ad13e-4d99-4006-8a09-d09c0a195286"
+      }
+    },
+    "owner": "atlaasgo"
+  }
+}

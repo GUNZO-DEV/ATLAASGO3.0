@@ -3,16 +3,37 @@
 // the rider accepts it. RN translation of the design's screen-offer.jsx, on the
 // light cream/white sheet with the sunset-orange accent.
 //
-// 18s countdown bar that auto-fires onDecline at 0, a big payout hero, the drop
-// landmark, a RouteSummary rail, and Decline (X) / Accept buttons.
+// 18s countdown bar that auto-fires onDecline at 0 (red <5s bar), the rich
+// DriverJob payout hero with its base/boost/tips breakdown, the
+// distance · eta · items trip column, and a RouteSummary rail with the real
+// pickup merchant. Accept routes through the race-safe accept_order_offer RPC
+// (the caller wires onAccept → acceptAssignment).
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
-import { Timer, X, Navigation } from 'lucide-react-native';
+import { Timer, X, Navigation, Snowflake } from 'lucide-react-native';
 import type { DriverJob } from '../../hooks/useDriverAssignments';
-import { BG, CARD, LINE, LINE2, BG2, EMERALD, GLOW, CREAM, MUTED, DANGER, LiveDot, RouteSummary, Tappable } from './ui';
+import {
+  BG,
+  CARD,
+  LINE,
+  LINE2,
+  BG2,
+  EMERALD,
+  GLOW,
+  CREAM,
+  MUTED,
+  DANGER,
+  SNOW,
+  GRAD,
+  R,
+  SHADOW_2,
+  LiveDot,
+  RouteSummary,
+  Tappable,
+} from './ui';
 
 const OFFER_SECS = 18;
 
@@ -47,9 +68,19 @@ export function OfferSheet({
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [job.assignmentId]);
+  }, [job.id]);
 
   const pct = (left / OFFER_SECS) * 100;
+  const urgent = left <= 5;
+  const hasBoost = job.boostDh > 0;
+  const hasTip = job.tipDh > 0;
+
+  // Trip stat column — "distanceKm · etaMin · itemCount items". Each piece is
+  // omitted when it has no backing value (distance/eta need a rider fix).
+  const tripStats: string[] = [];
+  if (job.distanceKm != null) tripStats.push(`${job.distanceKm} km`);
+  if (job.etaMin != null) tripStats.push(`~${job.etaMin} min`);
+  tripStats.push(`${job.itemCount} ${job.itemCount === 1 ? 'item' : 'items'}`);
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onDecline}>
@@ -64,17 +95,13 @@ export function OfferSheet({
           <View
             style={{
               backgroundColor: BG,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
+              borderTopLeftRadius: R.xl,
+              borderTopRightRadius: R.xl,
               borderWidth: 1,
               borderColor: LINE,
               overflow: 'hidden',
-              // soft lift off the scrim
-              shadowColor: '#1A1410',
-              shadowOffset: { width: 0, height: -10 },
-              shadowOpacity: 0.18,
-              shadowRadius: 40,
-              elevation: 12,
+              // elevated sheet lift off the scrim (--sh-2)
+              ...SHADOW_2,
             }}
           >
             <SafeAreaView edges={['bottom']}>
@@ -91,28 +118,51 @@ export function OfferSheet({
                   }}
                 />
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <View style={{ marginRight: 7 }}>
-                    <LiveDot size={7} />
-                  </View>
-                  <View
-                    style={{
-                      backgroundColor: 'rgba(255,87,34,0.12)', // --grad-soft / sunset tint
-                      borderRadius: 8,
-                      paddingHorizontal: 9,
-                      paddingVertical: 3,
-                    }}
-                  >
-                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: EMERALD, letterSpacing: 0.4 }}>
-                      NEW OFFER
-                    </Text>
-                  </View>
+                  {hasBoost ? (
+                    // Snow-boost badge — surge is live on this offer.
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: 'rgba(90,169,230,0.12)',
+                        borderRadius: 8,
+                        paddingHorizontal: 9,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Snowflake size={12} color={SNOW} strokeWidth={2.5} />
+                      <Text style={{ fontSize: 10.5, fontWeight: '800', color: SNOW, letterSpacing: 0.4 }}>
+                        SNOW BOOST
+                      </Text>
+                    </View>
+                  ) : (
+                    // Plain "New offer" pill (no surge).
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ marginRight: 7 }}>
+                        <LiveDot size={7} />
+                      </View>
+                      <View
+                        style={{
+                          backgroundColor: 'rgba(255,87,34,0.12)', // --grad-soft / sunset tint
+                          borderRadius: 8,
+                          paddingHorizontal: 9,
+                          paddingVertical: 3,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: EMERALD, letterSpacing: 0.4 }}>
+                          NEW OFFER
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                   <View style={{ flex: 1 }} />
-                  <Timer size={14} color={left <= 5 ? DANGER : MUTED} />
+                  <Timer size={14} color={urgent ? DANGER : MUTED} />
                   <Text
                     style={{
                       fontSize: 13,
                       fontWeight: '800',
-                      color: left <= 5 ? DANGER : MUTED,
+                      color: urgent ? DANGER : MUTED,
                       marginLeft: 5,
                     }}
                   >
@@ -120,7 +170,7 @@ export function OfferSheet({
                   </Text>
                 </View>
 
-                {/* countdown bar — light track, sunset-gradient fill */}
+                {/* countdown bar — light track, sunset-gradient fill (red <5s) */}
                 <View
                   style={{
                     height: 5,
@@ -137,11 +187,11 @@ export function OfferSheet({
                       overflow: 'hidden',
                     }}
                   >
-                    {left <= 5 ? (
+                    {urgent ? (
                       <View style={{ flex: 1, backgroundColor: DANGER }} />
                     ) : (
                       <LinearGradient
-                        colors={[EMERALD, GLOW]}
+                        colors={GRAD.colors}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={{ flex: 1 }}
@@ -151,9 +201,9 @@ export function OfferSheet({
                 </View>
               </View>
 
-              {/* payout hero */}
+              {/* payout hero + trip-stat column */}
               <View style={{ paddingHorizontal: 22, paddingTop: 18 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '800', letterSpacing: 1.4, color: EMERALD }}>
                       NEW ORDER · #{job.orderId.slice(0, 8)}
@@ -168,20 +218,42 @@ export function OfferSheet({
                         marginTop: 4,
                       }}
                     >
-                      {job.totalDh}
+                      {job.payoutDh}
                       <Text style={{ fontSize: 22, fontWeight: '800', color: MUTED }}> dh</Text>
                     </Text>
+                    {/* fare breakdown — base + boost (snow) + tips; pieces hidden at 0 */}
                     <Text style={{ fontSize: 12.5, color: MUTED, marginTop: 4 }} numberOfLines={1}>
-                      Drop · {job.landmark}
+                      base {job.baseDh}
+                      {hasBoost ? (
+                        <Text style={{ color: SNOW, fontWeight: '700' }}> + boost {job.boostDh} (snow)</Text>
+                      ) : null}
+                      {hasTip ? <Text> + tips {job.tipDh}</Text> : null}
                     </Text>
+                  </View>
+
+                  {/* trip stat column */}
+                  <View style={{ alignItems: 'flex-end' }}>
+                    {tripStats.map((s, i) => (
+                      <Text
+                        key={i}
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '800',
+                          color: i === 0 ? CREAM : MUTED,
+                          marginTop: i === 0 ? 0 : 2,
+                        }}
+                      >
+                        {s}
+                      </Text>
+                    ))}
                   </View>
                 </View>
 
-                {/* route rail (design .ag-card) */}
+                {/* route rail (design .ag-card) — real pickup merchant */}
                 <View
                   style={{
                     backgroundColor: CARD,
-                    borderRadius: 16,
+                    borderRadius: R.md,
                     borderWidth: 1,
                     borderColor: LINE2,
                     padding: 16,
@@ -195,8 +267,12 @@ export function OfferSheet({
                   }}
                 >
                   <RouteSummary
-                    pickup={{ name: 'Pickup', area: 'Collect the order' }}
-                    dropoff={{ name: job.landmark, area: 'Customer drop-off' }}
+                    pickup={{
+                      name: job.pickupName,
+                      area: job.pickupArea || 'Collect the order',
+                      dist: job.distanceKm != null ? `${job.distanceKm} km` : undefined,
+                    }}
+                    dropoff={{ name: job.dropName, area: job.dropArea || 'Customer drop-off' }}
                   />
                 </View>
               </View>
@@ -216,7 +292,7 @@ export function OfferSheet({
                     style={{
                       width: 62,
                       height: 56,
-                      borderRadius: 16,
+                      borderRadius: R.md,
                       borderWidth: 1,
                       borderColor: LINE,
                       backgroundColor: CARD,
@@ -236,11 +312,11 @@ export function OfferSheet({
                 </Tappable>
                 <Tappable onPress={onAccept} disabled={busy}>
                   <LinearGradient
-                    colors={[EMERALD, GLOW]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
+                    colors={GRAD.colors}
+                    start={GRAD.start}
+                    end={GRAD.end}
                     style={{
-                      borderRadius: 16,
+                      borderRadius: R.md,
                       // sunset glow (--sh-glow)
                       shadowColor: EMERALD,
                       shadowOffset: { width: 0, height: 14 },
@@ -252,7 +328,7 @@ export function OfferSheet({
                     <View
                       style={{
                         height: 56,
-                        borderRadius: 16,
+                        borderRadius: R.md,
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -265,7 +341,7 @@ export function OfferSheet({
                         <>
                           <Navigation size={17} color="#fff" />
                           <Text style={{ fontWeight: '800', fontSize: 15.5, color: '#fff', marginLeft: 8 }}>
-                            Accept · {job.totalDh} dh
+                            Accept · {job.payoutDh} dh
                           </Text>
                         </>
                       )}

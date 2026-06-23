@@ -1,13 +1,17 @@
 // AtlaasDriver 3.0 — Earnings screen.
-// Real data: useRiderStats() → todayDh / weekDh / tripsToday / history.
+// Real data: useRiderStats() → todayDh / weekDh / lastWeekDh / tripsToday /
+// tipsToday / week[] (with the snow-boost split) / history.
 // Light cream surface, sunset-orange accents. Translation of screen-earnings.jsx.
+//
+// Cash-out calls the real rider_cash_out RPC (a 'requested' rider_payouts row).
 
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Wallet, Package, TrendingUp, ArrowUpRight } from 'lucide-react-native';
-import { useRiderStats, type RiderHistoryEntry } from '../../hooks/useRiderProfile';
+import { Wallet, TrendingUp, ArrowUpRight, ArrowUp } from 'lucide-react-native';
+import { useRiderStats, type RiderHistoryEntry, type WeekDay as StatWeekDay } from '../../hooks/useRiderProfile';
+import { cashOut } from '../../lib/orderActions';
 import {
   BG,
   CARD,
@@ -21,6 +25,7 @@ import {
   ONLINE,
   Enter,
   Section,
+  SecHead,
   StatTile,
   WeekBars,
   Tappable,
@@ -31,38 +36,27 @@ const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 type WeekDay = { d: string; amt: number; boost?: number; today?: boolean };
 
-// Build a real Mon→Sun breakdown from delivered history.
-// We only have delivery_fee_dh per delivered assignment (no boost split), so
-// bucket each delivered fee into its weekday — no fabricated daily numbers.
-function buildWeek(history: RiderHistoryEntry[]): WeekDay[] {
-  const now = new Date();
-  // Monday of the current week (local time), at 00:00.
-  const monday = new Date(now);
-  const dow = (monday.getDay() + 6) % 7; // 0 = Monday … 6 = Sunday
-  monday.setDate(monday.getDate() - dow);
-  monday.setHours(0, 0, 0, 0);
-
-  const todayIdx = dow;
-  const amounts = [0, 0, 0, 0, 0, 0, 0];
-
-  for (const h of history) {
-    if (!h.deliveredAt) continue;
-    const d = new Date(h.deliveredAt);
-    const diffDays = Math.floor((d.getTime() - monday.getTime()) / 86_400_000);
-    if (diffDays >= 0 && diffDays < 7) amounts[diffDays] += h.feeDh;
-  }
-
-  return DAY_LETTERS.map((d, i) => ({
-    d,
-    amt: Math.round(amounts[i]),
-    today: i === todayIdx,
+// Re-shape the hook's Sun-first week[] (real delivered fee + boost split per
+// weekday) into the design's Mon→Sun rail, marking today's column. No fabricated
+// numbers — only a re-ordering of the real per-day totals.
+function toMondayWeek(week: StatWeekDay[]): WeekDay[] {
+  // hook week[] is indexed Sun(0)..Sat(6); remap to Mon(0)..Sun(6).
+  const sunFirst = week.length === 7 ? week : [0, 1, 2, 3, 4, 5, 6].map(() => ({ d: '', amt: 0, boost: 0 }));
+  const order = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun → Sun-first indices
+  const todaySunIdx = new Date().getDay(); // 0=Sun..6=Sat
+  const todayMonIdx = (todaySunIdx + 6) % 7; // 0=Mon..6=Sun
+  return order.map((sunIdx, i) => ({
+    d: DAY_LETTERS[i],
+    amt: Math.round(sunFirst[sunIdx]?.amt ?? 0),
+    boost: Math.round(sunFirst[sunIdx]?.boost ?? 0),
+    today: i === todayMonIdx,
   }));
 }
 
 // White cash-out button that sits on the dark hero (design: bg #fff / ink text).
-function CashOutButton({ onPress }: { onPress: () => void }) {
+function CashOutButton({ onPress, busy }: { onPress: () => void; busy: boolean }) {
   return (
-    <Tappable onPress={onPress}>
+    <Tappable onPress={onPress} disabled={busy}>
       <View
         style={{
           borderRadius: 13,
@@ -71,12 +65,19 @@ function CashOutButton({ onPress }: { onPress: () => void }) {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#fff',
+          opacity: busy ? 0.65 : 1,
         }}
       >
-        <ArrowUpRight size={18} color={CREAM} strokeWidth={2.5} />
-        <Text style={{ fontWeight: '800', fontSize: 14, marginLeft: 7, color: CREAM }}>
-          Cash out instantly
-        </Text>
+        {busy ? (
+          <ActivityIndicator color={CREAM} />
+        ) : (
+          <>
+            <ArrowUpRight size={18} color={CREAM} strokeWidth={2.5} />
+            <Text style={{ fontWeight: '800', fontSize: 14, marginLeft: 7, color: CREAM }}>
+              Cash out instantly
+            </Text>
+          </>
+        )}
       </View>
     </Tappable>
   );
@@ -95,7 +96,9 @@ function tripWhen(iso: string | null): string {
 }
 
 // One delivered-trip row — landmark, delivered time, payout (design .dr-trip).
-function TripRow({ entry }: { entry: RiderHistoryEntry }) {
+// The green "+N tip" line renders only when a real per-trip tip is present.
+function TripRow({ entry }: { entry: RiderHistoryEntry & { tipDh?: number } }) {
+  const tip = entry.tipDh ?? 0;
   return (
     <View
       style={{
@@ -124,17 +127,48 @@ function TripRow({ entry }: { entry: RiderHistoryEntry }) {
           {tripWhen(entry.deliveredAt)}
         </Text>
       </View>
-      <Text style={{ fontWeight: '800', fontSize: 14, color: CREAM, letterSpacing: -0.3 }}>
-        +{entry.feeDh}
-        <Text style={{ fontSize: 12, fontWeight: '700', color: MUTED }}> dh</Text>
-      </Text>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={{ fontWeight: '800', fontSize: 14, color: CREAM, letterSpacing: -0.3 }}>
+          +{entry.feeDh}
+          <Text style={{ fontSize: 12, fontWeight: '700', color: MUTED }}> dh</Text>
+        </Text>
+        {tip > 0 ? (
+          <Text style={{ fontSize: 11, fontWeight: '600', color: ONLINE, marginTop: 1 }}>+{tip} tip</Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+// 3-tile metric row for "Today": Earned / Tips / Trips.
+function MetricTile({ value, label }: { value: string; label: string }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: CARD,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: LINE2,
+        paddingVertical: 16,
+        alignItems: 'center',
+        shadowColor: CREAM,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        elevation: 2,
+      }}
+    >
+      <Text style={{ fontSize: 22, fontWeight: '800', color: CREAM, letterSpacing: -0.6 }}>{value}</Text>
+      <Text style={{ fontSize: 9.5, fontWeight: '700', letterSpacing: 1, color: MUTED, marginTop: 4 }}>{label}</Text>
     </View>
   );
 }
 
 export default function EarningsScreen() {
-  const { todayDh, weekDh, tripsToday, history, refresh } = useRiderStats();
+  const { todayDh, weekDh, lastWeekDh, tripsToday, tipsToday, week: statWeek, history, refresh } = useRiderStats();
   const [refreshing, setRefreshing] = useState(false);
+  const [cashingOut, setCashingOut] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -142,8 +176,13 @@ export default function EarningsScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  const week = useMemo(() => buildWeek(history), [history]);
+  const week = useMemo(() => toMondayWeek(statWeek), [statWeek]);
   const hasDailyBreakdown = useMemo(() => week.some((w) => w.amt > 0), [week]);
+  // Trend vs last week — only shown when there's a real prior-week baseline.
+  const trendPct = useMemo(
+    () => (lastWeekDh > 0 ? Math.round(((weekDh - lastWeekDh) / lastWeekDh) * 100) : null),
+    [weekDh, lastWeekDh],
+  );
   // Only delivered trips belong on an earnings screen (skip rejected).
   const deliveredTrips = useMemo(
     () => history.filter((h) => h.deliveredAt).slice(0, 6),
@@ -151,12 +190,31 @@ export default function EarningsScreen() {
   );
 
   function onCashOut() {
-    // No payout backend exists yet — surface an honest "coming soon" notice
-    // rather than inventing a transfer flow.
+    if (cashingOut) return;
+    if (weekDh <= 0) {
+      Alert.alert('Nothing to cash out', 'Complete a few deliveries first — your balance settles here.');
+      return;
+    }
     Alert.alert(
-      'Cash out',
-      'Instant payouts are coming soon. Your earnings are tracked here and settled with dispatch in the meantime.',
-      [{ text: 'Got it' }],
+      'Cash out instantly',
+      `Request a payout of ${weekDh} dh to your account? Payouts are processed by dispatch.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Cash out',
+          onPress: async () => {
+            setCashingOut(true);
+            const res = await cashOut(weekDh);
+            setCashingOut(false);
+            if (res.ok) {
+              Alert.alert('Payout requested', `${weekDh} dh is on its way. You'll be notified once it's processed.`);
+              void refresh();
+            } else {
+              Alert.alert('Could not cash out', res.error);
+            }
+          },
+        },
+      ],
     );
   }
 
@@ -222,7 +280,7 @@ export default function EarningsScreen() {
                 <Text style={{ fontSize: 20, fontWeight: '700', color: 'rgba(251,247,242,0.7)' }}> dh</Text>
               </Text>
               <View style={{ marginTop: 16 }}>
-                <CashOutButton onPress={onCashOut} />
+                <CashOutButton onPress={onCashOut} busy={cashingOut} />
               </View>
             </View>
           </View>
@@ -253,9 +311,32 @@ export default function EarningsScreen() {
                 </Text>
                 <Text style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Mon – Sun</Text>
               </View>
+              {/* +N% vs last week — only with a real prior-week baseline */}
+              {trendPct != null ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 3,
+                    paddingVertical: 5,
+                    paddingHorizontal: 10,
+                    borderRadius: 999,
+                    backgroundColor: trendPct >= 0 ? 'rgba(47,163,107,0.12)' : 'rgba(225,29,72,0.10)',
+                  }}
+                >
+                  <ArrowUp
+                    size={13}
+                    color={trendPct >= 0 ? ONLINE : '#E11D48'}
+                    style={{ transform: [{ rotate: trendPct >= 0 ? '0deg' : '180deg' }] }}
+                  />
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: trendPct >= 0 ? ONLINE : '#E11D48' }}>
+                    {trendPct >= 0 ? '+' : ''}{trendPct}% vs last week
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <WeekBars week={week} />
-            {/* Legend — base/tips vs snow boost (visual key, no fabricated data) */}
+            {/* Legend — base/tips vs snow boost (drives the blue boost overlay) */}
             <View style={{ flexDirection: 'row', gap: 16, marginTop: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: BG2 }} />
@@ -274,26 +355,18 @@ export default function EarningsScreen() {
           </View>
         </Enter>
 
-        {/* Today */}
+        {/* Today — 3 metrics: Earned / Tips / Trips */}
         <Section icon={<Wallet size={14} color={EMERALD} />} title="Today" />
         <Enter delay={160}>
           <View style={{ flexDirection: 'row', gap: 11 }}>
-            <StatTile
-              icon={<Wallet size={15} color={EMERALD} />}
-              value={`${todayDh}`}
-              unit="dh"
-              label="Earned today"
-            />
-            <StatTile
-              icon={<Package size={15} color={EMERALD} />}
-              value={`${tripsToday}`}
-              label="Trips today"
-            />
+            <MetricTile value={`${todayDh}`} label="EARNED · DH" />
+            <MetricTile value={`${tipsToday}`} label="TIPS · DH" />
+            <MetricTile value={`${tripsToday}`} label="TRIPS" />
           </View>
         </Enter>
 
         {/* Recent trips — real delivered history (landmark · time · fee) */}
-        <Section icon={<Package size={14} color={EMERALD} />} title="Recent trips" />
+        <SecHead title="Recent trips" action={deliveredTrips.length > 0 ? 'See all' : undefined} />
         {deliveredTrips.length > 0 ? (
           <Enter delay={200}>
             <View style={{ gap: 10 }}>

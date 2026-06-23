@@ -13,9 +13,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { CheckCheck, MapPin, MessageCircle, Send, X } from 'lucide-react-native';
-import { BG, CARD, LINE, EMERALD, CREAM, MUTED, DANGER } from './ui';
+import { BG, CARD, LINE, EMERALD, CREAM, MUTED, DANGER, GRAD, R } from './ui';
 import { RIDER_QUICK_REPLIES, useOrderChat, type OrderMessage } from '../../hooks/useOrderChat';
 
 /**
@@ -45,6 +46,31 @@ function Bubble({ message, mine, showLabel }: { message: OrderMessage; mine: boo
     void Linking.openURL(`https://www.google.com/maps?q=${message.location_lat},${message.location_lng}`);
   };
 
+  // Bubble body — shared between the gradient (mine) and white (inbound) shells.
+  const bubbleInner = (
+    <>
+      {isLocation ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 32, height: 32, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: mine ? 'rgba(255,255,255,0.2)' : 'rgba(255,87,34,0.10)' }}>
+            <MapPin size={14} color={mine ? '#fff' : EMERALD} strokeWidth={2.5} />
+          </View>
+          <View style={{ marginLeft: 10 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: mine ? '#fff' : CREAM }}>
+              {message.body || 'My location'}
+            </Text>
+            <Text style={{ fontSize: 11, marginTop: 1, color: mine ? 'rgba(255,255,255,0.75)' : MUTED }}>Tap to open map</Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={{ fontSize: 14.5, lineHeight: 20, color: mine ? '#fff' : CREAM }}>{message.body}</Text>
+      )}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 4 }}>
+        <Text style={{ fontSize: 10, color: mine ? 'rgba(255,255,255,0.65)' : MUTED }}>{fmtTime(message.created_at)}</Text>
+        {mine ? <CheckCheck size={13} color={message.read_at ? '#8AE9FF' : 'rgba(255,255,255,0.55)'} /> : null}
+      </View>
+    </>
+  );
+
   return (
     <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '82%', marginBottom: 8 }}>
       {!mine && showLabel ? (
@@ -53,41 +79,41 @@ function Bubble({ message, mine, showLabel }: { message: OrderMessage; mine: boo
         </Text>
       ) : null}
       <Pressable onPress={openMap} disabled={!isLocation}>
-        <View
-          style={{
-            backgroundColor: mine ? EMERALD : CARD,
-            borderWidth: mine ? 0 : 1,
-            borderColor: LINE,
-            borderRadius: 20,
-            borderBottomRightRadius: mine ? 6 : 20,
-            borderBottomLeftRadius: mine ? 20 : 6,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            ...(isLocation
-              ? { borderWidth: 1, borderColor: mine ? 'rgba(255,255,255,0.4)' : 'rgba(255,87,34,0.3)', borderStyle: 'dashed' }
-              : {}),
-          }}
-        >
-          {isLocation ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 32, height: 32, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: mine ? 'rgba(255,255,255,0.2)' : 'rgba(255,87,34,0.10)' }}>
-                <MapPin size={14} color={mine ? '#fff' : EMERALD} strokeWidth={2.5} />
-              </View>
-              <View style={{ marginLeft: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: mine ? '#fff' : CREAM }}>
-                  {message.body || 'My location'}
-                </Text>
-                <Text style={{ fontSize: 11, marginTop: 1, color: mine ? 'rgba(255,255,255,0.75)' : MUTED }}>Tap to open map</Text>
-              </View>
-            </View>
-          ) : (
-            <Text style={{ fontSize: 14.5, lineHeight: 20, color: mine ? '#fff' : CREAM }}>{message.body}</Text>
-          )}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 4 }}>
-            <Text style={{ fontSize: 10, color: mine ? 'rgba(255,255,255,0.65)' : MUTED }}>{fmtTime(message.created_at)}</Text>
-            {mine ? <CheckCheck size={13} color={message.read_at ? '#8AE9FF' : 'rgba(255,255,255,0.55)'} /> : null}
+        {/* own-bubble carries the shared sunset gradient; inbound stays white */}
+        {mine ? (
+          <LinearGradient
+            colors={GRAD.colors}
+            start={GRAD.start}
+            end={GRAD.end}
+            style={{
+              borderRadius: 20,
+              borderBottomRightRadius: 6,
+              overflow: 'hidden',
+              ...(isLocation
+                ? { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderStyle: 'dashed' }
+                : {}),
+            }}
+          >
+            <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>{bubbleInner}</View>
+          </LinearGradient>
+        ) : (
+          <View
+            style={{
+              backgroundColor: CARD,
+              borderWidth: 1,
+              borderColor: LINE,
+              borderRadius: 20,
+              borderBottomLeftRadius: 6,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              ...(isLocation
+                ? { borderWidth: 1, borderColor: 'rgba(255,87,34,0.3)', borderStyle: 'dashed' }
+                : {}),
+            }}
+          >
+            {bubbleInner}
           </View>
-        </View>
+        )}
       </Pressable>
     </View>
   );
@@ -220,12 +246,17 @@ export function OrderChat({ orderId, onClose }: { orderId: string; onClose: () =
                 placeholder="Message the customer…"
                 placeholderTextColor="#A89E94"
                 multiline
-                style={{ flex: 1, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 22, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, maxHeight: 110, fontSize: 14, color: CREAM }}
+                style={{ flex: 1, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: R.lg, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, maxHeight: 110, fontSize: 14, color: CREAM }}
               />
               <Pressable onPress={() => onSend()} disabled={sending || !draft.trim()}>
-                <View style={{ width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: EMERALD, opacity: sending || !draft.trim() ? 0.4 : 1 }}>
+                <LinearGradient
+                  colors={GRAD.colors}
+                  start={GRAD.start}
+                  end={GRAD.end}
+                  style={{ width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', opacity: sending || !draft.trim() ? 0.4 : 1 }}
+                >
                   <Send size={16} color="#fff" />
-                </View>
+                </LinearGradient>
               </Pressable>
             </View>
           </KeyboardAvoidingView>

@@ -92,11 +92,17 @@ export function useCreateOrder() {
       }
       if (!city) city = DEFAULT_CITY;
 
+      // The pickup restaurant — the cart's first line carries its id. Populating
+      // orders.restaurant_id is what lets auto-dispatch resolve pickup coords and
+      // reach the nearest rider (and powers the driver pickup pin).
+      const restaurantId = input.items?.[0]?.restaurantId ?? null;
+
       const { data, error: err } = await supabase
         .from('orders')
         .insert({
           customer_id: input.customerId,
           status: 'ordered',
+          restaurant_id: restaurantId,
           landmark,
           coords,
           city,

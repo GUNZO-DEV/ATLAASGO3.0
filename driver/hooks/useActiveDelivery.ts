@@ -3,9 +3,15 @@ import { supabase } from '../lib/supabase';
 
 /**
  * The single active delivery a rider is working on, resolved from an order id.
- * Joins the order's first item back to its restaurant for the pickup pin, and
- * maps the order's drop coords/landmark for the dropoff pin. Defensive: never
- * throws on missing rows or columns, returns null when the order can't be read.
+ * Pickup is resolved the RIGHT way: orders.restaurant_id → restaurants(id) for
+ * the merchant name + map coords (NOT the stale items[].restaurantSlug). The
+ * drop pin maps the order's coords/landmark. Payout is the rider's real cut
+ * (delivery_fee_dh + tip_dh + boost_dh), and counterpartyPhone resolves the
+ * customer's number via the SECURITY DEFINER order_contact_phone RPC.
+ *
+ * Defensive: never throws on missing rows/columns, returns null when the order
+ * can't be read. Keeps the existing nested shape (pickup/dropoff/items) and
+ * adds the flat fields the v2 delivery screen reads.
  */
 export type LatLng = { latitude: number; longitude: number };
 
@@ -24,11 +30,16 @@ export type ActiveDelivery = {
     coords: LatLng | null;
   };
   items: { qty: number; name: string }[];
+  // Flat accessors for the v2 design screens (additive over the nested shape).
+  pickupName: string;
+  pickupCoords: LatLng | null;
+  dropCoords: LatLng | null;
+  counterpartyPhone: string | null;
+  isPickup: boolean;
+  stageLabel: string;
 };
 
 type OrderItem = {
-  restaurantSlug?: string | null;
-  restaurantName?: string | null;
   name?: string | null;
   qty?: number | null;
 };
@@ -36,7 +47,9 @@ type OrderItem = {
 type OrderRow = {
   id: string;
   status: string | null;
-  total_dh: number | null;
+  restaurant_id: string | null;
+  delivery_fee_dh: number | null;
+  tip_dh: number | null;
   coords: { lat?: number | null; lng?: number | null } | null;
   landmark: string | null;
   campus_building: string | null;
@@ -45,9 +58,32 @@ type OrderRow = {
   items: OrderItem[] | null;
 };
 
-function toLatLng(c: { lat?: number | null; lng?: number | null } | null): LatLng | null {
+function toLatLng(c: { lat?: number | null; lng?: number | null } | null | undefined): LatLng | null {
   if (!c || typeof c.lat !== 'number' || typeof c.lng !== 'number') return null;
   return { latitude: c.lat, longitude: c.lng };
+}
+
+/** Stages before the rider has the food = pickup side; after = drop side. */
+const PICKUP_STAGES = new Set(['ordered', 'preparing', 'enRoute']);
+
+function stageLabelFor(status: string, isPickup: boolean): string {
+  switch (status) {
+    case 'ordered':
+    case 'preparing':
+      return 'Heading to pickup';
+    case 'enRoute':
+      return 'At the merchant';
+    case 'outForDelivery':
+      return 'On the way to drop';
+    case 'arriving':
+      return 'Arriving now';
+    case 'delivered':
+      return 'Delivered';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return isPickup ? 'Heading to pickup' : 'On the way to drop';
+  }
 }
 
 export function useActiveDelivery(orderId: string | null) {
@@ -65,7 +101,9 @@ export function useActiveDelivery(orderId: string | null) {
 
     const { data, error } = await supabase
       .from('orders')
-      .select('id, status, total_dh, coords, landmark, campus_building, delivery_notes, city, items')
+      .select(
+        'id, status, restaurant_id, delivery_fee_dh, tip_dh, coords, landmark, campus_building, delivery_notes, city, items',
+      )
       .eq('id', orderId)
       .maybeSingle();
 
@@ -77,44 +115,61 @@ export function useActiveDelivery(orderId: string | null) {
 
     const order = data as unknown as OrderRow;
     const items = Array.isArray(order.items) ? order.items : [];
-    const first = items[0];
 
-    let pickupName = first?.restaurantName || 'Pickup';
+    // Pickup pin: orders.restaurant_id → restaurants(id) for name + coords.
+    let pickupName = 'Pickup';
     let pickupCoords: LatLng | null = null;
-
-    if (first?.restaurantSlug) {
+    if (order.restaurant_id) {
       const { data: rest } = await supabase
         .from('restaurants')
         .select('name, coords')
-        .eq('slug', first.restaurantSlug)
+        .eq('id', order.restaurant_id)
         .maybeSingle();
-
       const restRow = rest as { name?: string | null; coords?: { lat?: number | null; lng?: number | null } | null } | null;
       if (restRow?.name) pickupName = restRow.name;
       pickupCoords = toLatLng(restRow?.coords ?? null);
     }
 
+    // Rider payout = delivery fee + tip + snow/surge boost (from the active
+    // assignment). boost_dh degrades to 0 if the column/row is unavailable.
+    let boostDh = 0;
+    const { data: asg } = await supabase
+      .from('order_assignments')
+      .select('boost_dh')
+      .eq('order_id', orderId)
+      .eq('is_active', true)
+      .maybeSingle();
+    const asgRow = asg as { boost_dh?: number | null } | null;
+    if (asgRow && typeof asgRow.boost_dh === 'number') boostDh = asgRow.boost_dh;
+    const payoutDh = (order.delivery_fee_dh ?? 0) + (order.tip_dh ?? 0) + boostDh;
+
+    // Counterparty phone via SECURITY DEFINER RPC (driver → customer number).
+    let counterpartyPhone: string | null = null;
+    const { data: phone } = await supabase.rpc('order_contact_phone', { p_order_id: orderId });
+    if (typeof phone === 'string' && phone.length > 0) counterpartyPhone = phone;
+
+    const status = order.status ?? 'ordered';
+    const isPickup = PICKUP_STAGES.has(status);
     const dropLabel = order.campus_building || order.landmark || 'Drop-off';
     const dropNote = order.delivery_notes || order.landmark || '';
+    const dropCoords = toLatLng(order.coords);
 
     setDelivery({
       orderId: order.id,
-      status: order.status ?? 'ordered',
-      payoutDh: order.total_dh ?? 0,
-      pickup: {
-        name: pickupName,
-        coords: pickupCoords,
-      },
-      dropoff: {
-        label: dropLabel,
-        sub: order.city ?? '',
-        note: dropNote,
-        coords: toLatLng(order.coords),
-      },
+      status,
+      payoutDh,
+      pickup: { name: pickupName, coords: pickupCoords },
+      dropoff: { label: dropLabel, sub: order.city ?? '', note: dropNote, coords: dropCoords },
       items: items.map((it) => ({
         qty: typeof it?.qty === 'number' ? it.qty : 1,
         name: it?.name ?? 'Item',
       })),
+      pickupName,
+      pickupCoords,
+      dropCoords,
+      counterpartyPhone,
+      isPickup,
+      stageLabel: stageLabelFor(status, isPickup),
     });
     setLoading(false);
   }, [orderId]);

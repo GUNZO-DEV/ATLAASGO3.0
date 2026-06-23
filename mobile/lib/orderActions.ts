@@ -83,34 +83,32 @@ export async function assignRider(orderId: string, riderUserId: string): Promise
   return ok();
 }
 
-/** Rider/admin: claim an open pool order for yourself → goes straight to enRoute. */
-export async function claimOrder(orderId: string, riderId: string): Promise<ActionResult> {
-  // Deactivate any stale active assignment for this order first.
-  await supabase.from('order_assignments').update({ is_active: false }).eq('order_id', orderId).eq('is_active', true);
-  const { error: insErr } = await supabase.from('order_assignments').insert({
-    order_id: orderId,
-    rider_id: riderId,
-    is_active: true,
-    accepted_at: new Date().toISOString(),
-  });
-  if (insErr) return fail(insErr);
-  const { error: oErr } = await supabase.from('orders').update({ status: 'enRoute' as OrderStage }).eq('id', orderId);
-  if (oErr) return fail(oErr);
+/** Translate a claim/accept failure: accept_order_offer raises errcode 23505
+ *  (unique_violation) when another rider already holds the order. */
+function claimFail(e: unknown): ActionResult {
+  const code = (e as { code?: string } | null)?.code;
+  const msg = e instanceof Error ? e.message : String(e);
+  if (code === '23505' || /already taken/i.test(msg)) {
+    return { ok: false, error: 'This order was just taken by another driver.' };
+  }
+  return fail(e);
+}
+
+/** Rider/admin: claim an open pool order for yourself → goes straight to enRoute.
+ *  Race-safe via the accept_order_offer RPC (re-asserts the active assignment
+ *  under the unique partial index, snapshots boost_dh, flips to enRoute). */
+export async function claimOrder(orderId: string, _riderId: string): Promise<ActionResult> {
+  const { error } = await supabase.rpc('accept_order_offer', { p_order_id: orderId });
+  if (error) return claimFail(error);
   void notifyCustomer(orderId, 'Driver assigned', 'A driver has picked up your order from the pool.');
   return ok();
 }
 
-/** Rider: accept an assignment an admin gave you → order moves to enRoute. */
-export async function acceptAssignment(orderId: string, riderId: string): Promise<ActionResult> {
-  const { error } = await supabase
-    .from('order_assignments')
-    .update({ accepted_at: new Date().toISOString() })
-    .eq('order_id', orderId)
-    .eq('rider_id', riderId)
-    .eq('is_active', true);
-  if (error) return fail(error);
-  const { error: oErr } = await supabase.from('orders').update({ status: 'enRoute' as OrderStage }).eq('id', orderId);
-  if (oErr) return fail(oErr);
+/** Rider: accept an assignment an admin gave you → order moves to enRoute.
+ *  Same race-safe RPC: an already-mine offer is accepted in place. */
+export async function acceptAssignment(orderId: string, _riderId: string): Promise<ActionResult> {
+  const { error } = await supabase.rpc('accept_order_offer', { p_order_id: orderId });
+  if (error) return claimFail(error);
   void notifyCustomer(orderId, 'Driver assigned', 'Your driver is on the way to the restaurant.');
   return ok();
 }
@@ -142,8 +140,25 @@ export async function markPickedUp(orderId: string, riderId: string): Promise<Ac
   return ok();
 }
 
-/** Rider: 1–2 minutes from the drop. */
-export async function markArriving(orderId: string): Promise<ActionResult> {
+/** Rider: 1–2 minutes from the drop. Scoped to the rider who actively holds the
+ *  order so only the assigned driver can advance their own trip. `riderId`
+ *  defaults to the signed-in user when the caller omits it. */
+export async function markArriving(orderId: string, riderId?: string): Promise<ActionResult> {
+  let rid = riderId;
+  if (!rid) {
+    const { data: auth } = await supabase.auth.getUser();
+    rid = auth.user?.id;
+  }
+  if (!rid) return { ok: false, error: 'Not signed in.' };
+  const { data: asg, error: aErr } = await supabase
+    .from('order_assignments')
+    .select('id')
+    .eq('order_id', orderId)
+    .eq('rider_id', rid)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (aErr) return fail(aErr);
+  if (!asg) return { ok: false, error: 'You are no longer assigned to this order.' };
   const { error } = await supabase.from('orders').update({ status: 'arriving' as OrderStage }).eq('id', orderId);
   if (error) return fail(error);
   void notifyCustomer(orderId, 'Arriving now', 'Your driver is 1–2 minutes away.');

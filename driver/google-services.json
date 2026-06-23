@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "625066103058",
+    "project_id": "atlaasgo",
+    "storage_bucket": "atlaasgo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625066103058:android:2b2ed42058f944b5c123cb",
+        "android_client_info": {
+          "package_name": "com.atlaasgo.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdrDS-0d6Rj8IrOf9xcxeak5pk-rXwob4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

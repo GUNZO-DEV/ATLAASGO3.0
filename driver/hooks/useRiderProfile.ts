@@ -4,8 +4,10 @@ import { useAuth } from '../lib/auth';
 
 /**
  * Rider profile + stats (mirrors the customer app / web src/lib/rider.ts).
- * setStatus() flips online / on_break / offline (upsert). useRiderStats sums
- * earnings from orders.delivery_fee_dh over delivered assignments.
+ * setStatus() flips online / on_break / offline (upsert). useRiderStats sums the
+ * rider's real cut (delivery_fee_dh + tip_dh + boost_dh) over delivered
+ * assignments and derives the week breakdown + acceptance rate for the v2
+ * earnings screen.
  */
 export type RiderStatus = 'offline' | 'online' | 'busy' | 'on_break';
 
@@ -18,6 +20,7 @@ export type RiderProfile = {
   totalTrips: number;
   totalEarningsDh: number;
   documentsVerified: boolean;
+  joinedAt: string | null;
 };
 
 type RiderRow = {
@@ -29,6 +32,7 @@ type RiderRow = {
   total_trips: number | null;
   total_earnings_dh: number | null;
   documents_verified: boolean | null;
+  created_at: string | null;
 };
 
 export function useRiderProfile() {
@@ -45,7 +49,7 @@ export function useRiderProfile() {
     }
     const { data, error: err } = await supabase
       .from('riders')
-      .select('user_id, vehicle, plate, status, rating, total_trips, total_earnings_dh, documents_verified')
+      .select('user_id, vehicle, plate, status, rating, total_trips, total_earnings_dh, documents_verified, created_at')
       .eq('user_id', user.id)
       .maybeSingle();
     if (err) {
@@ -65,6 +69,7 @@ export function useRiderProfile() {
             totalTrips: row.total_trips ?? 0,
             totalEarningsDh: row.total_earnings_dh ?? 0,
             documentsVerified: row.documents_verified ?? false,
+            joinedAt: row.created_at,
           }
         : null,
     );
@@ -102,24 +107,45 @@ export type RiderHistoryEntry = {
   assignedAt: string;
 };
 
+export type WeekDay = { d: string; amt: number; boost: number };
+
 type StatRow = {
   id: string;
   order_id: string;
   delivered_at: string | null;
   rejected_at: string | null;
+  accepted_at: string | null;
   assigned_at: string;
+  boost_dh: number | null;
   orders: {
     landmark: string | null;
     driver_payload: { headerLandmark?: string } | null;
     delivery_fee_dh: number | null;
+    tip_dh: number | null;
   } | null;
 };
+
+const STAT_SELECT =
+  'id, order_id, delivered_at, rejected_at, accepted_at, assigned_at, boost_dh, ' +
+  'orders(landmark, driver_payload, delivery_fee_dh, tip_dh)';
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Rider's real cut for a delivered assignment: fee + tip + boost. */
+function payoutOf(r: StatRow): number {
+  return (r.orders?.delivery_fee_dh ?? 0) + (r.orders?.tip_dh ?? 0) + (r.boost_dh ?? 0);
+}
 
 export function useRiderStats() {
   const { user } = useAuth();
   const [todayDh, setTodayDh] = useState(0);
   const [weekDh, setWeekDh] = useState(0);
+  const [lastWeekDh, setLastWeekDh] = useState(0);
   const [tripsToday, setTripsToday] = useState(0);
+  const [tipsToday, setTipsToday] = useState(0);
+  const [weekTipsDh, setWeekTipsDh] = useState(0);
+  const [acceptancePct, setAcceptancePct] = useState(0);
+  const [week, setWeek] = useState<WeekDay[]>([]);
   const [history, setHistory] = useState<RiderHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,44 +160,92 @@ export function useRiderStats() {
     startOfDay.setHours(0, 0, 0, 0);
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
-    const [{ data: earned, error: e1 }, { data: closed, error: e2 }] = await Promise.all([
-      supabase
-        .from('order_assignments')
-        .select('id, order_id, delivered_at, rejected_at, assigned_at, orders(landmark, driver_payload, delivery_fee_dh)')
-        .eq('rider_id', user.id)
-        .not('delivered_at', 'is', null)
-        .gte('delivered_at', weekAgo.toISOString()),
-      supabase
-        .from('order_assignments')
-        .select('id, order_id, delivered_at, rejected_at, assigned_at, orders(landmark, driver_payload, delivery_fee_dh)')
-        .eq('rider_id', user.id)
-        .or('delivered_at.not.is.null,rejected_at.not.is.null')
-        .order('assigned_at', { ascending: false })
-        .limit(20),
-    ]);
+    const [{ data: earned, error: e1 }, { data: prevWeek, error: e2 }, { data: closed, error: e3 }, { data: offered, error: e4 }] =
+      await Promise.all([
+        // This week's delivered (for today/week totals + the week[] breakdown).
+        supabase
+          .from('order_assignments')
+          .select(STAT_SELECT)
+          .eq('rider_id', user.id)
+          .not('delivered_at', 'is', null)
+          .gte('delivered_at', weekAgo.toISOString()),
+        // Last week's delivered (14d..7d window) for the trend comparison.
+        supabase
+          .from('order_assignments')
+          .select(STAT_SELECT)
+          .eq('rider_id', user.id)
+          .not('delivered_at', 'is', null)
+          .gte('delivered_at', twoWeeksAgo.toISOString())
+          .lt('delivered_at', weekAgo.toISOString()),
+        // Recent closed assignments for the history list.
+        supabase
+          .from('order_assignments')
+          .select(STAT_SELECT)
+          .eq('rider_id', user.id)
+          .or('delivered_at.not.is.null,rejected_at.not.is.null')
+          .order('assigned_at', { ascending: false })
+          .limit(20),
+        // All assignments this week for the acceptance rate (accepted vs offered).
+        supabase
+          .from('order_assignments')
+          .select('id, accepted_at, rejected_at')
+          .eq('rider_id', user.id)
+          .gte('assigned_at', weekAgo.toISOString()),
+      ]);
 
-    if (e1 || e2) {
-      setError((e1 ?? e2)!.message);
+    if (e1 || e2 || e3 || e4) {
+      setError((e1 ?? e2 ?? e3 ?? e4)!.message);
       setLoading(false);
       return;
     }
 
     const earnedRows = (earned ?? []) as unknown as StatRow[];
     let today = 0;
-    let week = 0;
+    let weekTotal = 0;
     let todayCount = 0;
+    let todayTips = 0;
+    let weekTips = 0;
+    // week[] keyed by day index (0=Sun..6=Sat).
+    const dayAmt = [0, 0, 0, 0, 0, 0, 0];
+    const dayBoost = [0, 0, 0, 0, 0, 0, 0];
     for (const r of earnedRows) {
-      const fee = r.orders?.delivery_fee_dh ?? 0;
-      week += fee;
-      if (r.delivered_at && new Date(r.delivered_at) >= startOfDay) {
-        today += fee;
-        todayCount += 1;
+      const pay = payoutOf(r);
+      const tip = r.orders?.tip_dh ?? 0;
+      const boost = r.boost_dh ?? 0;
+      weekTotal += pay;
+      weekTips += tip;
+      if (r.delivered_at) {
+        const idx = new Date(r.delivered_at).getDay();
+        dayAmt[idx] += pay;
+        dayBoost[idx] += boost;
+        if (new Date(r.delivered_at) >= startOfDay) {
+          today += pay;
+          todayCount += 1;
+          todayTips += tip;
+        }
       }
     }
+
+    const prevRows = (prevWeek ?? []) as unknown as StatRow[];
+    let prevTotal = 0;
+    for (const r of prevRows) prevTotal += payoutOf(r);
+
+    const offeredRows = (offered ?? []) as { id: string; accepted_at: string | null; rejected_at: string | null }[];
+    const decided = offeredRows.filter((o) => o.accepted_at || o.rejected_at);
+    const accepted = offeredRows.filter((o) => o.accepted_at);
+    const acceptance = decided.length > 0 ? Math.round((accepted.length / decided.length) * 100) : 0;
+
     setTodayDh(today);
-    setWeekDh(week);
+    setWeekDh(weekTotal);
+    setLastWeekDh(prevTotal);
     setTripsToday(todayCount);
+    setTipsToday(todayTips);
+    setWeekTipsDh(weekTips);
+    setAcceptancePct(acceptance);
+    setWeek(DAY_LABELS.map((d, i) => ({ d, amt: dayAmt[i], boost: dayBoost[i] })));
 
     const closedRows = (closed ?? []) as unknown as StatRow[];
     setHistory(
@@ -179,7 +253,7 @@ export function useRiderStats() {
         assignmentId: r.id,
         orderId: r.order_id,
         landmark: r.orders?.driver_payload?.headerLandmark || r.orders?.landmark || 'Delivery',
-        feeDh: r.orders?.delivery_fee_dh ?? 0,
+        feeDh: payoutOf(r),
         deliveredAt: r.delivered_at,
         rejectedAt: r.rejected_at,
         assignedAt: r.assigned_at,
@@ -211,5 +285,18 @@ export function useRiderStats() {
     };
   }, [user, refresh]);
 
-  return { todayDh, weekDh, tripsToday, history, loading, error, refresh };
+  return {
+    todayDh,
+    weekDh,
+    lastWeekDh,
+    tripsToday,
+    tipsToday,
+    weekTipsDh,
+    acceptancePct,
+    week,
+    history,
+    loading,
+    error,
+    refresh,
+  };
 }

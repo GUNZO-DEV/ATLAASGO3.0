@@ -1,9 +1,14 @@
 // AtlaasDriver 3.0 — Profile / account screen.
-// Real data: useRiderProfile() (rating, status, vehicle, plate, totalTrips),
-// useAuth() (name / email), useRiderStats() (tripsToday). Light cream/white
-// surface, sunset-orange accent (green for the online/done state). Translation
-// of screen-profile.jsx — never fabricates a metric: fields the backend doesn't
-// expose render as "—".
+// Real data: useRiderProfile() (rating, status, vehicle, plate, totalTrips,
+// joinedAt), useAuth() (name / email), useRiderStats() (acceptancePct,
+// tripsToday). Light cream/white surface, sunset-orange accent (green for the
+// online/done state). Translation of screen-profile.jsx — never fabricates a
+// metric: fields the backend doesn't expose render as "—".
+//
+// DEFERRED: the design's "Winter Atlas badge" gamification card (42/50 snow-day
+// drops → +5% boost) is intentionally NOT built — there is no backing data for
+// the streak count or the unlock threshold, and fabricating it would mislead
+// couriers about real earnings. Revisit when a rider_badges table exists.
 
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -64,6 +69,15 @@ function initialsOf(name: string): string {
   if (parts.length === 0) return 'AG';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// "Courier since {Mon YYYY}" from the real riders.created_at (joinedAt). Returns
+// null when the column is empty/unparseable so we never invent a join date.
+function joinedLabel(joinedAt: string | null | undefined): string | null {
+  if (!joinedAt) return null;
+  const d = new Date(joinedAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 // Courier tier label derived purely from the real rating (no stored tier field).
@@ -156,7 +170,7 @@ function ListRow({
 export default function ProfileScreen() {
   const { user } = useAuth();
   const { profile, loading, refresh } = useRiderProfile();
-  const { tripsToday, refresh: refreshStats } = useRiderStats();
+  const { tripsToday, acceptancePct, refresh: refreshStats } = useRiderStats();
   const { signOut } = useClerk();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -174,6 +188,16 @@ export default function ProfileScreen() {
   const rating = profile?.rating ?? 5.0;
   const tier = tierFor(rating);
   const status = statusMeta(profile?.status);
+
+  // "Courier since {Mon YYYY} · {plate}" — only the parts we actually have.
+  const courierSince = useMemo(() => {
+    const since = joinedLabel(profile?.joinedAt);
+    const plate = typeof profile?.plate === 'string' && profile.plate.trim() ? profile.plate.trim() : null;
+    const bits = [since ? `Courier since ${since}` : null, plate].filter(
+      (b): b is string => typeof b === 'string',
+    );
+    return bits.join(' · ');
+  }, [profile?.joinedAt, profile?.plate]);
 
   // Vehicle subline — only what actually exists on the profile row.
   const vehicleLine = useMemo(() => {
@@ -290,6 +314,12 @@ export default function ProfileScreen() {
               <TierRibbon label={tier} />
             </View>
 
+            {courierSince ? (
+              <Text style={{ fontSize: 12, color: MUTED, marginTop: 12 }} numberOfLines={1}>
+                {courierSince}
+              </Text>
+            ) : null}
+
             {email ? (
               <Text style={{ fontSize: 12, color: MUTED, marginTop: 12 }} numberOfLines={1}>
                 {email}
@@ -298,7 +328,10 @@ export default function ProfileScreen() {
           </View>
         </Enter>
 
-        {/* Metrics — only real fields. Acceptance / on-time aren't tracked yet → "—". */}
+        {/* Lifetime metrics (design: DELIVERIES / ACCEPTANCE / ON-TIME). Rating
+            already lives in the identity pill above. Acceptance is real
+            (useRiderStats.acceptancePct over this week's offers); on-time has no
+            backing data, so it stays "—" rather than a fabricated percentage. */}
         <Enter delay={120}>
           <View
             style={{
@@ -311,9 +344,9 @@ export default function ProfileScreen() {
               paddingVertical: 18,
             }}
           >
-            <Metric value={rating.toFixed(1)} label="RATING" />
-            <MetricDivider />
             <Metric value={`${profile?.totalTrips ?? 0}`} label="DELIVERIES" />
+            <MetricDivider />
+            <Metric value={`${acceptancePct}%`} label="ACCEPTANCE" />
             <MetricDivider />
             <Metric value="—" label="ON-TIME" />
           </View>

@@ -73,7 +73,12 @@ const RECEIPT_SELECT =
   'id, items, subtotal_dh, delivery_fee_dh, service_fee_dh, total_dh, payment_method, promotion_code, delivery_notes, created_at, is_campus, city';
 
 /* The 3.0 six-stage timeline. Maps the live DB stage → which rows are done/now.
- * (The DB has 5 active stages + delivered; we present the spec's 6.) */
+ * (The DB has 5 active stages + delivered; we present the spec's 6.)
+ * Note the truthful semantics: `enRoute` = the courier accepted and is heading
+ * TO the restaurant (assigned, not yet holding the food); `outForDelivery` = the
+ * courier has collected the order and is en route to the customer. The labelKeys
+ * below read accordingly (stagePickedUp* = "Courier assigned", stageOnTheWay* =
+ * "Picked up · on the way"). */
 const TIMELINE: { key: OrderStage | 'delivered'; labelKey: string; subKey: string }[] = [
   { key: 'ordered', labelKey: 'stageOrderedLabel', subKey: 'stageOrderedSub' },
   { key: 'preparing', labelKey: 'stagePreparingLabel', subKey: 'stagePreparingSub' },

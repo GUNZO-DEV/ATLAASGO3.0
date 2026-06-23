@@ -4,6 +4,10 @@
 // accept/decline/pickup/arriving/delivered/claim handlers + location broadcast
 // + pull-to-refresh + focus polling) onto the 3.0 LIGHT cockpit look. The active
 // delivery uses the slide-to-confirm flow whose stages map to the real actions.
+//
+// Wired to the real Phase-1 hooks: useRiderShift drives the online window +
+// online-time / per-hour KPIs, useNearestCity drives the AUTO order-zone, and
+// useCityWeather drives the snow-boost banner (rendered only when a boost is on).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,18 +17,21 @@ import { MotiView } from 'moti';
 import Svg, { G, Path, Rect, Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import {
-  Power, Wallet, Package, Star, MapPin, LogOut, Bike, XCircle, ArrowRight, Zap, Navigation,
-  TrendingUp, Snowflake, Flame, MapPinned,
+  Power, Wallet, Package, MapPin, LogOut, Bike, XCircle, ArrowRight, Zap, Navigation,
+  TrendingUp, Snowflake, Flame, MapPinned, Bell, Clock,
 } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { useRiderProfile, useRiderStats, type RiderStatus } from '../../hooks/useRiderProfile';
 import { useDriverAssignments, type DriverJob } from '../../hooks/useDriverAssignments';
 import { useAvailableOrders, type PoolOrder } from '../../hooks/useAvailableOrders';
 import { useBroadcastLocation } from '../../hooks/useBroadcastLocation';
+import { useNearestCity } from '../../hooks/useNearestCity';
+import { useCityWeather } from '../../hooks/useCityWeather';
+import { useRiderShift } from '../../hooks/useRiderShift';
 import { acceptAssignment, rejectAssignment, markPickedUp, markArriving, markDelivered, claimOrder } from '../../lib/orderActions';
 import {
   BG, CARD, LINE, LINE2, EMERALD, GLOW, CREAM, MUTED, AMBER, DANGER, SNOW, ONLINE, BG2, FG_SOFT,
-  Enter, Tappable, LiveDot, StatTile, RouteSummary, SlideConfirm, Section, ActionBtn,
+  Enter, Tappable, LiveDot, StatTile, RouteSummary, SlideConfirm, Section, ActionBtn, SecHead,
 } from '../../components/dr/ui';
 import { OfferSheet } from '../../components/dr/OfferSheet';
 
@@ -41,6 +48,13 @@ function greeting(): string {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+// Format an elapsed-seconds shift duration as "Hh Mm" (e.g. "4h 12m").
+function formatOnline(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
 }
 
 // Derive a friendly first name + initials from the real Supabase user (email or
@@ -78,6 +92,13 @@ export default function DriveScreen() {
   const isOnline = status === 'online' || status === 'busy';
   const pending = useMemo(() => jobs.filter((j) => !j.acceptedAt), [jobs]);
   const active = useMemo(() => jobs.filter((j) => !!j.acceptedAt), [jobs]);
+
+  // AUTO order-zone — the rider's nearest SERVED city (GPS → public.cities), and
+  // its live weather/surcharge for the snow-boost banner.
+  const { city: detectedCity, cityId, locating } = useNearestCity();
+  const weather = useCityWeather(cityId || null);
+  // Online window + online-time / per-hour KPIs (opens/closes the shift).
+  const { onlineSeconds, perHourDh } = useRiderShift(isOnline);
 
   const { first, initials } = useMemo(
     () => nameParts(user?.email, (user?.user_metadata?.full_name as string | undefined) ?? null),
@@ -133,7 +154,9 @@ export default function DriveScreen() {
     }, []),
   );
 
-  useBroadcastLocation(profile?.userId, isOnline && active.length > 0);
+  // Broadcast location the WHOLE time the rider is online (idle cadence) so
+  // dispatch always has a fresh fix; tighten the cadence while a delivery runs.
+  useBroadcastLocation(isOnline ? profile?.userId : undefined, active.length > 0);
 
   async function toggleOnline() {
     if (toggling) return;
@@ -184,17 +207,19 @@ export default function DriveScreen() {
     if (user) void rejectAssignment(j.orderId, user.id, 'Declined');
   };
 
-  // The pool city the rider is currently scoped to (drives the AUTO order-zone
-  // card). Defaults to the most-represented pool city, else "Atlas region".
+  // The pool city the rider is currently scoped to (drives the "Finding orders
+  // in …" subline). Honours the manual filter, then the AUTO-detected city, then
+  // the most-represented pool city.
   const zoneCity = useMemo(() => {
     if (cityFilter !== 'All') return cityFilter;
+    if (detectedCity) return detectedCity;
     const counts = new Map<string, number>();
     for (const o of pool) if (o.city) counts.set(o.city, (counts.get(o.city) ?? 0) + 1);
     let best: string | null = null;
     let bestN = 0;
     for (const [c, n] of counts) if (n > bestN) { best = c; bestN = n; }
     return best;
-  }, [pool, cityFilter]);
+  }, [pool, cityFilter, detectedCity]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top']}>
@@ -211,7 +236,7 @@ export default function DriveScreen() {
           />
         }
       >
-        {/* Greeting header — avatar initials + greeting + name + bell/logout */}
+        {/* Greeting header — avatar initials + greeting + name + bell + logout */}
         <Enter>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 4 }}>
             <LinearGradient
@@ -231,6 +256,13 @@ export default function DriveScreen() {
                 {first}
               </Text>
             </View>
+            {/* notification bell (decorative for now — no notifications source yet) */}
+            <Pressable
+              hitSlop={12}
+              style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Bell size={18} color={MUTED} />
+            </Pressable>
             <Pressable
               onPress={() => clerkSignOut()}
               hitSlop={12}
@@ -293,9 +325,11 @@ export default function DriveScreen() {
                   </Text>
                   <Text style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }} numberOfLines={1}>
                     {isOnline
-                      ? zoneCity
-                        ? `Finding orders in ${zoneCity}…`
-                        : 'Receiving requests'
+                      ? locating
+                        ? 'Locating your zone…'
+                        : zoneCity
+                          ? `Finding orders in ${zoneCity}…`
+                          : 'Receiving requests'
                       : 'Go online to start receiving orders'}
                   </Text>
                 </View>
@@ -325,7 +359,7 @@ export default function DriveScreen() {
           </View>
         </Enter>
 
-        {/* Auto order-zone card (AUTO badge) */}
+        {/* Auto order-zone card (AUTO badge) — driven by useNearestCity() */}
         <Enter delay={130}>
           <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
             <View
@@ -358,8 +392,8 @@ export default function DriveScreen() {
                     <Text style={{ fontSize: 9, fontWeight: '800', letterSpacing: 1.2, color: EMERALD }}>AUTO</Text>
                   </View>
                 </View>
-                <Text style={{ fontWeight: '800', fontSize: 17, marginTop: 3, color: zoneCity ? CREAM : MUTED }} numberOfLines={1}>
-                  {zoneCity ?? 'Atlas region'}
+                <Text style={{ fontWeight: '800', fontSize: 17, marginTop: 3, color: locating && !detectedCity ? MUTED : CREAM }} numberOfLines={1}>
+                  {locating && !detectedCity ? 'Locating…' : detectedCity || 'Atlas region'}
                 </Text>
                 <Text style={{ fontSize: 11.5, color: MUTED, marginTop: 1 }}>Set from your location · Atlas region</Text>
               </View>
@@ -367,32 +401,38 @@ export default function DriveScreen() {
           </View>
         </Enter>
 
-        {/* Snow-surge banner */}
-        <Enter delay={180}>
-          <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
-            <View
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13,
-                borderRadius: 18, backgroundColor: '#EAF3FB',
-                borderWidth: 1, borderColor: 'rgba(90,169,230,0.35)',
-              }}
-            >
-              <LinearGradient
-                colors={[SNOW, '#2A6FA8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+        {/* Snow-boost banner — rendered ONLY when the city carries a live boost */}
+        {weather.isBoost && (
+          <Enter delay={180}>
+            <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
+              <View
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13,
+                  borderRadius: 18, backgroundColor: '#EAF3FB',
+                  borderWidth: 1, borderColor: 'rgba(90,169,230,0.35)',
+                }}
               >
-                <Snowflake size={20} color="#fff" />
-              </LinearGradient>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 14.5, fontWeight: '800', color: CREAM }}>Snow boost active</Text>
-                <Text style={{ fontSize: 12, color: MUTED, marginTop: 1 }}>Higher payouts while it snows in the Atlas</Text>
+                <LinearGradient
+                  colors={[SNOW, '#2A6FA8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Snowflake size={20} color="#fff" />
+                </LinearGradient>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 14.5, fontWeight: '800', color: CREAM }}>Snow boost active</Text>
+                  <Text style={{ fontSize: 12, color: MUTED, marginTop: 1 }} numberOfLines={2}>
+                    {weather.note ?? 'Higher payouts while it snows in the Atlas'}
+                  </Text>
+                </View>
+                {weather.surchargeDh > 0 ? (
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: SNOW }}>+{weather.surchargeDh} dh</Text>
+                ) : null}
               </View>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: SNOW }}>+20%</Text>
             </View>
-          </View>
-        </Enter>
+          </Enter>
+        )}
 
         {/* Today — 4-stat grid */}
         <Enter delay={230}>
@@ -403,8 +443,18 @@ export default function DriveScreen() {
               <StatTile icon={<Package size={15} color={EMERALD} />} value={`${tripsToday}`} label="Deliveries" />
             </View>
             <View style={{ flexDirection: 'row', gap: 11, marginTop: 11 }}>
-              <StatTile icon={<TrendingUp size={15} color={EMERALD} />} value={`${weekDh}`} unit="DH" label="This week" />
-              <StatTile icon={<Star size={15} color={AMBER} />} value={(profile?.rating ?? 5).toFixed(1)} label="Rating" />
+              {/* Online time — from the open shift; falls back to this-week total. */}
+              {onlineSeconds != null ? (
+                <StatTile icon={<Clock size={15} color={EMERALD} />} value={formatOnline(onlineSeconds)} label="Online time" />
+              ) : (
+                <StatTile icon={<TrendingUp size={15} color={EMERALD} />} value={`${weekDh}`} unit="DH" label="This week" />
+              )}
+              {/* Per hour — from the shift; falls back to the live star rating. */}
+              {perHourDh != null ? (
+                <StatTile icon={<TrendingUp size={15} color={EMERALD} />} value={`${perHourDh}`} unit="DH/h" label="Per hour" />
+              ) : (
+                <StatTile icon={<TrendingUp size={15} color={AMBER} />} value={(profile?.rating ?? 5).toFixed(1)} label="Rating" />
+              )}
             </View>
           </View>
         </Enter>
@@ -413,7 +463,7 @@ export default function DriveScreen() {
         <Enter delay={280}>
           <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
             <SecHead title="Demand near you" />
-            <ZoneMap />
+            <ZoneMap poolCount={pool.length} />
           </View>
         </Enter>
 
@@ -480,7 +530,8 @@ export default function DriveScreen() {
         </View>
       </ScrollView>
 
-      {/* Incoming OFFER ping — one at a time, over the dashboard. */}
+      {/* Incoming OFFER ping — one at a time, over the dashboard. Passes the rich
+          DriverJob so the sheet can read the real payout / drop / route. */}
       {offer && (
         <OfferSheet
           job={offer}
@@ -493,23 +544,10 @@ export default function DriveScreen() {
   );
 }
 
-// Section heading with an optional action link (matches the design's SecHead).
-function SecHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-      <Text style={{ fontSize: 13, fontWeight: '800', color: CREAM, letterSpacing: 0.3 }}>{title}</Text>
-      {action ? (
-        <Pressable onPress={onAction} hitSlop={8}>
-          <Text style={{ fontSize: 12.5, fontWeight: '700', color: EMERALD }}>{action}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
 // Stylized hot-zone decoration — a faux street grid + radial sunset heat blobs.
 // Purely decorative (NOT a real map); the live map lives in the delivery flow.
-function ZoneMap() {
+// The legend count is driven by the real available-pool size.
+function ZoneMap({ poolCount }: { poolCount: number }) {
   const zones = [
     { x: 28, y: 32, heat: 2 },
     { x: 66, y: 26, heat: 3 },
@@ -517,6 +555,11 @@ function ZoneMap() {
     { x: 78, y: 66, heat: 1 },
     { x: 18, y: 70, heat: 2 },
   ];
+  const hotZones = zones.filter((z) => z.heat === 3).length;
+  const legend =
+    poolCount > 0
+      ? `${poolCount} open ${poolCount === 1 ? 'order' : 'orders'} near you`
+      : `${hotZones} hot zones near you`;
   return (
     <View
       style={{
@@ -566,7 +609,7 @@ function ZoneMap() {
         }}
       >
         <Flame size={14} color={EMERALD} />
-        <Text style={{ fontSize: 11, fontWeight: '700', color: CREAM }}>3 hot zones near you</Text>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: CREAM }}>{legend}</Text>
       </View>
     </View>
   );
@@ -621,13 +664,13 @@ function ActiveCard({
             </View>
             <Text style={{ fontSize: 11.5, color: MUTED, marginLeft: 8 }}>#{job.orderId.slice(0, 8)}</Text>
           </View>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{job.totalDh} dh</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{job.payoutDh} dh</Text>
         </View>
 
-        {/* route rail */}
+        {/* route rail — real pickup restaurant + customer drop landmark */}
         <RouteSummary
-          pickup={{ name: 'Restaurant', area: pickedUp ? 'Collected' : 'Collect the order' }}
-          dropoff={{ name: job.landmark, area: 'Customer drop-off' }}
+          pickup={{ name: job.pickupName, area: pickedUp ? 'Collected' : job.pickupArea || 'Collect the order' }}
+          dropoff={{ name: job.dropName, area: job.dropArea || 'Customer drop-off' }}
         />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, gap: 5 }}>
@@ -651,10 +694,10 @@ function JobRow({ job }: { job: DriverJob }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
           <MapPin size={16} color={EMERALD} />
           <Text style={{ fontSize: 15.5, fontWeight: '700', color: CREAM, marginLeft: 8, flex: 1 }} numberOfLines={1}>
-            {job.landmark}
+            {job.dropName}
           </Text>
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{job.totalDh} dh</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{job.payoutDh} dh</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 9 }}>
         <View style={{ backgroundColor: 'rgba(255,87,34,0.12)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>

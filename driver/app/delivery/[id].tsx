@@ -13,18 +13,21 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import {
-  ArrowLeft, Navigation, Phone, MessageCircle, MapPin, Check, Store, Package,
+  ArrowLeft, Navigation, Phone, MessageCircle, MapPin, Check, Store, Package, Snowflake,
 } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { useActiveDelivery, type LatLng } from '../../hooks/useActiveDelivery';
 import { useBroadcastLocation } from '../../hooks/useBroadcastLocation';
+import { useNearestCity } from '../../hooks/useNearestCity';
+import { useCityWeather } from '../../hooks/useCityWeather';
 import { OrderChat } from '../../components/dr/OrderChat';
 import { markPickedUp, markArriving, markDelivered } from '../../lib/orderActions';
+import { supabase } from '../../lib/supabase';
 import {
-  BG, CARD, LINE, LINE2, EMERALD, GLOW, CREAM, MUTED, AMBER, ONLINE, FG_SOFT,
+  BG, CARD, LINE, LINE2, EMERALD, GLOW, CREAM, MUTED, AMBER, SNOW, ONLINE, FG_SOFT,
   LiveDot, SlideConfirm, ActionBtn,
 } from '../../components/dr/ui';
 
@@ -81,8 +84,13 @@ export default function DeliveryScreen() {
   const [chatOpen, setChatOpen] = useState(false);
   const mapRef = useRef<MapView>(null);
 
-  // Keep streaming the rider's GPS to the customer for the whole screen.
+  // Mount the "active delivery" intent: tight-cadence GPS broadcast so the
+  // customer sees the courier pin move smoothly the whole screen.
   useBroadcastLocation(user?.id, true);
+
+  // Live weather for the drop city → optional snow-boost badge on the map.
+  const { cityId } = useNearestCity();
+  const weather = useCityWeather(cityId);
 
   // Foreground location: snapshot first, then watch for the courier pin.
   useEffect(() => {
@@ -110,6 +118,24 @@ export default function DeliveryScreen() {
 
   // Re-fetch the order when this screen regains focus (status may have moved).
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+
+  // Realtime: refresh the moment the order row changes from anywhere else (the
+  // customer cancelling, dispatch reassigning, a parallel device advancing it),
+  // so the stepper/stage and slide action never go stale on-screen.
+  useEffect(() => {
+    if (!orderId) return;
+    const channel = supabase
+      .channel(`delivery-${orderId}-${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
+        () => void refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId, refresh]);
 
   const pickup = delivery?.pickup.coords ?? null;
   const dropoff = delivery?.dropoff.coords ?? null;
@@ -235,6 +261,16 @@ export default function DeliveryScreen() {
           showsMyLocationButton={false}
           toolbarEnabled={false}
         >
+          {/* pickup → dropoff leg */}
+          {pickup && dropoff ? (
+            <Polyline
+              coordinates={[pickup, dropoff]}
+              strokeColor={EMERALD}
+              strokeWidth={4}
+              lineCap="round"
+              lineDashPattern={[2, 10]}
+            />
+          ) : null}
           {pickup ? (
             <Marker coordinate={pickup} title={delivery.pickup.name} pinColor={AMBER}>
               <Pin color={AMBER} />
@@ -273,6 +309,18 @@ export default function DeliveryScreen() {
               <Navigation size={19} color="#fff" />
             </Pressable>
           </View>
+
+          {/* weather / snow-boost badge — only when a real boost is live for the
+              city (city_weather surcharge or snow condition). */}
+          {weather.isBoost ? (
+            <View style={weatherBadge}>
+              <Snowflake size={13} color={SNOW} />
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: CREAM }}>
+                {weather.tempC != null ? `${weather.tempC}° · ` : ''}
+                {weather.condition ?? 'Snow boost'}
+              </Text>
+            </View>
+          ) : null}
         </SafeAreaView>
       </View>
 
@@ -376,13 +424,17 @@ export default function DeliveryScreen() {
               >
                 <MessageCircle size={19} color={EMERALD} />
               </Pressable>
-              <Pressable
-                onPress={() => Linking.openURL('tel:')}
-                hitSlop={8}
-                style={contactIconBtn}
-              >
-                <Phone size={18} color={EMERALD} />
-              </Pressable>
+              {/* Call the counterparty — only when a number is on file (the
+                  order_contact_phone RPC returns null otherwise). */}
+              {delivery.counterpartyPhone ? (
+                <Pressable
+                  onPress={() => Linking.openURL(`tel:${delivery.counterpartyPhone}`)}
+                  hitSlop={8}
+                  style={contactIconBtn}
+                >
+                  <Phone size={18} color={EMERALD} />
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
@@ -552,4 +604,22 @@ const navBtnFill = {
   right: 0,
   bottom: 0,
   left: 0,
+};
+
+// Snow-boost badge (.ag-badge-snow) — white pill, snow-blue trim, tucked under
+// the top-right nav button. Only mounts when a real boost is live for the city.
+const weatherBadge = {
+  position: 'absolute' as const,
+  top: 56,
+  right: 16,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 6,
+  paddingVertical: 6,
+  paddingHorizontal: 10,
+  borderRadius: 999,
+  backgroundColor: CARD,
+  borderWidth: 1,
+  borderColor: 'rgba(90,169,230,0.35)',
+  ...cardShadow,
 };
