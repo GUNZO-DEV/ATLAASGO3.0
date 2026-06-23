@@ -1,14 +1,14 @@
-// AtlaasDriver 3.0 — Profile / account screen.
-// Real data: useRiderProfile() (rating, status, vehicle, plate, totalTrips,
-// joinedAt), useAuth() (name / email), useRiderStats() (acceptancePct,
-// tripsToday). Light cream/white surface, sunset-orange accent (green for the
-// online/done state). Translation of screen-profile.jsx — never fabricates a
-// metric: fields the backend doesn't expose render as "—".
+// AtlaasDriver 3.0 — Profile / account screen. Faithful translation of the
+// design screen-profile.jsx: identity-first (no page header), rating + tier
+// chip, "Courier since {Mon YYYY} · {plate}", the DELIVERIES/ACCEPTANCE/ON-TIME
+// metric row, the Winter Atlas badge progress card, one flat settings list, and
+// a ghost "Sign out" button. Light cream/white + sunset accent.
 //
-// DEFERRED: the design's "Winter Atlas badge" gamification card (42/50 snow-day
-// drops → +5% boost) is intentionally NOT built — there is no backing data for
-// the streak count or the unlock threshold, and fabricating it would mislead
-// couriers about real earnings. Revisit when a rider_badges table exists.
+// Real data: useRiderProfile() (rating, status, vehicle, plate, totalTrips,
+// joinedAt, documentsVerified), useAuth() (name/email), useRiderStats()
+// (acceptancePct). Never fabricates: on-time has no backing column → "—"; the
+// Atlas-badge progress is driven by the REAL totalTrips toward a 50-delivery
+// milestone (no invented "snow-drop counter" or fake boost reward).
 
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -24,9 +24,9 @@ import {
   LifeBuoy,
   LogOut,
   ChevronRight,
-  Package,
-  Clock,
   BadgeCheck,
+  Wallet,
+  Snowflake,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
@@ -39,20 +39,17 @@ import {
   EMERALD,
   CREAM,
   MUTED,
-  FG_SOFT,
   AMBER,
-  DANGER,
+  SNOW,
+  BG2,
   ONLINE,
   Enter,
-  Section,
   TierRibbon,
 } from '../../components/dr/ui';
 
 // Soft sunset tint behind row-icon chips (mirrors --grad-soft in driver.css).
 const GRAD_SOFT = 'rgba(255,87,34,0.12)';
 
-// Derive a display name from the Supabase user — metadata first, then the
-// email local part. Never invent a name we don't have.
 function displayName(meta: Record<string, unknown> | undefined, email: string | undefined): string {
   const m = meta ?? {};
   const cand =
@@ -63,7 +60,6 @@ function displayName(meta: Record<string, unknown> | undefined, email: string | 
   return (cand || 'Rider').trim();
 }
 
-// Two-letter initials from the display name.
 function initialsOf(name: string): string {
   const parts = name.split(/[\s._-]+/).filter(Boolean);
   if (parts.length === 0) return 'AG';
@@ -71,8 +67,6 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// "Courier since {Mon YYYY}" from the real riders.created_at (joinedAt). Returns
-// null when the column is empty/unparseable so we never invent a join date.
 function joinedLabel(joinedAt: string | null | undefined): string | null {
   if (!joinedAt) return null;
   const d = new Date(joinedAt);
@@ -80,7 +74,6 @@ function joinedLabel(joinedAt: string | null | undefined): string | null {
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-// Courier tier label derived purely from the real rating (no stored tier field).
 function tierFor(rating: number): string {
   if (rating >= 4.9) return 'Atlas Elite';
   if (rating >= 4.7) return 'Gold Courier';
@@ -88,37 +81,20 @@ function tierFor(rating: number): string {
   return 'Courier';
 }
 
-type StatusMeta = { label: string; color: string };
-function statusMeta(status: string | undefined): StatusMeta {
-  switch (status) {
-    case 'online':
-      return { label: 'Online', color: ONLINE };
-    case 'busy':
-      return { label: 'On a trip', color: AMBER };
-    case 'on_break':
-      return { label: 'On break', color: AMBER };
-    default:
-      return { label: 'Offline', color: MUTED };
-  }
-}
-
 // A single metric cell — value big, label small. "—" when the field is unknown.
 function Metric({ value, label }: { value: string; label: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
       <Text style={{ fontSize: 22, fontWeight: '800', color: CREAM, letterSpacing: -0.6 }}>{value}</Text>
-      <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 0.8, color: MUTED, marginTop: 5 }}>
-        {label}
-      </Text>
+      <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 0.8, color: MUTED, marginTop: 5 }}>{label}</Text>
     </View>
   );
 }
-
 function MetricDivider() {
   return <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: LINE, marginVertical: 4 }} />;
 }
 
-// A tappable settings list row.
+// A settings list row (icon chip · label · optional detail · chevron).
 function ListRow({
   Icon,
   label,
@@ -134,7 +110,6 @@ function ListRow({
   tint?: string;
   last?: boolean;
 }) {
-  const color = tint ?? CREAM;
   return (
     <Pressable
       onPress={onPress}
@@ -160,8 +135,8 @@ function ListRow({
       >
         <Icon size={18} color={tint ?? EMERALD} />
       </View>
-      <Text style={{ flex: 1, marginLeft: 13, fontSize: 14.5, fontWeight: '600', color }}>{label}</Text>
-      {detail ? <Text style={{ fontSize: 12.5, color: MUTED, marginRight: 8 }}>{detail}</Text> : null}
+      <Text style={{ flex: 1, marginLeft: 13, fontSize: 14.5, fontWeight: '600', color: CREAM }}>{label}</Text>
+      {detail ? <Text style={{ fontSize: 12.5, color: MUTED, marginRight: 8 }} numberOfLines={1}>{detail}</Text> : null}
       <ChevronRight size={18} color={MUTED} />
     </Pressable>
   );
@@ -170,7 +145,7 @@ function ListRow({
 export default function ProfileScreen() {
   const { user } = useAuth();
   const { profile, loading, refresh } = useRiderProfile();
-  const { tripsToday, acceptancePct, refresh: refreshStats } = useRiderStats();
+  const { acceptancePct, refresh: refreshStats } = useRiderStats();
   const { signOut } = useClerk();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -187,25 +162,25 @@ export default function ProfileScreen() {
 
   const rating = profile?.rating ?? 5.0;
   const tier = tierFor(rating);
-  const status = statusMeta(profile?.status);
+  const totalTrips = profile?.totalTrips ?? 0;
 
-  // "Courier since {Mon YYYY} · {plate}" — only the parts we actually have.
   const courierSince = useMemo(() => {
     const since = joinedLabel(profile?.joinedAt);
     const plate = typeof profile?.plate === 'string' && profile.plate.trim() ? profile.plate.trim() : null;
-    const bits = [since ? `Courier since ${since}` : null, plate].filter(
-      (b): b is string => typeof b === 'string',
-    );
-    return bits.join(' · ');
+    return [since ? `Courier since ${since}` : null, plate].filter((b): b is string => typeof b === 'string').join(' · ');
   }, [profile?.joinedAt, profile?.plate]);
 
-  // Vehicle subline — only what actually exists on the profile row.
   const vehicleLine = useMemo(() => {
-    const bits = [profile?.vehicle, profile?.plate].filter(
-      (b): b is string => typeof b === 'string' && b.trim().length > 0,
-    );
-    return bits.join(' · ');
+    return [profile?.vehicle, profile?.plate]
+      .filter((b): b is string => typeof b === 'string' && b.trim().length > 0)
+      .join(' · ');
   }, [profile?.vehicle, profile?.plate]);
+
+  // Atlas-badge progress from REAL deliveries toward the next 50-delivery tier.
+  const GOAL = 50;
+  const done = totalTrips === 0 ? 0 : totalTrips % GOAL === 0 ? GOAL : totalTrips % GOAL;
+  const remaining = GOAL - done;
+  const badgePct = Math.min(1, done / GOAL);
 
   function comingSoon(title: string) {
     Alert.alert(title, 'This lives in your account with dispatch for now — in-app controls are coming soon.', [
@@ -216,13 +191,7 @@ export default function ProfileScreen() {
   function onSignOut() {
     Alert.alert('Sign out', 'Sign out of AtlaasGo Driver?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
-      },
+      { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
     ]);
   }
 
@@ -232,30 +201,12 @@ export default function ProfileScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 46 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={EMERALD}
-            colors={[EMERALD]}
-            progressBackgroundColor={BG}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={EMERALD} colors={[EMERALD]} progressBackgroundColor={BG} />
         }
       >
-        {/* Header */}
-        <Enter>
-          <View>
-            <Text style={{ fontSize: 10.5, fontWeight: '800', letterSpacing: 1.8, color: EMERALD }}>
-              ATLAASGO · DRIVER
-            </Text>
-            <Text style={{ fontSize: 30, fontWeight: '800', color: CREAM, letterSpacing: -0.8, marginTop: 3 }}>
-              Profile
-            </Text>
-          </View>
-        </Enter>
-
-        {/* Identity */}
-        <Enter delay={80}>
-          <View style={{ alignItems: 'center', marginTop: 22 }}>
+        {/* Identity (design is identity-first — no page header) */}
+        <Enter delay={40}>
+          <View style={{ alignItems: 'center', paddingTop: 10 }}>
             <LinearGradient
               colors={[EMERALD, AMBER]}
               start={{ x: 0, y: 0 }}
@@ -266,7 +217,6 @@ export default function ProfileScreen() {
                 borderRadius: 42,
                 alignItems: 'center',
                 justifyContent: 'center',
-                // sunset glow (--sh-glow)
                 shadowColor: EMERALD,
                 shadowOffset: { width: 0, height: 14 },
                 shadowOpacity: 0.38,
@@ -274,65 +224,31 @@ export default function ProfileScreen() {
                 elevation: 6,
               }}
             >
-              <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>
-                {initials}
-              </Text>
+              <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>{initials}</Text>
             </LinearGradient>
 
-            <Text
-              style={{ marginTop: 14, fontSize: 22, fontWeight: '800', color: CREAM, letterSpacing: -0.5 }}
-              numberOfLines={1}
-            >
+            <Text style={{ marginTop: 13, fontSize: 23, fontWeight: '900', color: CREAM, letterSpacing: -0.5 }} numberOfLines={1}>
               {name}
             </Text>
 
-            {/* Rating + live status */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 9 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Star size={15} color={AMBER} fill={AMBER} />
                 <Text style={{ fontSize: 14, fontWeight: '800', color: CREAM }}>{rating.toFixed(1)}</Text>
               </View>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  paddingVertical: 4,
-                  paddingHorizontal: 9,
-                  borderRadius: 999,
-                  backgroundColor: CARD,
-                  borderWidth: 1,
-                  borderColor: LINE,
-                }}
-              >
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: status.color }} />
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: FG_SOFT }}>{status.label}</Text>
-              </View>
-            </View>
-
-            <View style={{ marginTop: 12 }}>
               <TierRibbon label={tier} />
             </View>
 
             {courierSince ? (
-              <Text style={{ fontSize: 12, color: MUTED, marginTop: 12 }} numberOfLines={1}>
+              <Text style={{ fontSize: 12, color: MUTED, marginTop: 9 }} numberOfLines={1}>
                 {courierSince}
-              </Text>
-            ) : null}
-
-            {email ? (
-              <Text style={{ fontSize: 12, color: MUTED, marginTop: 12 }} numberOfLines={1}>
-                {email}
               </Text>
             ) : null}
           </View>
         </Enter>
 
-        {/* Lifetime metrics (design: DELIVERIES / ACCEPTANCE / ON-TIME). Rating
-            already lives in the identity pill above. Acceptance is real
-            (useRiderStats.acceptancePct over this week's offers); on-time has no
-            backing data, so it stays "—" rather than a fabricated percentage. */}
-        <Enter delay={120}>
+        {/* Lifetime metrics: DELIVERIES / ACCEPTANCE / ON-TIME (on-time = "—", no data) */}
+        <Enter delay={90}>
           <View
             style={{
               flexDirection: 'row',
@@ -344,7 +260,7 @@ export default function ProfileScreen() {
               paddingVertical: 18,
             }}
           >
-            <Metric value={`${profile?.totalTrips ?? 0}`} label="DELIVERIES" />
+            <Metric value={`${totalTrips}`} label="DELIVERIES" />
             <MetricDivider />
             <Metric value={`${acceptancePct}%`} label="ACCEPTANCE" />
             <MetricDivider />
@@ -352,117 +268,85 @@ export default function ProfileScreen() {
           </View>
         </Enter>
 
-        {/* Today */}
-        <Enter delay={160}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginTop: 12,
-              backgroundColor: CARD,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: LINE2,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              gap: 12,
-            }}
-          >
-            <Package size={18} color={EMERALD} />
-            <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: CREAM }}>Trips today</Text>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: CREAM }}>{tripsToday}</Text>
-          </View>
-        </Enter>
-
-        {/* Verification / vehicle */}
-        {profile?.documentsVerified ? (
-          <Section icon={<BadgeCheck size={14} color={ONLINE} />} title="Verified courier" />
-        ) : (
-          <Section icon={<Clock size={14} color={AMBER} />} title="Account" />
-        )}
-        <Enter delay={200}>
-          <View
-            style={{
-              backgroundColor: CARD,
-              borderRadius: 18,
-              borderWidth: 1,
-              borderColor: LINE2,
-              overflow: 'hidden',
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: 15,
-                paddingHorizontal: 16,
-                borderBottomWidth: vehicleLine ? 1 : 0,
-                borderBottomColor: LINE2,
-              }}
-            >
-              <ShieldCheck size={18} color={profile?.documentsVerified ? ONLINE : MUTED} />
-              <Text style={{ flex: 1, marginLeft: 13, fontSize: 14, fontWeight: '600', color: CREAM }}>
-                {profile?.documentsVerified ? 'Documents verified' : 'Verification pending'}
-              </Text>
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: profile?.documentsVerified ? ONLINE : AMBER }}>
-                {profile?.documentsVerified ? 'Active' : 'Review'}
-              </Text>
-            </View>
-            {vehicleLine ? (
+        {/* Winter Atlas badge — design's progress card, driven by real deliveries */}
+        <Enter delay={130}>
+          <View style={{ marginTop: 16, backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2, padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 11 }}>
+              <Snowflake size={18} color={SNOW} />
+              <Text style={{ fontSize: 14.5, fontWeight: '800', color: CREAM }}>Winter Atlas badge</Text>
               <View
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 15, paddingHorizontal: 16 }}
+                style={{
+                  marginLeft: 'auto',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingVertical: 3,
+                  paddingHorizontal: 9,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(90,169,230,0.14)',
+                }}
               >
-                <Bike size={18} color={EMERALD} />
-                <Text style={{ flex: 1, marginLeft: 13, fontSize: 14, fontWeight: '600', color: CREAM }}>
-                  Vehicle
-                </Text>
-                <Text style={{ fontSize: 12.5, color: MUTED }} numberOfLines={1}>
-                  {vehicleLine}
-                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: SNOW, fontVariant: ['tabular-nums'] }}>{done} / {GOAL}</Text>
               </View>
-            ) : null}
+            </View>
+            <View style={{ height: 8, borderRadius: 999, backgroundColor: BG2, overflow: 'hidden' }}>
+              <LinearGradient
+                colors={[SNOW, '#2A6FA8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ height: '100%', width: `${Math.round(badgePct * 100)}%`, borderRadius: 999 }}
+              />
+            </View>
+            <Text style={{ fontSize: 12, color: MUTED, marginTop: 9 }}>
+              {remaining} more deliver{remaining === 1 ? 'y' : 'ies'} to your next Atlas badge tier.
+            </Text>
           </View>
         </Enter>
 
-        {/* Settings */}
-        <Section icon={<Settings size={14} color={EMERALD} />} title="Settings" />
-        <Enter delay={240}>
-          <View
-            style={{
-              backgroundColor: CARD,
-              borderRadius: 18,
-              borderWidth: 1,
-              borderColor: LINE2,
-              overflow: 'hidden',
-            }}
-          >
-            <ListRow Icon={Bell} label="Notifications" onPress={() => comingSoon('Notifications')} />
+        {/* Settings — one flat list (design order), with the real verification row first */}
+        <Enter delay={170}>
+          <View style={{ marginTop: 20, backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: LINE2, overflow: 'hidden' }}>
+            <ListRow
+              Icon={BadgeCheck}
+              label={profile?.documentsVerified ? 'Verified courier' : 'Verification pending'}
+              detail={profile?.documentsVerified ? 'Active' : 'In review'}
+              tint={profile?.documentsVerified ? ONLINE : AMBER}
+              onPress={() => comingSoon('Verification')}
+            />
+            <ListRow Icon={Bike} label="Vehicle & winter kit" detail={vehicleLine || undefined} onPress={() => comingSoon('Vehicle & winter kit')} />
+            <ListRow Icon={Wallet} label="Payout method" detail="Set up" onPress={() => comingSoon('Payout method')} />
+            <ListRow Icon={Bell} label="Notifications" detail="On" onPress={() => comingSoon('Notifications')} />
             <ListRow Icon={ShieldCheck} label="Safety toolkit" onPress={() => comingSoon('Safety toolkit')} />
             <ListRow Icon={LifeBuoy} label="Help & support" onPress={() => comingSoon('Help & support')} />
-            <ListRow Icon={Settings} label="App settings" onPress={() => comingSoon('App settings')} last />
+            <ListRow Icon={Settings} label="Settings" onPress={() => comingSoon('Settings')} last />
           </View>
         </Enter>
 
-        {/* Sign out */}
-        <Enter delay={280}>
-          <View
-            style={{
-              marginTop: 16,
+        {/* Sign out — ghost button (design), sunset accent */}
+        <Enter delay={210}>
+          <Pressable
+            onPress={onSignOut}
+            style={({ pressed }) => ({
+              marginTop: 18,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 9,
+              paddingVertical: 15,
+              borderRadius: 16,
               backgroundColor: CARD,
-              borderRadius: 18,
               borderWidth: 1,
-              borderColor: LINE2,
-              overflow: 'hidden',
-            }}
+              borderColor: LINE,
+              opacity: pressed ? 0.6 : 1,
+            })}
           >
-            <ListRow Icon={LogOut} label="Sign out" tint={DANGER} onPress={onSignOut} last />
-          </View>
+            <LogOut size={18} color={EMERALD} />
+            <Text style={{ fontSize: 15, fontWeight: '800', color: EMERALD }}>Sign out</Text>
+          </Pressable>
         </Enter>
 
         {loading && !profile ? (
-          <Text style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', marginTop: 22 }}>
-            Loading your courier profile…
-          </Text>
+          <Text style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', marginTop: 22 }}>Loading your courier profile…</Text>
         ) : null}
       </ScrollView>
     </SafeAreaView>
