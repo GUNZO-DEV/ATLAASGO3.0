@@ -108,6 +108,13 @@ export default function CustomerLoginScreen() {
   const [secs, setSecs] = useState(0);
   const [busy, setBusy] = useState(false);
   const otpRefs = useRef<(TextInput | null)[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
+  // Lift the form above the on-screen keyboard. On Android the window resizes
+  // when the keyboard opens, so scrolling the hero up brings the inputs + the
+  // primary button fully into view instead of leaving them under the keyboard.
+  const revealForm = () => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  };
 
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const valid = mode === 'phone' ? digits.length >= PHONE_MAX : emailOk;
@@ -188,21 +195,49 @@ export default function CustomerLoginScreen() {
     }
   }
 
-  // ── Google OAuth via Clerk SSO (works once Google is enabled in Clerk) ──
+  // ── Google OAuth via Clerk SSO ──
+  // NOTE: clerk.atlaasgo.com is a *production* Clerk instance, so Google needs
+  // custom Google-Cloud OAuth credentials in Clerk AND the redirect URI
+  // https://clerk.atlaasgo.com/v1/oauth_callback whitelisted in Google Cloud —
+  // shared dev credentials do not work on production instances.
   async function startGoogle() {
     if (busy) return;
     setBusy(true);
     try {
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({
         strategy: 'oauth_google',
-        redirectUrl: createURL('/'),
+        // Explicit callback path — on a standalone (production) Android build a
+        // bare "/" redirect can be swallowed by the router before Clerk reads it.
+        redirectUrl: createURL('/sso-callback'),
       });
-      if (createdSessionId && setActive) {
-        await setActive({ session: createdSessionId });
+
+      // Happy path — Clerk minted a session straight away.
+      if (createdSessionId) {
+        await setActive?.({ session: createdSessionId });
         succeed();
+        return;
       }
-      // No session → user cancelled the browser, or further steps are required
-      // (e.g. MFA/transfer); stay on the screen silently.
+
+      // First-time Google user whose email already exists (e.g. they signed up
+      // with an email code before): transfer the Google identity onto it.
+      if (signIn?.firstFactorVerification?.status === 'transferable') {
+        const res = await signIn.create({ transfer: true });
+        if (res.createdSessionId) {
+          await setActive?.({ session: res.createdSessionId });
+          succeed();
+          return;
+        }
+      }
+      if (signUp?.verifications?.externalAccount?.status === 'transferable') {
+        const res = await signUp.create({ transfer: true });
+        if (res.createdSessionId) {
+          await setActive?.({ session: res.createdSessionId });
+          succeed();
+          return;
+        }
+      }
+      // Got here with no session and no throw → the user dismissed the Google
+      // sheet. Real credential/redirect errors are surfaced by the catch below.
     } catch (e) {
       Alert.alert(tr('auth.googleFailedTitle'), clerkErr(e, tr('auth.genericError')));
     } finally {
@@ -307,9 +342,15 @@ export default function CustomerLoginScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
+        >
           {/* ── HERO ── */}
-          <LinearGradient colors={WARM} locations={[0, 0.42, 1]} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ paddingTop: insets.top + 30, paddingHorizontal: 28, paddingBottom: 60 }}>
+          <LinearGradient colors={WARM} locations={[0, 0.42, 1]} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ paddingTop: insets.top + 22, paddingHorizontal: 28, paddingBottom: 52 }}>
             <View style={styles.mark}>
               <PinMark color={t.colors.primary} />
             </View>
@@ -372,6 +413,7 @@ export default function CustomerLoginScreen() {
                         keyboardType="number-pad"
                         placeholder="6 12 34 56 78"
                         placeholderTextColor={t.colors.muted}
+                        onFocus={revealForm}
                         style={[styles.input, { color: t.colors.fg }]}
                       />
                     </View>
@@ -392,6 +434,7 @@ export default function CustomerLoginScreen() {
                         keyboardType="email-address"
                         placeholder="you@email.com"
                         placeholderTextColor={t.colors.muted}
+                        onFocus={revealForm}
                         onSubmitEditing={usePassword ? undefined : onContinue}
                         style={[styles.input, { color: t.colors.fg, fontWeight: '600' }]}
                       />
@@ -412,6 +455,7 @@ export default function CustomerLoginScreen() {
                             secureTextEntry
                             placeholder={tr('auth.passwordPlaceholder')}
                             placeholderTextColor={t.colors.muted}
+                            onFocus={revealForm}
                             onSubmitEditing={onContinue}
                             style={[styles.input, { color: t.colors.fg, fontWeight: '600' }]}
                           />
