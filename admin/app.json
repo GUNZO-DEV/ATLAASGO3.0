@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "AtlaasGo Admin",
+    "slug": "atlaasgo-admin",
+    "scheme": "atlaasgoadmin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.atlaasgo.admin",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.atlaasgo.admin",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1b4ad13e-4d99-4006-8a09-d09c0a195286"
+      }
+    },
+    "owner": "atlaasgo"
+  }
+}
