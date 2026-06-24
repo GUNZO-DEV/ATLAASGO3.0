@@ -278,6 +278,10 @@ export default function PrimeScreen() {
             {tr('prime.stickyPrice', { price: LEAD_TIER.priceDh, period: LEAD_TIER.period })}
           </Text>
         )}
+        {/* subscription-transparency disclosure — auto-renews, how it's billed, how to cancel */}
+        <Text style={{ fontSize: 11, color: t.colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 16 }}>
+          {tr('prime.billingDisclosure')}
+        </Text>
       </View>
     </SafeAreaView>
   );

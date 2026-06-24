@@ -27,9 +27,11 @@ import {
   BadgeCheck,
   Wallet,
   Snowflake,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
+import { supabase } from '../../lib/supabase';
 import { useRiderProfile, useRiderStats } from '../../hooks/useRiderProfile';
 import {
   BG,
@@ -43,6 +45,7 @@ import {
   SNOW,
   BG2,
   ONLINE,
+  DANGER,
   Enter,
   TierRibbon,
 } from '../../components/dr/ui';
@@ -148,6 +151,7 @@ export default function ProfileScreen() {
   const { acceptancePct, refresh: refreshStats } = useRiderStats();
   const { signOut } = useClerk();
   const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -192,6 +196,29 @@ export default function ProfileScreen() {
     Alert.alert('Sign out', 'Sign out of AtlaasGo Driver?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+    ]);
+  }
+
+  // In-app account deletion (Google Play User-Data policy). Calls the deployed
+  // 'delete-account' edge function — same flow as the customer app — then signs
+  // the courier out. Two-step Alert so deletion is never a single mis-tap.
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+      if (error) throw new Error(error.message);
+      await signOut();
+    } catch (e) {
+      Alert.alert('Could not delete account', (e as Error).message || 'Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function onDeleteAccount() {
+    Alert.alert('Delete account', 'This permanently deletes your courier account and data. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete account', style: 'destructive', onPress: () => void handleDeleteAccount() },
     ]);
   }
 
@@ -342,6 +369,28 @@ export default function ProfileScreen() {
           >
             <LogOut size={18} color={EMERALD} />
             <Text style={{ fontSize: 15, fontWeight: '800', color: EMERALD }}>Sign out</Text>
+          </Pressable>
+        </Enter>
+
+        {/* Delete account — in-app deletion (Google Play User-Data policy), danger-tinted */}
+        <Enter delay={240}>
+          <Pressable
+            onPress={onDeleteAccount}
+            disabled={deleting}
+            style={({ pressed }) => ({
+              marginTop: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              paddingVertical: 13,
+              opacity: deleting ? 0.5 : pressed ? 0.6 : 1,
+            })}
+          >
+            <Trash2 size={15} color={DANGER} />
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: DANGER }}>
+              {deleting ? 'Deleting…' : 'Delete account'}
+            </Text>
           </Pressable>
         </Enter>
 

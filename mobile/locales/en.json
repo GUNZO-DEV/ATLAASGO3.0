@@ -552,7 +552,8 @@
     "choosePlan": "Choose your plan",
     "currentPlan": "Current plan",
     "choose": "Choose {{name}}",
-    "billingNote": "Billed securely via Stripe · cancel anytime from your account."
+    "billingNote": "Billed securely via Stripe · cancel anytime from your account.",
+    "billingDisclosure": "Billed securely via Stripe. Your membership renews automatically until you cancel. Manage or cancel anytime from this screen."
   },
   "receipt": {
     "payCash": "Cash",

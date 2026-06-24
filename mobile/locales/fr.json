@@ -552,7 +552,8 @@
     "choosePlan": "Choisissez votre formule",
     "currentPlan": "Formule actuelle",
     "choose": "Choisir {{name}}",
-    "billingNote": "Paiement sécurisé via Stripe · annulable à tout moment depuis votre compte."
+    "billingNote": "Paiement sécurisé via Stripe · annulable à tout moment depuis votre compte.",
+    "billingDisclosure": "Paiement sécurisé via Stripe. Votre abonnement se renouvelle automatiquement jusqu’à son annulation. Gérez-le ou annulez-le à tout moment depuis cet écran."
   },
   "receipt": {
     "payCash": "Espèces",
