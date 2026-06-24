@@ -12,9 +12,6 @@
       "bundleIdentifier": "com.atlaasgo.driver",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "AtlaasGo Driver uses your location to share live position with customers during deliveries.",
-        "UIBackgroundModes": [
-          "location"
-        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -24,11 +21,7 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -36,7 +29,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "AtlaasGo Driver shares your location with customers while you deliver."
+          "locationWhenInUsePermission": "AtlaasGo Driver shares your location with customers while you deliver."
         }
       ],
       "expo-notifications"
