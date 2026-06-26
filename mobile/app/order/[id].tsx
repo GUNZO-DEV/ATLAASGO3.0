@@ -70,7 +70,7 @@ type ReceiptRow = Omit<ReceiptOrder, 'items'> & {
 };
 
 const RECEIPT_SELECT =
-  'id, items, subtotal_dh, delivery_fee_dh, service_fee_dh, total_dh, payment_method, promotion_code, delivery_notes, created_at, is_campus, city';
+  'id, items, subtotal_dh, delivery_fee_dh, service_fee_dh, tip_dh, total_dh, payment_method, promotion_code, delivery_notes, created_at, is_campus, city';
 
 /* The 3.0 six-stage timeline. Maps the live DB stage → which rows are done/now.
  * (The DB has 5 active stages + delivered; we present the spec's 6.)

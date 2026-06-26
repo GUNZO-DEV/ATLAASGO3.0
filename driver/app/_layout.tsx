@@ -21,11 +21,11 @@ export default function RootLayout() {
             <AuthProvider>
               <ClerkSupabaseBridge />
               <PushRegistrar />
-              <StatusBar style="light" />
+              <StatusBar style="dark" />
               <Stack
                 screenOptions={{
                   headerShown: false,
-                  contentStyle: { backgroundColor: '#07140E' },
+                  contentStyle: { backgroundColor: '#FBF7F2' },
                   animation: 'slide_from_right',
                 }}
               />

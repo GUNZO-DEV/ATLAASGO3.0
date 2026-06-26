@@ -9,7 +9,9 @@
  *   STRIPE_SECRET_KEY=sk_live_…  (or sk_test_… for dev)
  *
  * Expects POST body:
- *   { orderId, totalDh, customerEmail? }
+ *   { orderId, customerEmail?, siteUrl? }
+ * The charge amount is read server-side from the order's own total_dh — never
+ * from the client — so it can't be tampered with.
  */
 import Stripe from 'https://esm.sh/stripe@17.7.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
@@ -42,18 +44,39 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orderId, totalDh, customerEmail, siteUrl } = await req.json();
+    const { orderId, customerEmail, siteUrl } = await req.json();
 
-    if (!orderId || !totalDh) {
+    if (!orderId) {
       return new Response(
-        JSON.stringify({ error: 'Missing orderId or totalDh' }),
+        JSON.stringify({ error: 'Missing orderId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Convert DH to centimes (Stripe uses smallest currency unit)
+    // Server-authoritative amount: never trust a client-supplied total. Read the
+    // order's own total_dh (set by the server-side cart_quote at checkout) so the
+    // charged amount can't be tampered with from the client.
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .select('id, total_dh')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (orderErr || !order) {
+      return new Response(
+        JSON.stringify({ error: 'Order not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // MAD (Moroccan Dirham) → centimes: 1 DH = 100 centimes
-    const amountCentimes = Math.round(totalDh * 100);
+    const amountCentimes = Math.round(Number(order.total_dh) * 100);
+    if (!Number.isFinite(amountCentimes) || amountCentimes <= 0) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid order total' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     const origin = siteUrl || 'https://atlaasgo.com';
 

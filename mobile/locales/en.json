@@ -565,6 +565,7 @@
     "subtotal": "Subtotal",
     "deliveryFee": "Delivery fee",
     "serviceFee": "Service fee",
+    "courierTip": "Courier tip",
     "total": "Total",
     "promo": "Promo",
     "riderNote": "Note for the rider:"

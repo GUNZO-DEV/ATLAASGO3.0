@@ -42,7 +42,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "AtlaasGo uses your location to coordinate delivery to your doorstep."
+          "locationWhenInUsePermission": "AtlaasGo uses your location to coordinate delivery to your doorstep."
         }
       ],
       [

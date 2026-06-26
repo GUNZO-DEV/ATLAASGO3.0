@@ -199,6 +199,11 @@ function DesktopCartPage() {
         discount = promo.flat_off_dh;
       } else if (promo.kind === 'free_delivery') {
         discount = deliveryFee;
+      } else {
+        // 'bogo' (and any unsupported/misconfigured kind) has no discount logic —
+        // refuse rather than silently applying 0 dh and burning a redemption.
+        toast.error('This promo code can’t be applied to your order');
+        return;
       }
       setPromoDiscount(discount);
       setPromoApplied(code);

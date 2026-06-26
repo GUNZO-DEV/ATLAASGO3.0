@@ -565,6 +565,7 @@
     "subtotal": "Sous-total",
     "deliveryFee": "Frais de livraison",
     "serviceFee": "Frais de service",
+    "courierTip": "Pourboire livreur",
     "total": "Total",
     "promo": "Promo",
     "riderNote": "Note pour le livreur :"

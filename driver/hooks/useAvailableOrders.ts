@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 /**
- * Orders in the dispatch pool — placed but not yet claimed. A pure rider can't
- * read the pool (RLS); non-empty for admins / dispatch who assign orders. Joins
- * the order's restaurant (via restaurant_id) for the pickup name and computes
- * the rider payout (delivery_fee_dh + tip_dh) so a pool card reads like a real
- * offer.
+ * Orders in the dispatch pool — placed but not yet claimed. Approved riders CAN
+ * read the pool via the live RLS policies "orders: rider pool read" and
+ * "order_assignments: rider pool visibility". Joins the order's restaurant (via
+ * restaurant_id) for the pickup name and computes the rider payout
+ * (delivery_fee_dh + tip_dh) so a pool card reads like a real offer.
  */
 export type PoolOrder = {
   id: string;

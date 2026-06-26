@@ -82,6 +82,12 @@ export function usePromotions() {
           discountDh = promo.flat_off_dh;
         } else if (promo.kind === 'free_delivery') {
           discountDh = deliveryFeeDh;
+        } else {
+          // 'bogo' (and any unsupported/misconfigured kind, e.g. percent_off with
+          // a null percentage) has no discount logic — refuse it rather than
+          // silently applying 0 dh and burning a redemption on the customer.
+          setError('This promo code can’t be applied to your order');
+          return null;
         }
         const next: AppliedPromo = { code: promo.code, kind: promo.kind, discountDh };
         setApplied(next);

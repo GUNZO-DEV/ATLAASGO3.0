@@ -7,6 +7,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    include: ["__tests__/**/*.test.ts"],
+    exclude: ["node_modules/**", "dist/**", "claude-mem/**"],
   },
   resolve: {
     alias: {

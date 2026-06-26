@@ -31,6 +31,7 @@ export type ReceiptOrder = {
   subtotal_dh: number | null;
   delivery_fee_dh: number | null;
   service_fee_dh: number | null;
+  tip_dh: number | null;
   total_dh: number | null;
   payment_method: string | null;
   promotion_code: string | null;
@@ -136,6 +137,9 @@ export function Receipt({ order, defaultOpen = false }: { order: ReceiptOrder; d
             <FeeRow label={tr('receipt.subtotal')} value={`${order.subtotal_dh ?? 0} dh`} />
             <FeeRow label={tr('receipt.deliveryFee')} value={`${order.delivery_fee_dh ?? 0} dh`} />
             <FeeRow label={tr('receipt.serviceFee')} value={`${order.service_fee_dh ?? 0} dh`} />
+            {order.tip_dh != null && order.tip_dh > 0 ? (
+              <FeeRow label={tr('receipt.courierTip', { defaultValue: 'Courier tip' })} value={`${order.tip_dh} dh`} />
+            ) : null}
             <View
               className="flex-row items-center justify-between"
               style={{ borderTopWidth: 1, borderColor: LINE, marginTop: 8, paddingTop: 10 }}
