@@ -17,8 +17,11 @@ import { useToast } from '../lib/toast';
 import type { OrderRow, AppRole } from '../lib/database.types';
 import { FadeUp } from '../components/visual/ScrollReveal';
 import { MotionButton } from '../components/visual/Motion';
+import { TIKTOK_CAMPAIGN, type TikTokVideo } from '../data/tiktokCampaign';
 
-type Tab = 'orders' | 'applications' | 'promotions' | 'users';
+type Tab = 'orders' | 'applications' | 'promotions' | 'users' | 'marketing';
+
+const EMERALD = '#059669';
 
 function STATUS_LABEL(s: string) {
   return s
@@ -106,7 +109,7 @@ function AdminShell() {
         </div>
 
         <div className="dash-tabs">
-          {(['orders', 'applications', 'promotions', 'users'] as Tab[]).map((t) => (
+          {(['orders', 'applications', 'promotions', 'users', 'marketing'] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
@@ -232,8 +235,175 @@ function AdminShell() {
             </div>
           </div>
         )}
+
+        {tab === 'marketing' && <MarketingTab />}
       </div>
     </section>
+  );
+}
+
+/* ── TikTok marketing campaign ────────────────────────────────────── */
+function MarketingTab() {
+  const videos = TIKTOK_CAMPAIGN;
+  const totals = useMemo(
+    () =>
+      videos.reduce(
+        (acc, v) => {
+          acc.views += v.stats.views;
+          acc.likes += v.stats.likes;
+          acc.live += v.status === 'live' ? 1 : 0;
+          return acc;
+        },
+        { views: 0, likes: 0, live: 0 },
+      ),
+    [videos],
+  );
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <div className="dash-panel">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <h3 style={{ margin: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <I.Trending size={16} /> TikTok campaign
+            </span>
+          </h3>
+          <span style={{ fontSize: 12, color: 'var(--fg-soft)' }}>
+            {totals.live} live · {videos.length} total · drop files in{' '}
+            <code style={{ fontSize: 11 }}>public/marketing/</code>
+          </span>
+        </div>
+      </div>
+
+      {videos.length === 0 ? (
+        <div className="dash-panel">
+          <div className="empty-state" style={{ padding: 40, textAlign: 'center' }}>
+            <p>No campaign videos yet.</p>
+            <p style={{ fontSize: 13, color: 'var(--fg-soft)' }}>
+              Add your clips to <code>public/marketing/</code> and list them in{' '}
+              <code>src/data/tiktokCampaign.ts</code>.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: 18,
+          }}
+        >
+          {videos.map((v) => (
+            <TikTokCard key={v.id} video={v} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const CAMPAIGN_STATUS_STYLE: Record<TikTokVideo['status'], { c: string; bg: string; label: string }> = {
+  live: { c: EMERALD, bg: 'rgba(16,185,129,0.12)', label: 'Live' },
+  scheduled: { c: '#C66B1F', bg: 'rgba(255,138,101,0.16)', label: 'Scheduled' },
+  draft: { c: '#7A6F66', bg: 'rgba(0,0,0,0.06)', label: 'Draft' },
+};
+
+function TikTokCard({ video }: { video: TikTokVideo }) {
+  const [missing, setMissing] = useState(false);
+  const st = CAMPAIGN_STATUS_STYLE[video.status];
+
+  return (
+    <FadeUp y={10}>
+      <div
+        style={{
+          border: '1px solid var(--line)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          background: 'var(--surface)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{ position: 'relative', aspectRatio: '9 / 16', background: '#0E1116' }}>
+          {missing ? (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
+                textAlign: 'center',
+                padding: 16,
+                color: 'rgba(255,255,255,0.7)',
+                fontSize: 12,
+              }}
+            >
+              <div>
+                <I.Trending size={22} />
+                <div style={{ marginTop: 8 }}>Video file not found</div>
+                <div style={{ marginTop: 4, opacity: 0.7, wordBreak: 'break-all' }}>{video.src}</div>
+              </div>
+            </div>
+          ) : (
+            <video
+              src={video.src}
+              poster={video.poster}
+              controls
+              playsInline
+              preload="metadata"
+              onError={() => setMissing(true)}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          )}
+          <span
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              padding: '3px 10px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 700,
+              background: st.bg,
+              color: st.c,
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            {st.label}
+          </span>
+        </div>
+
+        <div style={{ padding: 14, display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>{video.title}</span>
+            <span style={{ fontSize: 11, color: 'var(--fg-soft)', whiteSpace: 'nowrap' }}>{video.city}</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--fg-soft)', lineHeight: 1.4 }}>{video.caption}</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {video.hashtags.map((h) => (
+              <span key={h} style={{ fontSize: 11, color: EMERALD, fontWeight: 600 }}>
+                #{h}
+              </span>
+            ))}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: 14,
+              fontSize: 11,
+              color: 'var(--fg-soft)',
+              borderTop: '1px solid var(--line)',
+              paddingTop: 8,
+            }}
+          >
+            <span>▶ {video.stats.views.toLocaleString()}</span>
+            <span>♥ {video.stats.likes.toLocaleString()}</span>
+            <span>↗ {video.stats.shares.toLocaleString()}</span>
+            <span style={{ marginLeft: 'auto' }}>{new Date(video.publishedAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+    </FadeUp>
   );
 }
 
